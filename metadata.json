@@ -1,0 +1,6 @@
+{
+  "name": "SkyTrack",
+  "description": "Live flight tracking assistant with interactive map, airport boards, delays, gate alerts, and offline caching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
