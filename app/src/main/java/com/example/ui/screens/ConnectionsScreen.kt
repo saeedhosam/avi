@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -88,33 +89,42 @@ fun ConnectionsScreen(
             .background(CockpitDark)
             .testTag("connections_screen")
     ) {
-        // 1. Full-Screen Interactive Geodesic Flight Connections Map
-        summary?.originAirport?.let { originNode ->
-            FlightConnectionsMapCanvas(
-                originAirport = originNode,
-                connections = filteredConnections,
-                selectedConnection = selectedConnection,
-                direction = filterState.direction,
-                onSelectDestination = { destIata ->
-                    if (selectedConnection?.destination?.iata == destIata && isInspectorExpanded) {
-                        // Second tap on an already-inspected destination pivots the map hub
-                        connectionsViewModel.pivotToDestinationHub(destIata)
-                    } else {
-                        connectionsViewModel.selectDestinationOnMap(destIata)
-                        isInspectorExpanded = true
-                    }
-                },
-                onTapEmptyMap = {
-                    if (isInspectorExpanded) {
-                        isInspectorExpanded = false
-                    }
-                    if (isFilterDrawerExpanded) {
-                        isFilterDrawerExpanded = false
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        // 1. Full-Screen Interactive FlightConnections.com + OpenStreetMap World Map
+        FlightConnectionsOsmMapCanvas(
+            originAirport = summary?.originAirport,
+            connections = filteredConnections,
+            selectedConnection = selectedConnection,
+            direction = filterState.direction,
+            onSelectDestination = { destIata ->
+                if (selectedConnection?.destination?.iata == destIata && isInspectorExpanded) {
+                    // Second tap on an already-inspected destination pivots the map hub
+                    connectionsViewModel.pivotToDestinationHub(destIata)
+                } else if (summary?.originAirport == null) {
+                    // In global all-routes view, tapping an airport dot sets it as the origin hub (like Nice NCE)
+                    connectionsViewModel.selectOriginHub(destIata)
+                } else {
+                    connectionsViewModel.selectDestinationOnMap(destIata)
+                    isInspectorExpanded = true
+                }
+            },
+            onClearOriginHub = {
+                connectionsViewModel.clearDepartureInput()
+                isInspectorExpanded = false
+            },
+            onClearSelectedDestination = {
+                connectionsViewModel.clearDestinationInput()
+                isInspectorExpanded = false
+            },
+            onTapEmptyMap = {
+                if (isInspectorExpanded) {
+                    isInspectorExpanded = false
+                }
+                if (isFilterDrawerExpanded) {
+                    isFilterDrawerExpanded = false
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
 
         // 2. Compact Floating Top Overlay with Departure & Destination Input Fields
         Column(
@@ -155,7 +165,7 @@ fun ConnectionsScreen(
                                 color = RadarCyan
                             ) {
                                 Text(
-                                    text = summary?.originAirport?.iata ?: originIata,
+                                    text = summary?.originAirport?.iata ?: if (departureInput.isNotBlank()) departureInput.take(3).uppercase() else "ALL",
                                     color = DeepSpace,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -164,10 +174,12 @@ fun ConnectionsScreen(
                                 )
                             }
                             Text(
-                                text = if (selectedConnection != null && destinationInput.isNotBlank()) {
-                                    "${originIata} ➔ ${selectedConnection!!.destination.iata} · ${selectedConnection!!.destination.city}"
+                                text = if (selectedConnection != null && (destinationInput.isNotBlank() || departureInput.isNotBlank())) {
+                                    "${selectedConnection!!.origin.iata} ➔ ${selectedConnection!!.destination.iata} · ${selectedConnection!!.destination.city}"
+                                } else if (summary?.originAirport != null) {
+                                    "${filteredConnections.size} Direct Routes from ${summary!!.originAirport!!.city}"
                                 } else {
-                                    "${filteredConnections.size} Direct Routes from ${summary?.originAirport?.city ?: originIata}"
+                                    "${filteredConnections.size} Global Routes Worldwide"
                                 },
                                 color = TextWhite,
                                 fontSize = 12.sp,
@@ -281,54 +293,70 @@ fun ConnectionsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // Departure Input Field (Enter code e.g. JFK or city name e.g. New York)
-                        OutlinedTextField(
-                            value = departureInput,
-                            onValueChange = { connectionsViewModel.updateDepartureInput(it) },
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = InstrumentSurface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (departureInput.isNotEmpty()) RadarCyan else InstrumentBorder
+                            ),
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag("departure_input_field"),
-                            placeholder = {
-                                Text(
-                                    text = "Departure (code or city)",
-                                    fontSize = 11.sp,
-                                    color = TextSubtle,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            leadingIcon = {
+                                .height(38.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.FlightTakeoff,
                                     contentDescription = "Departure",
                                     tint = RadarCyan,
                                     modifier = Modifier.size(15.dp)
                                 )
-                            },
-                            trailingIcon = {
-                                if (departureInput.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { connectionsViewModel.clearDepartureInput() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Clear Departure",
-                                            tint = TextMuted,
-                                            modifier = Modifier.size(14.dp)
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (departureInput.isEmpty()) {
+                                        Text(
+                                            text = "Departure (code/city)",
+                                            fontSize = 11.sp,
+                                            color = TextSubtle,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
+                                    BasicTextField(
+                                        value = departureInput,
+                                        onValueChange = { connectionsViewModel.updateDepartureInput(it) },
+                                        singleLine = true,
+                                        textStyle = TextStyle(
+                                            fontSize = 12.sp,
+                                            color = TextWhite,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        cursorBrush = SolidColor(RadarCyan),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("departure_input_field")
+                                    )
                                 }
-                            },
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextWhite, fontWeight = FontWeight.SemiBold),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = InstrumentSurface,
-                                unfocusedContainerColor = InstrumentSurface,
-                                focusedBorderColor = RadarCyan,
-                                unfocusedBorderColor = InstrumentBorder
-                            )
-                        )
+                                if (departureInput.isNotEmpty()) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear Departure",
+                                        tint = TextMuted,
+                                        modifier = Modifier
+                                            .size(15.dp)
+                                            .clickable { connectionsViewModel.clearDepartureInput() }
+                                    )
+                                }
+                            }
+                        }
 
                         // Swap Button between Departure and Destination
                         Surface(
@@ -351,54 +379,70 @@ fun ConnectionsScreen(
                         }
 
                         // Destination Input Field (Enter code e.g. LHR or city name e.g. London)
-                        OutlinedTextField(
-                            value = destinationInput,
-                            onValueChange = { connectionsViewModel.updateDestinationInput(it) },
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = InstrumentSurface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (destinationInput.isNotEmpty()) AeroBlue else InstrumentBorder
+                            ),
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag("destination_input_field"),
-                            placeholder = {
-                                Text(
-                                    text = "Destination (code, city, All)",
-                                    fontSize = 11.sp,
-                                    color = TextSubtle,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            leadingIcon = {
+                                .height(38.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.FlightLand,
                                     contentDescription = "Destination",
                                     tint = AeroBlue,
                                     modifier = Modifier.size(15.dp)
                                 )
-                            },
-                            trailingIcon = {
-                                if (destinationInput.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { connectionsViewModel.clearDestinationInput() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Clear Destination",
-                                            tint = TextMuted,
-                                            modifier = Modifier.size(14.dp)
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (destinationInput.isEmpty()) {
+                                        Text(
+                                            text = "Destination (code/city)",
+                                            fontSize = 11.sp,
+                                            color = TextSubtle,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
+                                    BasicTextField(
+                                        value = destinationInput,
+                                        onValueChange = { connectionsViewModel.updateDestinationInput(it) },
+                                        singleLine = true,
+                                        textStyle = TextStyle(
+                                            fontSize = 12.sp,
+                                            color = TextWhite,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        cursorBrush = SolidColor(AeroBlue),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("destination_input_field")
+                                    )
                                 }
-                            },
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextWhite, fontWeight = FontWeight.SemiBold),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = InstrumentSurface,
-                                unfocusedContainerColor = InstrumentSurface,
-                                focusedBorderColor = AeroBlue,
-                                unfocusedBorderColor = InstrumentBorder
-                            )
-                        )
+                                if (destinationInput.isNotEmpty()) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear Destination",
+                                        tint = TextMuted,
+                                        modifier = Modifier
+                                            .size(15.dp)
+                                            .clickable { connectionsViewModel.clearDestinationInput() }
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Autocomplete Suggestion Chips for Departure Input
@@ -486,29 +530,13 @@ fun ConnectionsScreen(
                 }
             }
 
-            // Compact Single-Line Floating Legend Pill + Live Sync Indicator
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = DeepSpace.copy(alpha = 0.82f),
-                    border = BorderStroke(0.8.dp, InstrumentBorder)
+            // Live Sync Indicator (when fetching routes)
+            if (isLoading) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        LegendDot(color = StatusLanded, label = "Short (<1.5k km)")
-                        LegendDot(color = AeroBlue, label = "Medium")
-                        LegendDot(color = StatusBoarding, label = "Long (>4k km)")
-                    }
-                }
-
-                if (isLoading) {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = CockpitDark.copy(alpha = 0.90f),
@@ -525,7 +553,7 @@ fun ConnectionsScreen(
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
-                                text = "Syncing $originIata...",
+                                text = if (originIata.isNotBlank()) "Syncing $originIata..." else "Loading routes...",
                                 color = TextWhite,
                                 fontSize = 10.sp,
                                 maxLines = 1
@@ -986,481 +1014,7 @@ private fun ConnectionsFilterStrip(
     }
 }
 
-/**
- * Full-Screen Interactive Geodesic World Map Canvas displaying direct flight connections
- * radiating from [originAirport] (e.g., CAI) to all connected airports.
- */
-@Composable
-private fun FlightConnectionsMapCanvas(
-    originAirport: AirportNode,
-    connections: List<DirectFlightConnection>,
-    selectedConnection: DirectFlightConnection?,
-    direction: ConnectionDirection,
-    onSelectDestination: (String) -> Unit,
-    onTapEmptyMap: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    var zoomScale by remember(originAirport.iata) { mutableFloatStateOf(1.35f) }
-    var panOffsetX by remember(originAirport.iata) { mutableFloatStateOf(0f) }
-    var panOffsetY by remember(originAirport.iata) { mutableFloatStateOf(0f) }
 
-    val textMeasurer = rememberTextMeasurer()
-
-    val infiniteTransition = rememberInfiniteTransition(label = "connectionsPulse")
-    val routeFlowProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "routeFlowProgress"
-    )
-    val hubPulseRadius by infiniteTransition.animateFloat(
-        initialValue = 8f,
-        targetValue = 32f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "hubPulseRadius"
-    )
-
-    val canvasCockpitDark = CockpitDark
-    val canvasDeepSpace = DeepSpace
-    val canvasRadarCyan = RadarCyan
-    val canvasAeroBlue = AeroBlue
-    val canvasShortHaul = StatusLanded
-    val canvasLongHaul = StatusBoarding
-    val canvasTextWhite = TextWhite
-
-    // Remember projected screen coordinates of each destination pin for tap hit-testing
-    val pinPositions = remember { mutableStateMapOf<String, Offset>() }
-
-    Box(
-        modifier = modifier
-            .background(CockpitDark)
-            .testTag("connections_map_canvas")
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(originAirport.iata) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        zoomScale = (zoomScale * zoom).coerceIn(0.85f, 4.5f)
-                        panOffsetX = (panOffsetX + pan.x).coerceIn(-size.width * 1.4f, size.width * 1.4f)
-                        panOffsetY = (panOffsetY + pan.y).coerceIn(-size.height * 1.4f, size.height * 1.4f)
-                    }
-                }
-                .pointerInput(originAirport.iata, connections) {
-                    detectTapGestures { tapOffset ->
-                        // Find closest airport marker within 44dp touch radius
-                        val hitRadiusPx = 44.dp.toPx()
-                        val hitEntry = pinPositions.entries
-                            .map { (iata, pos) ->
-                                val dist = hypot(tapOffset.x - pos.x, tapOffset.y - pos.y)
-                                iata to dist
-                            }
-                            .filter { it.second <= hitRadiusPx }
-                            .minByOrNull { it.second }
-
-                        if (hitEntry != null) {
-                            onSelectDestination(hitEntry.first)
-                        } else {
-                            onTapEmptyMap()
-                        }
-                    }
-                }
-        ) {
-            val w = size.width
-            val h = size.height
-
-            // Helper function projecting (lat, lon) centered around originAirport with zoom & pan
-            fun projectLatLon(lat: Double, lon: Double): Offset {
-                // Center projection on originAirport so CAI (or current hub) sits naturally near center
-                val deltaLon = ((lon - originAirport.longitude + 540.0) % 360.0) - 180.0
-                val deltaLat = lat - originAirport.latitude
-
-                val baseScaleX = (w / 175f) * zoomScale
-                val baseScaleY = (h / 105f) * zoomScale
-
-                val x = (w * 0.5f) + (deltaLon.toFloat() * baseScaleX) + panOffsetX
-                val y = (h * 0.48f) - (deltaLat.toFloat() * baseScaleY) + panOffsetY
-                return Offset(x, y)
-            }
-
-            // 1. Draw subtle lat/lon graticule lines
-            for (lonStep in -150..180 step 30) {
-                val pStart = projectLatLon(-70.0, lonStep.toDouble())
-                val pEnd = projectLatLon(75.0, lonStep.toDouble())
-                drawLine(
-                    color = canvasRadarCyan.copy(alpha = 0.05f),
-                    start = Offset(pStart.x, 0f),
-                    end = Offset(pEnd.x, h),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
-            for (latStep in -60..60 step 20) {
-                val pStart = projectLatLon(latStep.toDouble(), -180.0)
-                drawLine(
-                    color = canvasRadarCyan.copy(alpha = 0.05f),
-                    start = Offset(0f, pStart.y),
-                    end = Offset(w, pStart.y),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
-
-            // 2. Draw stylized world continental landmass polygons for geographic context
-            drawWorldContinents(::projectLatLon, canvasRadarCyan.copy(alpha = 0.07f), canvasRadarCyan.copy(alpha = 0.16f))
-
-            val originOffset = projectLatLon(originAirport.latitude, originAirport.longitude)
-
-            // 3. Draw concentric distance range rings around the Origin Hub (e.g., CAI)
-            val ringRadii = listOf(90f, 185f, 290f).map { it * (zoomScale * 0.78f) }
-            ringRadii.forEach { r ->
-                drawCircle(
-                    color = canvasRadarCyan.copy(alpha = 0.09f),
-                    radius = r,
-                    center = originOffset,
-                    style = Stroke(
-                        width = 1.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 10f), 0f)
-                    )
-                )
-            }
-
-            pinPositions.clear()
-
-            // 4. Draw all Direct Flight Connection Geodesic Arcs
-            connections.forEach { conn ->
-                val destOffset = projectLatLon(conn.destination.latitude, conn.destination.longitude)
-                pinPositions[conn.destination.iata] = destOffset
-
-                val isSelected = selectedConnection?.destination?.iata == conn.destination.iata
-                val routeColor = when {
-                    isSelected -> canvasRadarCyan
-                    conn.haulCategory == HaulCategory.SHORT_HAUL -> canvasShortHaul
-                    conn.haulCategory == HaulCategory.MEDIUM_HAUL -> canvasAeroBlue
-                    else -> canvasLongHaul
-                }
-
-                // Compute great-circle upward control point
-                val midX = (originOffset.x + destOffset.x) / 2f
-                val midY = (originOffset.y + destOffset.y) / 2f
-                val chordDist = hypot(destOffset.x - originOffset.x, destOffset.y - originOffset.y)
-                val arcLift = (chordDist * 0.18f).coerceIn(14f, 95f)
-                val controlPoint = Offset(midX, midY - arcLift)
-
-                val routePath = Path().apply {
-                    moveTo(originOffset.x, originOffset.y)
-                    quadraticTo(controlPoint.x, controlPoint.y, destOffset.x, destOffset.y)
-                }
-
-                if (isSelected) {
-                    // Outer neon glow for selected route
-                    drawPath(
-                        path = routePath,
-                        color = canvasRadarCyan.copy(alpha = 0.32f),
-                        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                    drawPath(
-                        path = routePath,
-                        color = canvasRadarCyan,
-                        style = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                } else {
-                    drawPath(
-                        path = routePath,
-                        color = routeColor.copy(alpha = 0.52f),
-                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-
-                // Animated directional pulse along the arc (Outbound vs Inbound)
-                val rawT = if (direction == ConnectionDirection.ARRIVALS) {
-                    1f - routeFlowProgress
-                } else {
-                    routeFlowProgress
-                }
-                val t = ((rawT + (conn.destination.iata.hashCode().absoluteValue % 100) / 100f) % 1f)
-                val pulseX = (1 - t).pow(2) * originOffset.x + 2 * (1 - t) * t * controlPoint.x + t.pow(2) * destOffset.x
-                val pulseY = (1 - t).pow(2) * originOffset.y + 2 * (1 - t) * t * controlPoint.y + t.pow(2) * destOffset.y
-
-                drawCircle(
-                    color = if (isSelected) canvasTextWhite else routeColor.copy(alpha = 0.85f),
-                    radius = if (isSelected) 4.dp.toPx() else 2.2.dp.toPx(),
-                    center = Offset(pulseX, pulseY)
-                )
-            }
-
-            // 5. Draw Destination Airport Nodes & IATA Labels
-            connections.forEach { conn ->
-                val destOffset = pinPositions[conn.destination.iata] ?: return@forEach
-                val isSelected = selectedConnection?.destination?.iata == conn.destination.iata
-                val pinColor = when {
-                    isSelected -> canvasRadarCyan
-                    conn.haulCategory == HaulCategory.SHORT_HAUL -> canvasShortHaul
-                    conn.haulCategory == HaulCategory.MEDIUM_HAUL -> canvasAeroBlue
-                    else -> canvasLongHaul
-                }
-
-                if (isSelected) {
-                    drawCircle(
-                        color = canvasRadarCyan.copy(alpha = 0.28f),
-                        radius = 13.dp.toPx(),
-                        center = destOffset
-                    )
-                }
-
-                drawCircle(
-                    color = pinColor,
-                    radius = if (isSelected) 6.dp.toPx() else 4.2.dp.toPx(),
-                    center = destOffset
-                )
-                drawCircle(
-                    color = canvasDeepSpace,
-                    radius = if (isSelected) 2.5.dp.toPx() else 1.8.dp.toPx(),
-                    center = destOffset
-                )
-
-                // Draw IATA badge next to marker
-                val labelText = conn.destination.iata
-                val measured = textMeasurer.measure(
-                    text = labelText,
-                    style = TextStyle(
-                        color = if (isSelected) canvasDeepSpace else canvasTextWhite,
-                        fontSize = if (isSelected) 11.sp else 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                )
-                val padH = 4.dp.toPx()
-                val padV = 2.dp.toPx()
-                val badgeW = measured.size.width + padH * 2
-                val badgeH = measured.size.height + padV * 2
-                val badgeTopLeft = Offset(
-                    x = destOffset.x - badgeW / 2f,
-                    y = destOffset.y - badgeH - (if (isSelected) 10.dp.toPx() else 7.dp.toPx())
-                )
-
-                drawRoundRect(
-                    color = if (isSelected) canvasRadarCyan else canvasCockpitDark.copy(alpha = 0.86f),
-                    topLeft = badgeTopLeft,
-                    size = Size(badgeW, badgeH),
-                    cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                )
-                if (!isSelected) {
-                    drawRoundRect(
-                        color = pinColor.copy(alpha = 0.65f),
-                        topLeft = badgeTopLeft,
-                        size = Size(badgeW, badgeH),
-                        cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
-                        style = Stroke(width = 0.8.dp.toPx())
-                    )
-                }
-                drawText(
-                    textLayoutResult = measured,
-                    topLeft = Offset(badgeTopLeft.x + padH, badgeTopLeft.y + padV)
-                )
-            }
-
-            // 6. Draw Origin Airport Hub Beacon (e.g., CAI) on top
-            drawCircle(
-                color = canvasRadarCyan.copy(alpha = 0.25f),
-                radius = hubPulseRadius.dp.toPx(),
-                center = originOffset
-            )
-            drawCircle(
-                color = canvasRadarCyan,
-                radius = 8.dp.toPx(),
-                center = originOffset
-            )
-            drawCircle(
-                color = canvasDeepSpace,
-                radius = 3.5.dp.toPx(),
-                center = originOffset
-            )
-
-            val originMeasured = textMeasurer.measure(
-                text = "★ ${originAirport.iata}",
-                style = TextStyle(
-                    color = canvasDeepSpace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace
-                )
-            )
-            val oPadH = 6.dp.toPx()
-            val oPadV = 3.dp.toPx()
-            val oBadgeW = originMeasured.size.width + oPadH * 2
-            val oBadgeH = originMeasured.size.height + oPadV * 2
-            val oTopLeft = Offset(
-                x = originOffset.x - oBadgeW / 2f,
-                y = originOffset.y + 10.dp.toPx()
-            )
-            drawRoundRect(
-                color = canvasRadarCyan,
-                topLeft = oTopLeft,
-                size = Size(oBadgeW, oBadgeH),
-                cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
-            )
-            drawText(
-                textLayoutResult = originMeasured,
-                topLeft = Offset(oTopLeft.x + oPadH, oTopLeft.y + oPadV)
-            )
-        }
-
-        // Center-Right Floating Map Zoom & Re-Center Controls (unobstructed by top or bottom bars)
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            SmallMapControlButton(
-                icon = Icons.Default.Add,
-                contentDescription = "Zoom In Connections Map",
-                tag = "connections_zoom_in_btn",
-                onClick = { zoomScale = (zoomScale * 1.25f).coerceAtMost(4.5f) }
-            )
-            SmallMapControlButton(
-                icon = Icons.Default.Remove,
-                contentDescription = "Zoom Out Connections Map",
-                tag = "connections_zoom_out_btn",
-                onClick = { zoomScale = (zoomScale / 1.25f).coerceAtLeast(0.85f) }
-            )
-            SmallMapControlButton(
-                icon = Icons.Default.CenterFocusStrong,
-                contentDescription = "Center on Origin Airport",
-                tag = "connections_recenter_btn",
-                onClick = {
-                    zoomScale = 1.35f
-                    panOffsetX = 0f
-                    panOffsetY = 0f
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun LegendDot(color: Color, label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Text(
-            text = label,
-            color = TextMuted,
-            fontSize = 9.sp,
-            maxLines = 1,
-            softWrap = false
-        )
-    }
-}
-
-@Composable
-private fun SmallMapControlButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    tag: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, InstrumentBorder, RoundedCornerShape(8.dp))
-            .clickable { onClick() }
-            .testTag(tag),
-        color = DeepSpace.copy(alpha = 0.88f)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = TextWhite,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
-/**
- * Draws simplified continental landmass outlines so the connections map immediately
- * conveys geographic orientation (Africa/Nile/Red Sea, Europe/Mediterranean, Asia, Americas).
- */
-private fun DrawScope.drawWorldContinents(
-    project: (Double, Double) -> Offset,
-    fillColor: Color,
-    strokeColor: Color
-) {
-    val continents = listOf(
-        // Africa
-        listOf(
-            37.0 to -6.0, 37.2 to 10.5, 32.0 to 32.0, 29.5 to 34.8, 12.0 to 44.0,
-            11.8 to 51.2, -2.0 to 41.0, -15.0 to 40.5, -26.0 to 33.0, -34.8 to 20.0,
-            -18.0 to 12.0, 4.0 to 9.5, 4.5 to -7.5, 14.7 to -17.5, 28.0 to -13.0, 35.8 to -5.5
-        ),
-        // Europe
-        listOf(
-            36.0 to -9.0, 43.5 to -9.0, 48.5 to -4.5, 51.0 to 2.0, 54.0 to 8.5,
-            58.0 to 8.0, 63.0 to 10.0, 68.0 to 18.0, 60.0 to 30.0, 47.0 to 39.0,
-            41.0 to 29.0, 38.0 to 24.0, 40.0 to 18.0, 44.0 to 12.0, 41.0 to 14.0,
-            38.0 to 15.5, 43.0 to 5.0, 41.0 to 2.0, 36.5 to -5.5
-        ),
-        // UK & Ireland
-        listOf(
-            50.0 to -5.5, 51.5 to 1.2, 55.0 to -1.5, 58.5 to -3.2, 54.5 to -8.0
-        ),
-        // Middle East & Asia
-        listOf(
-            41.0 to 29.5, 42.0 to 41.5, 38.0 to 48.0, 29.5 to 48.5, 26.0 to 56.5,
-            22.5 to 59.8, 13.0 to 45.0, 18.0 to 41.0, 28.0 to 35.0, 31.5 to 34.5,
-            36.5 to 36.0, 41.0 to 29.5
-        ),
-        // Wider Asia & India/China/SE Asia
-        listOf(
-            45.0 to 50.0, 55.0 to 75.0, 52.0 to 135.0, 38.0 to 122.0, 22.5 to 114.0,
-            1.5 to 104.0, 15.0 to 96.0, 22.0 to 88.0, 8.0 to 77.5, 19.0 to 72.8,
-            25.0 to 67.0, 27.0 to 56.0, 40.0 to 50.0
-        ),
-        // North America
-        listOf(
-            65.0 to -165.0, 70.0 to -130.0, 60.0 to -64.0, 47.0 to -53.0, 40.5 to -74.0,
-            25.5 to -80.2, 29.0 to -95.0, 19.0 to -96.0, 16.0 to -95.0, 32.5 to -117.0,
-            37.7 to -122.4, 48.0 to -124.5, 60.0 to -148.0
-        ),
-        // South America
-        listOf(
-            11.0 to -75.0, 8.0 to -60.0, -5.0 to -35.0, -23.5 to -43.0, -35.0 to -55.0,
-            -54.0 to -68.0, -33.0 to -71.5, -12.0 to -77.0, 0.0 to -80.0
-        ),
-        // Australia
-        listOf(
-            -12.5 to 131.0, -16.0 to 145.5, -28.0 to 153.5, -34.0 to 151.0,
-            -38.0 to 145.0, -35.0 to 136.0, -32.0 to 115.8, -21.0 to 114.0
-        )
-    )
-
-    for (poly in continents) {
-        if (poly.isEmpty()) continue
-        val path = Path()
-        poly.forEachIndexed { idx, (lat, lon) ->
-            val pt = project(lat, lon)
-            if (idx == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
-        }
-        path.close()
-        drawPath(path = path, color = fillColor)
-        drawPath(path = path, color = strokeColor, style = Stroke(width = 1.dp.toPx()))
-    }
-}
 
 /**
  * Compact floating bottom bar over the full-screen map that expands into the full
@@ -1540,7 +1094,7 @@ private fun SelectedRouteInspectorPanel(
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
-                                text = conn.destination.iata,
+                                text = if (originAirport != null) conn.destination.iata else "${conn.origin.iata}➔${conn.destination.iata}",
                                 color = if (isSelected) RadarCyan else TextWhite,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -1595,7 +1149,7 @@ private fun SelectedRouteInspectorPanel(
                                     softWrap = false
                                 )
                                 Text(
-                                    text = "${route.destination.city} · ${route.durationFormatted} · ${route.dailyFlightsCount}x/d",
+                                    text = "${route.destination.city} · ${route.durationFormatted}",
                                     color = TextWhite,
                                     fontSize = 11.sp,
                                     maxLines = 1,

@@ -308,8 +308,15 @@ class AirportConnectionsRepository(context: Context) {
         )
     }
 
+    suspend fun loadAllRoutes(): AirportRouteNetworkSummary = withContext(Dispatchers.IO) {
+        _isLoadingRoutes.value = false
+        _routeDataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
+        val allConn = GlobalRouteCatalog.getAllUniqueConnections()
+        return@withContext buildSummary(null, allConn)
+    }
+
     private fun buildSummary(
-        origin: AirportNode,
+        origin: AirportNode?,
         connections: List<DirectFlightConnection>
     ): AirportRouteNetworkSummary {
         val countries = connections.map { it.destination.country }.distinct().size
@@ -1377,6 +1384,34 @@ object GlobalRouteCatalog {
                 )
             }
             .sortedByDescending { it.dailyFlightsCount }
+    }
+
+    fun getAllUniqueConnections(): List<DirectFlightConnection> {
+        return coreRoutes.map { spec ->
+            val origin = getAirport(spec.originIata)
+            val dest = getAirport(spec.destIata)
+            val distKm = GeodesicRouteCalculator.calculateDistanceKm(
+                origin.latitude, origin.longitude,
+                dest.latitude, dest.longitude
+            )
+            val distNm = GeodesicRouteCalculator.kmToNm(distKm)
+            val durationMin = GeodesicRouteCalculator.estimateDurationMinutes(distKm)
+            DirectFlightConnection(
+                id = "${origin.iata}-${dest.iata}",
+                origin = origin,
+                destination = dest,
+                distanceKm = distKm,
+                distanceNm = distNm,
+                estimatedDurationMinutes = durationMin,
+                durationFormatted = GeodesicRouteCalculator.formatDuration(durationMin),
+                haulCategory = GeodesicRouteCalculator.classifyHaul(distKm),
+                dailyFlightsCount = spec.dailyFlights,
+                hasDepartures = true,
+                hasArrivals = true,
+                operatingCarriers = spec.carriers,
+                isLiveVerified = false
+            )
+        }.sortedByDescending { it.dailyFlightsCount }
     }
 
     fun inferRegionFromCoords(lat: Double, lon: Double): RouteRegion {

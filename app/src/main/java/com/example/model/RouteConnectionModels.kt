@@ -68,7 +68,7 @@ data class AirlineFilterChipItem(
 )
 
 data class AirportRouteNetworkSummary(
-    val originAirport: AirportNode,
+    val originAirport: AirportNode? = null,
     val connections: List<DirectFlightConnection>,
     val totalDirectDestinations: Int,
     val totalCountriesServed: Int,

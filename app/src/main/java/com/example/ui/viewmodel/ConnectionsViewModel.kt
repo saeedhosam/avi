@@ -27,10 +27,10 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
     val isLoadingRoutes: StateFlow<Boolean> = repository.isLoadingRoutes
     val routeDataSourceMode: StateFlow<DataSourceMode> = repository.routeDataSourceMode
 
-    private val _originIata = MutableStateFlow("JFK")
+    private val _originIata = MutableStateFlow("")
     val originIata: StateFlow<String> = _originIata.asStateFlow()
 
-    private val _departureInput = MutableStateFlow("JFK · New York")
+    private val _departureInput = MutableStateFlow("")
     val departureInput: StateFlow<String> = _departureInput.asStateFlow()
 
     private val _destinationInput = MutableStateFlow("")
@@ -66,9 +66,14 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
 
     val filteredConnections: StateFlow<List<DirectFlightConnection>> = combine(
         _networkSummary,
-        _filterState
-    ) { summary, filters ->
+        _filterState,
+        _departureInput,
+        _destinationInput
+    ) { summary, filters, depInput, destInput ->
         val rawList = summary?.connections.orEmpty()
+        val depQ = depInput.trim().lowercase(Locale.ROOT)
+        val destQ = (if (destInput.isNotBlank()) destInput else filters.destinationQuery).trim().lowercase(Locale.ROOT)
+
         rawList.filter { conn ->
             val matchesDirection = when (filters.direction) {
                 ConnectionDirection.ALL -> true
@@ -81,17 +86,24 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
                 conn.haulCategory == filters.haulCategory
             val matchesRegion = filters.region == RouteRegion.ALL ||
                 conn.destination.region == filters.region
-            val q = filters.destinationQuery.trim().lowercase(Locale.ROOT)
-            val matchesQuery = q.isEmpty() ||
-                conn.destination.iata.lowercase(Locale.ROOT).contains(q) ||
-                conn.destination.city.lowercase(Locale.ROOT).contains(q) ||
-                conn.destination.country.lowercase(Locale.ROOT).contains(q) ||
+
+            val matchesDep = depQ.isEmpty() ||
+                conn.origin.iata.lowercase(Locale.ROOT).contains(depQ) ||
+                conn.origin.city.lowercase(Locale.ROOT).contains(depQ) ||
+                conn.origin.name.lowercase(Locale.ROOT).contains(depQ) ||
+                depQ.contains(conn.origin.iata.lowercase(Locale.ROOT))
+
+            val matchesDest = destQ.isEmpty() ||
+                conn.destination.iata.lowercase(Locale.ROOT).contains(destQ) ||
+                conn.destination.city.lowercase(Locale.ROOT).contains(destQ) ||
+                conn.destination.country.lowercase(Locale.ROOT).contains(destQ) ||
+                destQ.contains(conn.destination.iata.lowercase(Locale.ROOT)) ||
                 conn.operatingCarriers.any {
-                    it.airlineName.lowercase(Locale.ROOT).contains(q) ||
-                        it.airlineCode.lowercase(Locale.ROOT).contains(q)
+                    it.airlineName.lowercase(Locale.ROOT).contains(destQ) ||
+                        it.airlineCode.lowercase(Locale.ROOT).contains(destQ)
                 }
 
-            matchesDirection && matchesAirline && matchesHaul && matchesRegion && matchesQuery
+            matchesDirection && matchesAirline && matchesHaul && matchesRegion && matchesDep && matchesDest
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -99,13 +111,10 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
         filteredConnections,
         _selectedDestinationIata
     ) { connections, selectedIata ->
-        if (connections.isEmpty()) {
+        if (connections.isEmpty() || selectedIata == null) {
             null
-        } else if (selectedIata != null) {
-            connections.find { it.destination.iata.equals(selectedIata, ignoreCase = true) }
-                ?: connections.firstOrNull()
         } else {
-            connections.firstOrNull()
+            connections.find { it.destination.iata.equals(selectedIata, ignoreCase = true) }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -125,12 +134,29 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
     )
 
     init {
-        loadOriginHub("JFK", recordHistory = false)
+        loadAllGlobalRoutes()
+    }
+
+    fun loadAllGlobalRoutes() {
+        _originIata.value = ""
+        _departureInput.value = ""
+        _departureSuggestions.value = emptyList()
+        _selectedDestinationIata.value = null
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            val summary = repository.loadAllRoutes()
+            _networkSummary.value = summary
+        }
     }
 
     fun updateDepartureInput(query: String) {
         _departureInput.value = query
         val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            _departureSuggestions.value = emptyList()
+            loadAllGlobalRoutes()
+            return
+        }
         if (trimmed.length == 3) {
             val directNode = repository.getAllAirports().find { it.iata.equals(trimmed, ignoreCase = true) }
             if (directNode != null) {
@@ -163,8 +189,7 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun clearDepartureInput() {
-        _departureInput.value = ""
-        _departureSuggestions.value = emptyList()
+        loadAllGlobalRoutes()
     }
 
     fun updateDestinationInput(query: String) {
@@ -227,6 +252,10 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
 
     fun selectOriginHub(iata: String) {
         val cleaned = iata.trim().uppercase(Locale.ROOT)
+        if (cleaned.isBlank()) {
+            loadAllGlobalRoutes()
+            return
+        }
         if (cleaned.length != 3) return
         if (cleaned == _originIata.value && _networkSummary.value != null) return
         loadOriginHub(cleaned, recordHistory = true)
@@ -252,7 +281,11 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun refreshCurrentHub() {
-        loadOriginHub(_originIata.value, recordHistory = false)
+        if (_originIata.value.isBlank()) {
+            loadAllGlobalRoutes()
+        } else {
+            loadOriginHub(_originIata.value, recordHistory = false)
+        }
     }
 
     private fun loadOriginHub(
@@ -281,7 +314,7 @@ class ConnectionsViewModel(application: Application) : AndroidViewModel(applicat
             _networkSummary.value = summary
             val defaultDest = preferredHighlightDest?.takeIf { pref ->
                 summary.connections.any { it.destination.iata.equals(pref, ignoreCase = true) }
-            } ?: summary.connections.firstOrNull()?.destination?.iata
+            }
             _selectedDestinationIata.value = defaultDest
         }
     }
