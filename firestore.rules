@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'displayName', 'email'])
+        && data.userId is string && data.userId == request.auth.uid
+        && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100
+        && data.email is string && data.email.size() > 3 && data.email.size() <= 150
+        && (!('homeAirport' in data) || (data.homeAirport is string && data.homeAirport.size() <= 10))
+        && (!('themePreference' in data) || (data.themePreference is string && data.themePreference in ['SYSTEM', 'LIGHT', 'DARK']))
+        && (!('photoUrl' in data) || data.photoUrl is string)
+        && (!('createdAt' in data) || data.createdAt is timestamp)
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidTrackedFlight(data) {
+      return data.keys().hasAll(['userId', 'flightNumber', 'airline', 'originCode', 'destCode', 'status'])
+        && data.userId is string && data.userId == request.auth.uid
+        && data.flightNumber is string && data.flightNumber.size() > 0 && data.flightNumber.size() <= 20
+        && data.airline is string && data.airline.size() <= 100
+        && data.originCode is string && data.originCode.size() <= 10
+        && data.destCode is string && data.destCode.size() <= 10
+        && data.status is string && data.status.size() <= 30
+        && (!('customNotes' in data) || (data.customNotes is string && data.customNotes.size() <= 500))
+        && (!('isFavorite' in data) || data.isFavorite is bool)
+        && (!('createdAt' in data) || data.createdAt is timestamp)
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidAlert(data) {
+      return data.keys().hasAll(['userId', 'flightNumber', 'alertType', 'title', 'message', 'isRead'])
+        && data.userId is string && data.userId == request.auth.uid
+        && data.flightNumber is string && data.flightNumber.size() <= 20
+        && data.alertType is string && data.alertType in ['GATE_CHANGE', 'DELAY', 'BOARDING', 'CANCELLATION', 'BAGGAGE']
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 1000
+        && data.isRead is bool
+        && (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // User Profile
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(userId);
+
+      // Tracked Flights
+      match /trackedFlights/{flightId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTrackedFlight(request.resource.data);
+        allow update: if isOwner(userId) && isValidTrackedFlight(request.resource.data) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Flight Alerts
+      match /alerts/{alertId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidAlert(request.resource.data);
+        allow update: if isOwner(userId) && isValidAlert(request.resource.data) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
