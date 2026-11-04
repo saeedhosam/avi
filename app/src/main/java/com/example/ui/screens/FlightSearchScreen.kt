@@ -35,6 +35,7 @@ import com.example.data.local.RecentSearchEntity
 import com.example.data.preferences.ThemeMode
 import com.example.model.Flight
 import com.example.model.FlightStatus
+import com.example.ui.components.DataSourceStatusBanner
 import com.example.ui.components.FlightCard
 import com.example.ui.components.ThemeSelectionDialog
 import com.example.ui.theme.*
@@ -67,6 +68,8 @@ fun FlightSearchScreen(
     val unreadAlerts by viewModel.unreadAlertCount.collectAsState()
     val userAccount by viewModel.userAccount.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val dataSourceMode by viewModel.dataSourceMode.collectAsState()
+    val isLiveLoading by viewModel.isLiveLoading.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showOriginPicker by remember { mutableStateOf(false) }
@@ -91,11 +94,11 @@ fun FlightSearchScreen(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(RadarCyan.copy(alpha = 0.2f))
                                 .border(1.dp, RadarCyan, CircleShape),
@@ -112,107 +115,26 @@ fun FlightSearchScreen(
                             Text(
                                 text = "SkyTrack",
                                 color = TextWhite,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Black
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "ROOM PERSISTENCE & LIVE RADAR",
+                                text = "LIVE RADAR & FLIGHT TELEMETRY",
                                 color = RadarCyan,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.8.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                         }
                     }
                 },
                 actions = {
-                    // Room Database Tracked Count Pill
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                0.8.dp,
-                                if (onlyTrackedFilter) RadarCyan else InstrumentBorder,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.setOnlyTrackedFilter(!onlyTrackedFilter) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("room_tracked_pill_btn"),
-                        color = if (onlyTrackedFilter) RadarCyan.copy(alpha = 0.2f) else InstrumentSurface
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storage,
-                                contentDescription = "Room Database",
-                                tint = if (onlyTrackedFilter) RadarCyan else TextMuted,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "Room (${trackedFlights.size})",
-                                color = if (onlyTrackedFilter) RadarCyan else TextWhite,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    // WorkManager Background Sync Pill
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(0.8.dp, InstrumentBorder, RoundedCornerShape(12.dp))
-                            .clickable {
-                                viewModel.triggerBackgroundSync()
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("WorkManager: Background cache sync triggered")
-                                }
-                            }
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                            .testTag("workmanager_sync_pill_btn"),
-                        color = InstrumentSurface
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudSync,
-                                contentDescription = "WorkManager Cache Sync",
-                                tint = RadarCyan,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "Sync",
-                                color = TextWhite,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    // Theme toggle button
-                    IconButton(
-                        onClick = { showThemeDialog = true },
-                        modifier = Modifier.testTag("theme_toggle_btn")
-                    ) {
-                        Icon(
-                            imageVector = when (themeMode) {
-                                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                                ThemeMode.LIGHT -> Icons.Default.LightMode
-                                ThemeMode.DARK -> Icons.Default.DarkMode
-                            },
-                            contentDescription = "Theme: ${themeMode.title}",
-                            tint = RadarCyan
-                        )
-                    }
-
                     // Notifications button with badge
                     IconButton(
                         onClick = onOpenNotifications,
@@ -238,7 +160,7 @@ fun FlightSearchScreen(
                         }
                     }
 
-                    // Account / OAuth Avatar button
+                    // Account / OAuth / Theme / Sync Avatar button
                     IconButton(
                         onClick = onOpenAccount,
                         modifier = Modifier.testTag("account_top_btn")
@@ -268,69 +190,21 @@ fun FlightSearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Hero ATC Radar Banner
+            // Live AeroDataBox & Open-Meteo Telemetry Status Pill
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(115.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, InstrumentBorder, RoundedCornerShape(18.dp))
-                        .testTag("hero_radar_banner"),
-                    colors = CardDefaults.cardColors(containerColor = CockpitDark)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Image(
-                            painter = painterResource(id = R.drawable.img_flight_hero),
-                            contentDescription = "ATC Global Radar",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        // Gradient overlay
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            CockpitDark.copy(alpha = 0.94f),
-                                            CockpitDark.copy(alpha = 0.65f),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
-
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "GLOBAL FLIGHT SEARCH & PERSISTENCE",
-                                color = RadarCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "Flight & Route Lookup",
-                                color = TextWhite,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Look up by flight # or route · Save to local Room DB for tracking",
-                                color = TextMuted,
-                                fontSize = 11.sp
-                            )
+                DataSourceStatusBanner(
+                    mode = dataSourceMode,
+                    isLiveLoading = isLiveLoading,
+                    onRefreshClick = {
+                        viewModel.refreshData()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Refreshing flight & weather telemetry...")
                         }
                     }
-                }
+                )
             }
 
             // Search Mode Tab Selector (Flight Number vs Route)
@@ -377,7 +251,8 @@ fun FlightSearchScreen(
                                         text = "Flight Number",
                                         fontWeight = if (searchMode == SearchMode.FLIGHT_NUMBER) FontWeight.Bold else FontWeight.Medium,
                                         color = if (searchMode == SearchMode.FLIGHT_NUMBER) RadarCyan else TextMuted,
-                                        fontSize = 13.sp
+                                        fontSize = 13.sp,
+                                        maxLines = 1
                                     )
                                 }
                             },
@@ -402,7 +277,8 @@ fun FlightSearchScreen(
                                         text = "Route Lookup",
                                         fontWeight = if (searchMode == SearchMode.ROUTE) FontWeight.Bold else FontWeight.Medium,
                                         color = if (searchMode == SearchMode.ROUTE) RadarCyan else TextMuted,
-                                        fontSize = 13.sp
+                                        fontSize = 13.sp,
+                                        maxLines = 1
                                     )
                                 }
                             },
@@ -424,9 +300,11 @@ fun FlightSearchScreen(
                                 .testTag("flight_search_input"),
                             placeholder = {
                                 Text(
-                                    text = "Enter flight # or airline (e.g. AA 100, BA 178, Delta)",
+                                    text = "Flight # or airline (e.g. AA 100, BA 178, Delta)",
                                     color = TextSubtle,
-                                    fontSize = 13.sp
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             },
                             leadingIcon = {
@@ -525,39 +403,59 @@ fun FlightSearchScreen(
                                 }
                             }
 
-                            // Origin and Destination Selector Row with Center Swap Button
+                            // Departure and Destination Direct Input Fields Row with Center Swap Button
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Origin Airport Selector Box
-                                Surface(
-                                    color = InstrumentSurface,
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, InstrumentBorder),
+                                // Origin / Departure Airport Input Field
+                                OutlinedTextField(
+                                    value = if (routeOrigin == "ALL") "" else routeOrigin,
+                                    onValueChange = { viewModel.setRouteOrigin(it) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { showOriginPicker = true }
-                                        .testTag("route_origin_selector_btn")
-                                ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("ORIGIN AIRPORT", fontSize = 9.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                                        .testTag("route_origin_selector_btn"),
+                                    label = { Text("Departure", fontSize = 10.sp, color = TextMuted) },
+                                    placeholder = {
                                         Text(
-                                            text = routeOrigin,
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = RadarCyan
-                                        )
-                                        val originAirport = MockFlightData.airports.find { it.code == routeOrigin }
-                                        Text(
-                                            text = originAirport?.city ?: "All Airports",
+                                            text = "Code or city (e.g. JFK, London)",
                                             fontSize = 11.sp,
-                                            color = TextWhite,
-                                            maxLines = 1
+                                            color = TextSubtle,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
-                                    }
-                                }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.FlightTakeoff,
+                                            contentDescription = "Departure",
+                                            tint = RadarCyan,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (routeOrigin.isNotEmpty() && routeOrigin != "ALL") {
+                                            IconButton(onClick = { viewModel.setRouteOrigin("") }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Clear",
+                                                    tint = TextMuted,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = TextWhite, fontWeight = FontWeight.Bold),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = InstrumentSurface,
+                                        unfocusedContainerColor = InstrumentSurface,
+                                        focusedBorderColor = RadarCyan,
+                                        unfocusedBorderColor = InstrumentBorder
+                                    )
+                                )
 
                                 // Interactive Swap Route Button
                                 FilledIconButton(
@@ -576,33 +474,53 @@ fun FlightSearchScreen(
                                     )
                                 }
 
-                                // Destination Airport Selector Box
-                                Surface(
-                                    color = InstrumentSurface,
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, InstrumentBorder),
+                                // Destination Airport Input Field
+                                OutlinedTextField(
+                                    value = if (routeDestination == "ALL") "" else routeDestination,
+                                    onValueChange = { viewModel.setRouteDestination(it) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { showDestPicker = true }
-                                        .testTag("route_dest_selector_btn")
-                                ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("DESTINATION AIRPORT", fontSize = 9.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                                        .testTag("route_dest_selector_btn"),
+                                    label = { Text("Destination", fontSize = 10.sp, color = TextMuted) },
+                                    placeholder = {
                                         Text(
-                                            text = routeDestination,
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = AeroBlue
-                                        )
-                                        val destAirport = MockFlightData.airports.find { it.code == routeDestination }
-                                        Text(
-                                            text = destAirport?.city ?: "All Airports",
+                                            text = "Code or city (e.g. LHR, Paris)",
                                             fontSize = 11.sp,
-                                            color = TextWhite,
-                                            maxLines = 1
+                                            color = TextSubtle,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
-                                    }
-                                }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.FlightLand,
+                                            contentDescription = "Destination",
+                                            tint = AeroBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (routeDestination.isNotEmpty() && routeDestination != "ALL") {
+                                            IconButton(onClick = { viewModel.setRouteDestination("") }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Clear",
+                                                    tint = TextMuted,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = TextWhite, fontWeight = FontWeight.Bold),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = InstrumentSurface,
+                                        unfocusedContainerColor = InstrumentSurface,
+                                        focusedBorderColor = AeroBlue,
+                                        unfocusedBorderColor = InstrumentBorder
+                                    )
+                                )
                             }
 
                             // Popular Route Fast-Pick Chips

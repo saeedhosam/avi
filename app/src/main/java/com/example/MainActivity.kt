@@ -42,6 +42,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // STEP 1: Configure App Check with launch intent before any UI, ViewModels, or Firebase operations
+        configureAppCheck(this, intent)
+
         enableEdgeToEdge()
 
         // Initialize Notification Channels
@@ -85,7 +89,8 @@ class MainActivity : ComponentActivity() {
 
 enum class NavigationScreen(val label: String, val icon: ImageVector, val tag: String) {
     SEARCH("Search", Icons.Default.Search, "nav_search"),
-    RADAR("Live Radar", Icons.Default.Radar, "nav_radar"),
+    RADAR("Radar", Icons.Default.Radar, "nav_radar"),
+    CONNECTIONS("Routes", Icons.Default.Hub, "nav_connections"),
     BOARDS("Airports", Icons.Default.FlightTakeoff, "nav_boards"),
     TERMINALS("Terminals", Icons.Default.Layers, "nav_terminals"),
     FAVORITES("Watchlist", Icons.Default.Favorite, "nav_favorites")
@@ -94,6 +99,7 @@ enum class NavigationScreen(val label: String, val icon: ImageVector, val tag: S
 @Composable
 fun SkyTrackApp(
     viewModel: FlightViewModel = viewModel(),
+    connectionsViewModel: com.example.ui.viewmodel.ConnectionsViewModel = viewModel(),
     initialFlightNumber: String? = null,
     initialOpenNotifications: Boolean = false,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -138,14 +144,18 @@ fun SkyTrackApp(
         }
     }
 
-    // Handle back button when overlay, Google Maps or flight detail is open
-    BackHandler(enabled = showTerminalOverlay || googleMapFlight != null || selectedDetailFlight != null) {
+    // Handle back button when overlay, Google Maps, flight detail, or secondary tab is open
+    BackHandler(
+        enabled = showTerminalOverlay || googleMapFlight != null || selectedDetailFlight != null || currentScreen != NavigationScreen.SEARCH
+    ) {
         if (showTerminalOverlay) {
             showTerminalOverlay = false
         } else if (googleMapFlight != null) {
             googleMapFlight = null
-        } else {
+        } else if (selectedDetailFlight != null) {
             selectedDetailFlight = null
+        } else {
+            currentScreen = NavigationScreen.SEARCH
         }
     }
 
@@ -197,7 +207,9 @@ fun SkyTrackApp(
                             label = {
                                 Text(
                                     text = screen.label,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
                             },
@@ -270,10 +282,38 @@ fun SkyTrackApp(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
+                    NavigationScreen.CONNECTIONS -> {
+                        ConnectionsScreen(
+                            connectionsViewModel = connectionsViewModel,
+                            onOpenRouteFlights = { originIata, destIata ->
+                                val directFlight = allFlights.find {
+                                    it.origin.code.equals(originIata, ignoreCase = true) &&
+                                        it.destination.code.equals(destIata, ignoreCase = true)
+                                }
+                                if (directFlight != null) {
+                                    selectedDetailFlight = directFlight
+                                } else {
+                                    viewModel.setSearchMode(com.example.ui.viewmodel.SearchMode.ROUTE)
+                                    viewModel.setRouteOrigin(originIata)
+                                    viewModel.setRouteDestination(destIata)
+                                    currentScreen = NavigationScreen.SEARCH
+                                }
+                            },
+                            onOpenAirportBoard = { airportIata ->
+                                viewModel.selectAirport(airportIata)
+                                currentScreen = NavigationScreen.BOARDS
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                     NavigationScreen.BOARDS -> {
                         AirportBoardScreen(
                             viewModel = viewModel,
                             onFlightSelected = { selectedDetailFlight = it },
+                            onOpenConnectionsMap = { airportCode ->
+                                connectionsViewModel.selectOriginHub(airportCode)
+                                currentScreen = NavigationScreen.CONNECTIONS
+                            },
                             modifier = Modifier.fillMaxSize()
                         )
                     }

@@ -15,6 +15,7 @@ class SkyTrackMessagingService : FirebaseMessagingService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
 
+    @Suppress("DEPRECATION")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d(TAG, "New Firebase Messaging Token received: $token")

@@ -1,22 +1,27 @@
 package com.example.data.weather
 
 import android.content.Context
+import android.util.Log
 import com.example.data.local.DestinationWeatherEntity
 import com.example.data.local.SkyTrackDatabase
+import com.example.data.remote.weather.OpenMeteoApiService
+import com.example.data.remote.weather.OpenMeteoMapper
+import com.example.data.remote.weather.OpenMeteoNetworkClient
 import com.example.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
- * Service component responsible for fetching, synthesizing, and caching
- * local destination airport weather forecasts tailored for flight arrival planning.
+ * Service component responsible for fetching real-time destination airport weather forecasts
+ * from Open-Meteo (with local Room SQLite caching and offline fallback) to help users plan their arrival.
  */
-class DestinationWeatherService(context: Context) {
+class DestinationWeatherService(
+    context: Context,
+    private val openMeteoApi: OpenMeteoApiService = OpenMeteoNetworkClient.apiService
+) {
 
     private val database = SkyTrackDatabase.getDatabase(context)
     private val flightDao = database.flightDao()
@@ -31,24 +36,47 @@ class DestinationWeatherService(context: Context) {
     }
 
     /**
-     * Fetches or generates a destination arrival weather forecast for the specified
-     * airport and arrival time, caching it in Room for offline access.
+     * Fetches a live destination arrival weather forecast from Open-Meteo for the specified
+     * airport coordinates and arrival time, caching it in Room for offline access.
      */
     suspend fun getDestinationForecast(
         airport: Airport,
-        arrivalTime: String
+        arrivalTime: String,
+        forceRefresh: Boolean = false
     ): DestinationArrivalForecast = withContext(Dispatchers.IO) {
-        // 1. Check local Room cache
+        // 1. Check local Room cache (15-minute TTL unless forceRefresh is requested)
         val cached = flightDao.getCachedDestinationWeather(airport.code)
         val now = System.currentTimeMillis()
-        if (cached != null && (now - cached.cachedTimestamp) < 15 * 60 * 1000) {
+        if (!forceRefresh && cached != null && (now - cached.cachedTimestamp) < 15 * 60 * 1000) {
             return@withContext mapEntityToForecast(cached)
         }
 
-        // 2. Synthesize fresh destination arrival forecast
-        val forecast = generateDestinationForecast(airport, arrivalTime)
+        // 2. Attempt live meteorological fetch from Open-Meteo API
+        val liveForecast = try {
+            val response = openMeteoApi.getForecast(
+                latitude = airport.latitude,
+                longitude = airport.longitude
+            )
+            if (response.isSuccessful && response.body() != null) {
+                OpenMeteoMapper.mapToDestinationForecast(
+                    airport = airport,
+                    arrivalTime = arrivalTime,
+                    dto = response.body()!!
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.d("DestinationWeather", "Open-Meteo live fetch fallback for ${airport.code}: ${e.message}")
+            null
+        }
 
-        // 3. Cache into Room database
+        // 3. Use live forecast if available, otherwise cached entity or synthesized fallback
+        val forecast = liveForecast
+            ?: cached?.let { mapEntityToForecast(it) }
+            ?: generateFallbackDestinationForecast(airport, arrivalTime)
+
+        // 4. Persist into Room database
         val entity = DestinationWeatherEntity(
             airportCode = forecast.airportCode,
             airportCity = forecast.airportCity,
@@ -73,17 +101,15 @@ class DestinationWeatherService(context: Context) {
         forecast
     }
 
-    private fun generateDestinationForecast(airport: Airport, arrivalTime: String): DestinationArrivalForecast {
+    private fun generateFallbackDestinationForecast(airport: Airport, arrivalTime: String): DestinationArrivalForecast {
         val baseWeather = airport.weather
         val arrivalHour = parseArrivalHour(arrivalTime)
 
-        // Adjust temperature slightly for time of day at arrival
         val isNightArrival = arrivalHour < 6 || arrivalHour > 21
         val tempAdjustment = if (isNightArrival) -3 else 1
         val arrTempC = baseWeather.tempC + tempAdjustment
         val arrTempF = (arrTempC * 9 / 5) + 32
 
-        // Determine precipitation chance based on condition
         val precipChance = when {
             baseWeather.condition.contains("Rain", ignoreCase = true) || baseWeather.condition.contains("Drizzle", ignoreCase = true) -> 75
             baseWeather.condition.contains("Thunder", ignoreCase = true) -> 90
@@ -92,14 +118,12 @@ class DestinationWeatherService(context: Context) {
             else -> 5
         }
 
-        // Aviation flight category (VFR, MVFR, IFR)
         val flightCategory = when {
             baseWeather.condition.contains("Thunder", ignoreCase = true) -> "IFR (Instrument Flight Rules)"
             baseWeather.condition.contains("Fog", ignoreCase = true) || baseWeather.condition.contains("Rain", ignoreCase = true) -> "MVFR (Marginal VFR)"
             else -> "VFR (Visual Flight Rules)"
         }
 
-        // Crosswind risk analysis
         val crosswindKnots = when (airport.code) {
             "SFO" -> 16
             "LHR" -> 14
@@ -113,7 +137,6 @@ class DestinationWeatherService(context: Context) {
             else -> "Light Crosswinds (Smooth Final)"
         }
 
-        // Destination packing & arrival tip
         val packingAdvice = when {
             arrTempC < 10 -> "Cold arrival expected (${arrTempC}°C). Heavy coat & thermal wear recommended."
             precipChance > 50 -> "Rain expected at arrival (${precipChance}% chance). Keep an umbrella and waterproof jacket handy."
@@ -122,7 +145,6 @@ class DestinationWeatherService(context: Context) {
             else -> "Pleasant conditions (${arrTempC}°C) expected. Light layers or jacket suitable for arrival."
         }
 
-        // Generate hourly forecast around arrival window (-2h to +4h)
         val hourlyList = mutableListOf<HourlyForecast>()
         for (offset in -2..4) {
             val hour = (arrivalHour + offset + 24) % 24
@@ -146,7 +168,6 @@ class DestinationWeatherService(context: Context) {
             )
         }
 
-        // Generate 3-day arrival outlook
         val dailyList = listOf(
             DailyForecast(
                 dayName = "Arrival Day",

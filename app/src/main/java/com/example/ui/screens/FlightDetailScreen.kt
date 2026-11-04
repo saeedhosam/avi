@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -606,7 +607,7 @@ fun FlightDetailScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.StickyNote2, contentDescription = null, tint = RadarCyan)
+                            Icon(Icons.AutoMirrored.Filled.StickyNote2, contentDescription = null, tint = RadarCyan)
                             Column {
                                 Text("My Personal Note", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 Text(flight.customNotes, color = TextWhite, fontSize = 13.sp)
@@ -686,21 +687,28 @@ private fun DetailInfoTile(
                 color = TextSubtle,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
+                letterSpacing = 0.5.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = primary,
                 color = TextWhite,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = secondary,
                 color = AeroBlue,
                 fontSize = 11.sp,
-                maxLines = 1
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
     }

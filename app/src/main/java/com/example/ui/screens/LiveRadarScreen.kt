@@ -120,7 +120,7 @@ fun LiveRadarScreen(
                         val isSelected = flight.id == selectedRadarFlight.id
                         Surface(
                             modifier = Modifier
-                                .width(200.dp)
+                                .width(218.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .border(
                                     1.dp,
@@ -143,7 +143,9 @@ fun LiveRadarScreen(
                                         text = flight.flightNumber,
                                         color = if (isSelected) RadarCyan else TextWhite,
                                         fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                     StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
                                 }
@@ -154,7 +156,9 @@ fun LiveRadarScreen(
                                     text = "${flight.origin.code} → ${flight.destination.code}",
                                     color = TextWhite,
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
 
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -166,13 +170,17 @@ fun LiveRadarScreen(
                                     Text(
                                         text = "${flight.telemetry.altitudeFeet} ft",
                                         color = TextMuted,
-                                        fontSize = 11.sp
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                     Text(
                                         text = "${flight.telemetry.groundSpeedKnots} kts",
                                         color = AeroBlue,
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
 
@@ -183,7 +191,14 @@ fun LiveRadarScreen(
                                     modifier = Modifier.fillMaxWidth().height(28.dp),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("Open Flight Dossier →", color = RadarCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = "Open Flight Dossier →",
+                                        color = RadarCyan,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
                                 }
                             }
                         }

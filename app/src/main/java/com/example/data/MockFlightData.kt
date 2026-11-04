@@ -142,6 +142,40 @@ object MockFlightData {
             )
         ),
         Airport(
+            code = "CAI",
+            name = "Cairo International Airport",
+            city = "Cairo",
+            country = "Egypt",
+            timezone = "EEST (UTC+3)",
+            latitude = 30.1219,
+            longitude = 31.4056,
+            weather = AirportWeather(
+                tempC = 28,
+                tempF = 82,
+                condition = "Sunny & Clear",
+                wind = "9 kt NNE",
+                visibility = "10+ mi",
+                humidity = 38
+            )
+        ),
+        Airport(
+            code = "IST",
+            name = "Istanbul Airport",
+            city = "Istanbul",
+            country = "Turkey",
+            timezone = "TRT (UTC+3)",
+            latitude = 41.2753,
+            longitude = 28.7519,
+            weather = AirportWeather(
+                tempC = 20,
+                tempF = 68,
+                condition = "Mostly Clear",
+                wind = "11 kt NE",
+                visibility = "10+ mi",
+                humidity = 61
+            )
+        ),
+        Airport(
             code = "ATL",
             name = "Hartsfield-Jackson Atlanta",
             city = "Atlanta",
@@ -652,6 +686,179 @@ object MockFlightData {
                 FlightTimelineEvent("Ground Stop Ordered", "17:30", true, false, "FAA advisory issued"),
                 FlightTimelineEvent("Flight Officially Cancelled", "18:15", true, true, "Automated rebooking active"),
                 FlightTimelineEvent("Passenger Assistance", "18:30", true, false, "Hotel vouchers & rebooking via App")
+            ),
+            isFavorite = false
+        ),
+        Flight(
+            id = "MS777",
+            flightNumber = "MS 777",
+            airline = "EgyptAir",
+            airlineCode = "MS",
+            origin = getAirport("CAI"),
+            destination = getAirport("LHR"),
+            departureTimeScheduled = "09:15",
+            departureTimeEstimated = "09:15",
+            departureTimeActual = "09:18",
+            arrivalTimeScheduled = "12:30",
+            arrivalTimeEstimated = "12:24",
+            status = FlightStatus.DEPARTED,
+            statusNote = "Cruising at FL380 · Over Mediterranean & Central Europe",
+            delayMinutes = 0,
+            terminalDeparture = "3",
+            gateDeparture = "Gate G4",
+            checkInCounter = "Terminal 3 Zone C",
+            terminalArrival = "2",
+            gateArrival = "Gate B38",
+            baggageCarousel = "Carousel 4",
+            aircraft = AircraftInfo(
+                model = "Boeing 787-9 Dreamliner",
+                registration = "SU-GER",
+                age = "4.2 yrs",
+                wifiAvailable = true,
+                powerOutlets = true,
+                seatLayout = "Business (30), Economy (279)"
+            ),
+            telemetry = FlightTelemetry(
+                currentLatitude = 43.25,
+                currentLongitude = 12.40,
+                altitudeFeet = 38000,
+                groundSpeedKnots = 492,
+                headingDegrees = 312f,
+                verticalSpeedFpm = 0,
+                mach = 0.85,
+                progressPercent = 0.56f,
+                distanceCoveredNm = 1065,
+                distanceRemainingNm = 835,
+                etaMinutesRemaining = 102,
+                waypoints = listOf(
+                    Waypoint("BLT", 31.55, 31.08, 24000),
+                    Waypoint("TANSA", 34.10, 26.50, 36000),
+                    Waypoint("ATH", 37.93, 23.94, 38000),
+                    Waypoint("FCO", 41.80, 12.24, 38000),
+                    Waypoint("GVA", 46.23, 6.10, 36000)
+                )
+            ),
+            timeline = listOf(
+                FlightTimelineEvent("Check-in at Cairo T3", "06:15", true, false, "Star Alliance counters open"),
+                FlightTimelineEvent("Boarding at Gate G4", "08:35", true, false, "Priority & main cabin boarded"),
+                FlightTimelineEvent("Takeoff from CAI Runway 05C", "09:18", true, false, "Smooth climb over Nile Delta"),
+                FlightTimelineEvent("Cruising FL380", "09:50", true, true, "En route via Mediterranean airway"),
+                FlightTimelineEvent("Touchdown LHR Terminal 2", "12:24", false, false, "Scheduled on time")
+            ),
+            isFavorite = false
+        ),
+        Flight(
+            id = "MS985",
+            flightNumber = "MS 985",
+            airline = "EgyptAir",
+            airlineCode = "MS",
+            origin = getAirport("CAI"),
+            destination = getAirport("JFK"),
+            departureTimeScheduled = "09:25",
+            departureTimeEstimated = "09:30",
+            departureTimeActual = "09:32",
+            arrivalTimeScheduled = "15:25",
+            arrivalTimeEstimated = "15:20",
+            status = FlightStatus.DEPARTED,
+            statusNote = "Cruising at FL360 · Transatlantic Track Bravo",
+            delayMinutes = 0,
+            terminalDeparture = "3",
+            gateDeparture = "Gate F2",
+            checkInCounter = "Terminal 3 Zone B",
+            terminalArrival = "1",
+            gateArrival = "Gate 6",
+            baggageCarousel = "Carousel 2",
+            aircraft = AircraftInfo(
+                model = "Boeing 777-300ER",
+                registration = "SU-GDR",
+                age = "6.8 yrs",
+                wifiAvailable = true,
+                powerOutlets = true,
+                seatLayout = "Business (49), Economy (297)"
+            ),
+            telemetry = FlightTelemetry(
+                currentLatitude = 48.10,
+                currentLongitude = -22.50,
+                altitudeFeet = 36000,
+                groundSpeedKnots = 485,
+                headingDegrees = 288f,
+                verticalSpeedFpm = 0,
+                mach = 0.84,
+                progressPercent = 0.61f,
+                distanceCoveredNm = 2970,
+                distanceRemainingNm = 1900,
+                etaMinutesRemaining = 235,
+                waypoints = listOf(
+                    Waypoint("CAI", 30.12, 31.40, 1200),
+                    Waypoint("ATH", 37.93, 23.94, 34000),
+                    Waypoint("CDG", 49.00, 2.54, 36000),
+                    Waypoint("SHANWICK", 51.00, -20.00, 36000),
+                    Waypoint("GANDER", 48.95, -54.58, 38000)
+                )
+            ),
+            timeline = listOf(
+                FlightTimelineEvent("Check-in at Cairo T3", "06:00", true, false, "US Pre-screening & Bag Drop"),
+                FlightTimelineEvent("Boarding at Gate F2", "08:40", true, false, "Widebody boarding complete"),
+                FlightTimelineEvent("Takeoff from CAI", "09:32", true, false, "Nonstop transatlantic departure"),
+                FlightTimelineEvent("North Atlantic Crossing", "14:15", true, true, "Cruising FL360"),
+                FlightTimelineEvent("Arrival at JFK Terminal 1", "15:20", false, false, "On-time arrival")
+            ),
+            isFavorite = false
+        ),
+        Flight(
+            id = "EK924",
+            flightNumber = "EK 924",
+            airline = "Emirates",
+            airlineCode = "EK",
+            origin = getAirport("CAI"),
+            destination = getAirport("DXB"),
+            departureTimeScheduled = "19:30",
+            departureTimeEstimated = "19:30",
+            departureTimeActual = null,
+            arrivalTimeScheduled = "00:50",
+            arrivalTimeEstimated = "00:50",
+            status = FlightStatus.BOARDING,
+            statusNote = "Boarding Airbus A380 at Cairo Terminal 2 Gate E5",
+            delayMinutes = 0,
+            terminalDeparture = "2",
+            gateDeparture = "Gate E5",
+            checkInCounter = "Terminal 2 Zone A",
+            terminalArrival = "3",
+            gateArrival = "Gate A14",
+            baggageCarousel = "Belt 8",
+            aircraft = AircraftInfo(
+                model = "Airbus A380-800",
+                registration = "A6-EOT",
+                age = "5.4 yrs",
+                wifiAvailable = true,
+                powerOutlets = true,
+                seatLayout = "First Suites (14), Business (76), Economy (429)"
+            ),
+            telemetry = FlightTelemetry(
+                currentLatitude = 30.12,
+                currentLongitude = 31.40,
+                altitudeFeet = 0,
+                groundSpeedKnots = 0,
+                headingDegrees = 115f,
+                verticalSpeedFpm = 0,
+                mach = 0.0,
+                progressPercent = 0.05f,
+                distanceCoveredNm = 0,
+                distanceRemainingNm = 1305,
+                etaMinutesRemaining = 200,
+                waypoints = listOf(
+                    Waypoint("CAI", 30.12, 31.40, 1000),
+                    Waypoint("SHARM", 27.97, 34.39, 35000),
+                    Waypoint("TABUK", 28.36, 36.61, 39000),
+                    Waypoint("RIYADH", 24.95, 46.69, 39000),
+                    Waypoint("DXB", 25.25, 55.36, 2000)
+                )
+            ),
+            timeline = listOf(
+                FlightTimelineEvent("Check-in at Cairo T2", "16:30", true, false, "Emirates First/Business & Economy"),
+                FlightTimelineEvent("Boarding at Gate E5", "18:45", true, true, "Double-deck boarding in progress"),
+                FlightTimelineEvent("Scheduled Pushback", "19:30", false, false, "Runway 05C departure"),
+                FlightTimelineEvent("Arrival at Dubai T3", "00:50", false, false, "Concourse A arrival")
             ),
             isFavorite = false
         )

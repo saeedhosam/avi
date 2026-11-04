@@ -9,7 +9,10 @@ import com.example.data.local.ScheduledNotificationEntity
 import com.example.data.local.TrackedFlightEntity
 import com.example.data.preferences.ThemeMode
 import com.example.data.preferences.ThemePreferences
+import com.example.data.remote.DataSourceMode
 import com.example.model.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -35,10 +38,15 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
     val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
+    val dataSourceMode: StateFlow<DataSourceMode> = repository.dataSourceMode
+    val isLiveLoading: StateFlow<Boolean> = repository.isLiveLoading
+
     private val _searchFilters = MutableStateFlow(FlightSearchFilters())
     val searchFilters: StateFlow<FlightSearchFilters> = _searchFilters.asStateFlow()
 
-    // Backward compatible individual state flows
+    private var liveFlightLookupJob: Job? = null
+    private var liveAirportBoardJob: Job? = null
+
     val searchQuery: StateFlow<String> = _searchFilters.map { it.query }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
     val statusFilter: StateFlow<FlightStatus?> = _searchFilters.map { it.status }
@@ -61,7 +69,7 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
     private val _airportAirlineFilter = MutableStateFlow("All")
     val airportAirlineFilter: StateFlow<String> = _airportAirlineFilter.asStateFlow()
 
-    private val _selectedFlightId = MutableStateFlow<String?>("AA100") // default select AA 100 for immediate rich preview
+    private val _selectedFlightId = MutableStateFlow<String?>("AA100")
     val selectedFlightId: StateFlow<String?> = _selectedFlightId.asStateFlow()
 
     val flights: StateFlow<List<Flight>> = repository.flights
@@ -86,8 +94,10 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
             val matchesMode = when (filters.mode) {
                 SearchMode.FLIGHT_NUMBER -> {
                     val q = filters.query.trim().lowercase()
+                    val qCompact = q.replace(" ", "")
                     if (q.isEmpty()) true else {
                         flight.flightNumber.lowercase().contains(q) ||
+                            flight.flightNumber.replace(" ", "").lowercase().contains(qCompact) ||
                             flight.airline.lowercase().contains(q) ||
                             flight.airlineCode.lowercase().contains(q) ||
                             flight.origin.code.lowercase().contains(q) ||
@@ -98,8 +108,16 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 SearchMode.ROUTE -> {
-                    val originMatch = filters.routeOrigin.isBlank() || filters.routeOrigin == "ALL" || flight.origin.code.equals(filters.routeOrigin, ignoreCase = true)
-                    val destMatch = filters.routeDestination.isBlank() || filters.routeDestination == "ALL" || flight.destination.code.equals(filters.routeDestination, ignoreCase = true)
+                    val origQ = filters.routeOrigin.trim().lowercase()
+                    val destQ = filters.routeDestination.trim().lowercase()
+                    val originMatch = origQ.isBlank() || origQ == "all" ||
+                        flight.origin.code.lowercase().contains(origQ) ||
+                        flight.origin.city.lowercase().contains(origQ) ||
+                        flight.origin.name.lowercase().contains(origQ)
+                    val destMatch = destQ.isBlank() || destQ == "all" ||
+                        flight.destination.code.lowercase().contains(destQ) ||
+                        flight.destination.city.lowercase().contains(destQ) ||
+                        flight.destination.name.lowercase().contains(destQ)
                     originMatch && destMatch
                 }
             }
@@ -136,6 +154,17 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setSearchQuery(query: String) {
         _searchFilters.value = _searchFilters.value.copy(query = query)
+        triggerDebouncedLiveFlightLookup(query)
+    }
+
+    private fun triggerDebouncedLiveFlightLookup(query: String) {
+        liveFlightLookupJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.length < 3) return
+        liveFlightLookupJob = viewModelScope.launch {
+            delay(450)
+            repository.fetchLiveFlightByNumber(trimmed)
+        }
     }
 
     fun setStatusFilter(status: FlightStatus?) {
@@ -173,6 +202,10 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectAirport(code: String) {
         _selectedAirportCode.value = code
+        liveAirportBoardJob?.cancel()
+        liveAirportBoardJob = viewModelScope.launch {
+            repository.fetchLiveAirportBoard(code)
+        }
     }
 
     fun setAirportBoardDirection(isDeparture: Boolean) {
@@ -265,44 +298,50 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         return repository.observeDestinationWeather(airportCode)
     }
 
+    fun signInWithGoogle(activity: android.app.Activity, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val res = com.example.util.GoogleAuthManager.signInWithGoogle(activity)
+            if (res.isSuccess) {
+                val userName = res.getOrNull() ?: "Google Aviator"
+                repository.addAlert(
+                    FlightAlert(
+                        id = java.util.UUID.randomUUID().toString(),
+                        flightNumber = "ACCOUNT",
+                        type = AlertType.BOARDING,
+                        title = "Google Sign-In Connected",
+                        message = "Welcome aboard, $userName. Your tracked flights and alerts are now backed by Firebase Firestore.",
+                        timestamp = "Just now",
+                        isRead = false
+                    ),
+                    triggerSystemPush = true
+                )
+                onResult(true, null)
+            } else {
+                val errorMsg = res.exceptionOrNull()?.message ?: "Google Sign-In cancelled or failed"
+                onResult(false, errorMsg)
+            }
+        }
+    }
+
     fun signInWithOAuth(provider: String = "Google Aviation SSO") {
         viewModelScope.launch {
-            repository.updateAccount(
-                UserAccount(
-                    name = "Capt. Alex Mercer",
-                    email = "alex.mercer@aviation.aero",
-                    avatarInitial = "A",
-                    isSignedIn = true,
-                    isOfflineMode = false,
-                    lastSyncTime = "Cloud OAuth Authenticated"
-                )
-            )
             repository.addAlert(
                 FlightAlert(
                     id = java.util.UUID.randomUUID().toString(),
                     flightNumber = "ACCOUNT",
                     type = AlertType.BOARDING,
-                    title = "OAuth Login Successful",
-                    message = "Connected to $provider. Push alerts & offline local cache are now synchronized.",
+                    title = "OAuth Login Prompt",
+                    message = "Please tap 'Sign in with Google' to authenticate with Firebase Auth & Firestore.",
                     timestamp = "Just now",
                     isRead = false
                 ),
-                triggerSystemPush = true
+                triggerSystemPush = false
             )
         }
     }
 
     fun signOut() {
-        repository.updateAccount(
-            UserAccount(
-                name = "Guest Traveler",
-                email = "guest@skytrack.local",
-                avatarInitial = "G",
-                isSignedIn = false,
-                isOfflineMode = true,
-                lastSyncTime = "Local Offline Cache Only"
-            )
-        )
+        com.example.util.GoogleAuthManager.signOut()
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -320,4 +359,3 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         setThemeMode(next)
     }
 }
-

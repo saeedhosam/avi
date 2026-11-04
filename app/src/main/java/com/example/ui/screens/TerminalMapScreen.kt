@@ -210,7 +210,15 @@ fun TerminalMapScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Find gates (e.g. B22), Centurion lounge, TSA, dining...", fontSize = 12.sp, color = TextMuted) },
+                            placeholder = {
+                                Text(
+                                    text = "Find gates (e.g. B22), lounges, dining...",
+                                    fontSize = 12.sp,
+                                    color = TextMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = RadarCyan, modifier = Modifier.size(18.dp)) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {

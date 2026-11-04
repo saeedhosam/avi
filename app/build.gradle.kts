@@ -73,6 +73,12 @@ android {
   }
 }
 
+kotlin {
+  compilerOptions {
+    freeCompilerArgs.add("-Xannotation-default-target=param-property")
+  }
+}
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
@@ -111,7 +117,7 @@ dependencies {
   implementation(libs.androidx.work.runtime.ktx)
   // implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
-  implementation(libs.firebase.ai)
+  // implementation(libs.firebase.ai)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
   implementation(libs.androidx.credentials)
@@ -142,8 +148,32 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
+  "kspDebug"(libs.androidx.room.compiler)
+  "kspRelease"(libs.androidx.room.compiler)
+  // "ksp"(libs.moshi.kotlin.codegen)
+}
+
+tasks.matching { it.name.startsWith("ksp") }.configureEach {
+  if (name.contains("UnitTest") || name.contains("AndroidTest")) {
+    enabled = false
+  }
+  doFirst {
+    val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+      val isKspAwtTeardownNpe =
+        thread.name.startsWith("AWT-EventQueue") &&
+          throwable is NullPointerException &&
+          throwable.stackTrace.any { it.className.startsWith("ksp.com.intellij.") }
+      if (!isKspAwtTeardownNpe) {
+        if (previousHandler != null) {
+          previousHandler.uncaughtException(thread, throwable)
+        } else {
+          System.err.print("Exception in thread \"${thread.name}\" ")
+          throwable.printStackTrace(System.err)
+        }
+      }
+    }
+  }
 }
 
 tasks.withType<Test> {

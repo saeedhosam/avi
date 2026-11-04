@@ -9,7 +9,11 @@ import com.example.data.MockFlightData
 import com.example.data.local.CachedFlightEntity
 import com.example.data.local.FlightAlertEntity
 import com.example.data.local.SkyTrackDatabase
-import com.example.model.AlertType
+import com.example.data.remote.ApiConfig
+import com.example.data.remote.aerodatabox.AeroDataBoxMapper
+import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
+import com.example.data.remote.aerodatabox.FlightStateDiffer
+import com.example.model.Flight
 import com.example.model.FlightStatus
 import com.example.notifications.FlightNotificationManager
 import kotlinx.coroutines.Dispatchers
@@ -18,12 +22,14 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
 /**
- * Background WorkManager Worker responsible for syncing live flight telemetry,
+ * Production Background WorkManager Worker responsible for syncing live AeroDataBox flight telemetry,
  * gate changes, and delay statuses into the local Room database whenever connectivity
  * is restored or periodic background sync occurs.
+ *
+ * Uses [FlightStateDiffer] to emit notifications only when a tracked flight's status, gate,
+ * or delay schedule genuinely changes.
  */
 class FlightSyncWorker(
     appContext: Context,
@@ -38,24 +44,95 @@ class FlightSyncWorker(
             val db = SkyTrackDatabase.getDatabase(applicationContext)
             val dao = db.flightDao()
 
-            // 1. Fetch current tracked and favorite flights to retain user preferences
+            // 1. Fetch current tracked, favorite, and cached flights from Room
             val favorites = dao.getAllFavorites().firstOrNull() ?: emptyList()
-            val favoriteMap = favorites.associateBy({ it.flightNumber }, { it.customNotes })
+            val favoriteMap = favorites.associateBy({ it.flightNumber.replace(" ", "").lowercase(Locale.ROOT) }, { it.customNotes })
 
             val tracked = dao.getAllTrackedFlights().firstOrNull() ?: emptyList()
-            val trackedMap = tracked.associateBy({ it.flightNumber.replace(" ", "").lowercase() }, { it.notes })
+            val trackedMap = tracked.associateBy({ it.flightNumber.replace(" ", "").lowercase(Locale.ROOT) }, { it.notes })
 
-            // 2. Obtain fresh flight data (simulating live cloud aviation feed)
+            val previousCached = dao.getAllCachedFlights().firstOrNull() ?: emptyList()
+            val previousFlightMap = previousCached.associateBy { it.flightNumber.replace(" ", "").lowercase(Locale.ROOT) }
+
+            val hasLiveKey = ApiConfig.hasValidAeroDataBoxKey()
+            val liveUpdatedFlights = mutableMapOf<String, Flight>()
+            var syncSourceLabel = "SUCCESS (Room Cache Refreshed)"
+
+            // 2. If AeroDataBox API key is configured, query live status for tracked & favorite flights
+            if (hasLiveKey) {
+                val priorityFlightNumbers = (tracked.map { it.flightNumber } + favorites.map { it.flightNumber })
+                    .distinctBy { it.replace(" ", "").lowercase(Locale.ROOT) }
+                    .take(6) // Protect API quota during background worker runs
+
+                for (flightNum in priorityFlightNumbers) {
+                    val compactCode = flightNum.replace(" ", "")
+                    runCatching {
+                        val response = AeroDataBoxNetworkClient.apiService.getFlightByNumber(compactCode)
+                        if (response.isSuccessful && !response.body().isNullOrEmpty()) {
+                            val mapped = AeroDataBoxMapper.mapDtoToFlight(response.body()!!.first())
+                            if (mapped != null) {
+                                val key = mapped.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
+                                liveUpdatedFlights[key] = mapped
+                                syncSourceLabel = "SUCCESS (Live AeroDataBox Sync)"
+                            }
+                        } else if (response.code() == 429) {
+                            syncSourceLabel = "SUCCESS (Quota Fallback · Room Cache)"
+                        }
+                    }
+                }
+            }
+
+            // 3. Merge live updated flights with baseline flights and run state diffing for tracked flights
             val baseFlights = MockFlightData.initialFlights
-            val entities = baseFlights.map { flight ->
-                val key = flight.flightNumber.replace(" ", "").lowercase()
-                val isFav = favoriteMap.containsKey(flight.flightNumber)
+            val mergedFlights = baseFlights.map { baseFlight ->
+                val key = baseFlight.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
+                liveUpdatedFlights[key] ?: baseFlight
+            } + liveUpdatedFlights.values.filter { live ->
+                baseFlights.none { it.flightNumber.replace(" ", "").equals(live.flightNumber.replace(" ", ""), ignoreCase = true) }
+            }
+
+            val entities = mergedFlights.map { flight ->
+                val key = flight.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
+                val isFav = favoriteMap.containsKey(key)
                 val isTrk = trackedMap.containsKey(key)
-                val note = favoriteMap[flight.flightNumber] ?: trackedMap[key] ?: flight.customNotes
+                val note = favoriteMap[key] ?: trackedMap[key] ?: flight.customNotes
+
+                // Diff against previous cached entity if this flight is tracked or favorited
+                val prevEntity = previousFlightMap[key]
+                if ((isTrk || isFav) && prevEntity != null) {
+                    val prevDomain = flight.copy(
+                        status = runCatching { FlightStatus.valueOf(prevEntity.status) }.getOrDefault(flight.status),
+                        delayMinutes = prevEntity.delayMinutes,
+                        gateDeparture = prevEntity.gateDeparture,
+                        baggageCarousel = prevEntity.baggageCarousel
+                    )
+                    val detectedAlerts = FlightStateDiffer.diffFlights(prevDomain, flight)
+                    for (alert in detectedAlerts) {
+                        dao.insertAlert(
+                            FlightAlertEntity(
+                                id = alert.id,
+                                flightNumber = alert.flightNumber,
+                                type = alert.type.name,
+                                title = alert.title,
+                                message = alert.message,
+                                timestamp = alert.timestamp,
+                                isRead = false
+                            )
+                        )
+                        FlightNotificationManager.showFlightAlertNotification(
+                            context = applicationContext,
+                            notificationId = (alert.flightNumber + alert.id).hashCode(),
+                            flightNumber = alert.flightNumber,
+                            type = alert.type,
+                            title = alert.title,
+                            message = alert.message
+                        )
+                    }
+                }
 
                 // Update telemetry progress for airborne flights
                 val progress = if (flight.status == FlightStatus.DEPARTED) {
-                    (flight.telemetry.progressPercent + 0.04f).coerceAtMost(0.99f)
+                    (flight.telemetry.progressPercent + 0.02f).coerceAtMost(0.99f)
                 } else {
                     flight.telemetry.progressPercent
                 }
@@ -97,10 +174,10 @@ class FlightSyncWorker(
                 )
             }
 
-            // 3. Upsert fresh flight data into Room SQLite database
+            // 4. Upsert fresh flight data into Room SQLite database
             dao.insertFlights(entities)
 
-            // 4. Update sync metadata in SharedPreferences
+            // 5. Update sync metadata in SharedPreferences
             val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
             val timeStr = timeFormat.format(Date())
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -108,71 +185,46 @@ class FlightSyncWorker(
                 .putLong(KEY_LAST_SYNC_TIMESTAMP, System.currentTimeMillis())
                 .putString(KEY_LAST_SYNC_TIME_STR, timeStr)
                 .putInt(KEY_LAST_SYNC_COUNT, entities.size)
-                .putString(KEY_LAST_SYNC_STATUS, "SUCCESS (Connectivity Restored)")
+                .putString(KEY_LAST_SYNC_STATUS, syncSourceLabel)
                 .apply()
 
-            // 5. If user has active tracked flights, create a sync notification & alert
-            if (tracked.isNotEmpty()) {
-                val firstTracked = tracked.first()
-                val alert = FlightAlertEntity(
-                    id = UUID.randomUUID().toString(),
-                    flightNumber = firstTracked.flightNumber,
-                    type = AlertType.GATE_CHANGE.name,
-                    title = "Background Cache Synced: ${firstTracked.flightNumber}",
-                    message = "Connectivity restored. Room database updated with latest radar & gate information.",
-                    timestamp = "Just now",
-                    isRead = false
-                )
-                dao.insertAlert(alert)
-                FlightNotificationManager.showFlightAlertNotification(
-                    context = applicationContext,
-                    notificationId = firstTracked.flightNumber.hashCode() + 999,
-                    flightNumber = firstTracked.flightNumber,
-                    type = AlertType.GATE_CHANGE,
-                    title = "Cache Synced: ${firstTracked.flightNumber}",
-                    message = "Connectivity restored. Room database updated with fresh telemetry."
-                )
-            }
-
-            val elapsed = System.currentTimeMillis() - startTime
-            Log.d(TAG, "WorkManager background flight sync completed in ${elapsed}ms. Cached ${entities.size} flights in Room.")
+            val elapsedMs = System.currentTimeMillis() - startTime
+            Log.d(TAG, "WorkManager flight sync completed in ${elapsedMs}ms (${entities.size} flights cached).")
 
             Result.success(
                 workDataOf(
-                    OUTPUT_KEY_FLIGHTS_SYNCED to entities.size,
-                    OUTPUT_KEY_TIMESTAMP to System.currentTimeMillis(),
-                    OUTPUT_KEY_TIME_STRING to timeStr
+                    "synced_count" to entities.size,
+                    "sync_time" to timeStr,
+                    "elapsed_ms" to elapsedMs
                 )
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Background sync failed: ${e.message}", e)
+            Log.e(TAG, "WorkManager flight sync failed: ${e.message}", e)
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit()
-                .putString(KEY_LAST_SYNC_STATUS, "FAILED: ${e.message}")
+                .putString(KEY_LAST_SYNC_STATUS, "RETRYING (${e.localizedMessage ?: "Network Error"})")
                 .apply()
 
             if (runAttemptCount < 3) {
                 Result.retry()
             } else {
-                Result.failure(workDataOf("error" to (e.message ?: "Sync failure")))
+                Result.failure()
             }
         }
     }
 
     companion object {
         const val TAG = "FlightSyncWorker"
+        const val WORK_NAME_PERIODIC = "skytrack_periodic_sync"
+        const val WORK_NAME_CONNECTIVITY = "skytrack_connectivity_sync"
         const val WORK_NAME_CONNECTIVITY_SYNC = "skytrack_connectivity_sync"
         const val WORK_NAME_PERIODIC_SYNC = "skytrack_periodic_sync"
         const val WORK_NAME_IMMEDIATE_SYNC = "skytrack_immediate_sync"
-
-        const val PREFS_NAME = "skytrack_prefs"
+        const val OUTPUT_KEY_FLIGHTS_SYNCED = "flights_synced"
+        const val PREFS_NAME = "skytrack_sync_prefs"
         const val KEY_LAST_SYNC_TIMESTAMP = "last_sync_timestamp"
         const val KEY_LAST_SYNC_TIME_STR = "last_sync_time_str"
-        const val KEY_LAST_SYNC_COUNT = "last_sync_flight_count"
+        const val KEY_LAST_SYNC_COUNT = "last_sync_count"
         const val KEY_LAST_SYNC_STATUS = "last_sync_status"
-
-        const val OUTPUT_KEY_FLIGHTS_SYNCED = "flights_synced"
-        const val OUTPUT_KEY_TIMESTAMP = "sync_timestamp"
-        const val OUTPUT_KEY_TIME_STRING = "sync_time_string"
     }
 }

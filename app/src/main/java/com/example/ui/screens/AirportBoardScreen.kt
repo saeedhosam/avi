@@ -10,9 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FlightLand
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.MockFlightData
 import com.example.model.Flight
 import com.example.model.FlightStatus
+import com.example.ui.components.DataSourceStatusBanner
 import com.example.ui.components.StatusBadge
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.FlightViewModel
@@ -34,15 +33,31 @@ import com.example.ui.viewmodel.FlightViewModel
 fun AirportBoardScreen(
     viewModel: FlightViewModel,
     onFlightSelected: (Flight) -> Unit,
+    onOpenConnectionsMap: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val selectedAirportCode by viewModel.selectedAirportCode.collectAsState()
     val isDeparture by viewModel.isDepartureBoard.collectAsState()
     val airlineFilter by viewModel.airportAirlineFilter.collectAsState()
     val flights by viewModel.airportBoardFlights.collectAsState()
+    val dataSourceMode by viewModel.dataSourceMode.collectAsState()
+    val isLiveLoading by viewModel.isLiveLoading.collectAsState()
 
     val currentAirport = remember(selectedAirportCode) {
         MockFlightData.getAirport(selectedAirportCode)
+    }
+    var showSearchScreen by remember { mutableStateOf(false) }
+
+    if (showSearchScreen) {
+        AirportSearchScreen(
+            onOpenAirportBoard = { airportCode ->
+                viewModel.selectAirport(airportCode)
+                showSearchScreen = false
+            },
+            onBack = { showSearchScreen = false },
+            modifier = modifier
+        )
+        return
     }
 
     Scaffold(
@@ -56,12 +71,38 @@ fun AirportBoardScreen(
                             text = "Airport Flight Boards",
                             color = TextWhite,
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${currentAirport.code} · ${currentAirport.name}",
                             color = RadarCyan,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { onOpenConnectionsMap(selectedAirportCode) },
+                        modifier = Modifier.testTag("open_airport_connections_map_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Hub,
+                            contentDescription = "View Direct Flight Connections Map",
+                            tint = RadarCyan
+                        )
+                    }
+                    IconButton(
+                        onClick = { showSearchScreen = true },
+                        modifier = Modifier.testTag("open_airport_search_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TravelExplore,
+                            contentDescription = "Search Worldwide Airports",
+                            tint = RadarCyan
                         )
                     }
                 },
@@ -74,6 +115,19 @@ fun AirportBoardScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CockpitDark)
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                DataSourceStatusBanner(
+                    mode = dataSourceMode,
+                    isLiveLoading = isLiveLoading,
+                    onRefreshClick = { viewModel.selectAirport(selectedAirportCode) }
+                )
+            }
+
             // 1. Airport Hub Selection Row
             LazyRow(
                 modifier = Modifier
@@ -82,6 +136,35 @@ fun AirportBoardScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, RadarCyan.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            .clickable { showSearchScreen = true }
+                            .testTag("search_all_airports_chip"),
+                        color = RadarCyan.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = RadarCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Search Worldwide",
+                                color = RadarCyan,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
                 items(MockFlightData.airports) { airport ->
                     val isSelected = airport.code == selectedAirportCode
                     Surface(
@@ -202,10 +285,10 @@ fun AirportBoardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("TIME / FLIGHT", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.2f))
-                    Text(if (isDeparture) "DESTINATION" else "ORIGIN", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
-                    Text("GATE", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.7f))
-                    Text("STATUS", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("TIME / FLIGHT", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, modifier = Modifier.weight(1.1f))
+                    Text(if (isDeparture) "DESTINATION" else "ORIGIN", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, modifier = Modifier.weight(1.2f))
+                    Text("GATE", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, modifier = Modifier.weight(0.75f))
+                    Text("STATUS", color = TextSubtle, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, modifier = Modifier.weight(1.15f))
                 }
             }
 
@@ -271,61 +354,74 @@ private fun AirportBoardRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Time / Flight
-            Column(modifier = Modifier.weight(1.2f)) {
+            Column(modifier = Modifier.weight(1.1f)) {
                 Text(
                     text = if (isDeparture) flight.departureTimeEstimated else flight.arrivalTimeEstimated,
                     color = RadarCyan,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = flight.flightNumber,
                     color = TextWhite,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = flight.airlineCode,
                     color = TextSubtle,
-                    fontSize = 10.sp
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
             // Destination / Origin
             val otherAirport = if (isDeparture) flight.destination else flight.origin
-            Column(modifier = Modifier.weight(1.3f)) {
+            Column(modifier = Modifier.weight(1.2f)) {
                 Text(
                     text = otherAirport.code,
                     color = TextWhite,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Black
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = otherAirport.city,
                     color = TextMuted,
                     fontSize = 11.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
 
             // Gate / Terminal
-            Column(modifier = Modifier.weight(0.7f)) {
+            Column(modifier = Modifier.weight(0.75f)) {
                 Text(
                     text = if (isDeparture) flight.gateDeparture else flight.gateArrival,
                     color = TextWhite,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
                     text = "T${if (isDeparture) flight.terminalDeparture else flight.terminalArrival}",
                     color = TextMuted,
-                    fontSize = 10.sp
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
             // Status Badge
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1.15f)) {
                 StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
             }
         }

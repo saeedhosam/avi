@@ -13,9 +13,10 @@ import androidx.room.RoomDatabase
         ScheduledNotificationEntity::class,
         RecentSearchEntity::class,
         TrackedFlightEntity::class,
-        DestinationWeatherEntity::class
+        DestinationWeatherEntity::class,
+        CachedAirportRouteEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SkyTrackDatabase : RoomDatabase() {

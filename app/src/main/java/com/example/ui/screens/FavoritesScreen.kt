@@ -1,10 +1,11 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AlertType
@@ -44,12 +46,16 @@ fun FavoritesScreen(
                             text = "Saved Flight Watchlist",
                             color = TextWhite,
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${favorites.size} Active Watchlists · Offline Cached",
                             color = RadarCyan,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -94,36 +100,37 @@ fun FavoritesScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    // Watchlist Info Banner
-                    Card(
+                    // Compact Single-Line Watchlist Status Bar
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, InstrumentBorder, RoundedCornerShape(14.dp)),
-                        colors = CardDefaults.cardColors(containerColor = CockpitDark)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, InstrumentBorder, RoundedCornerShape(12.dp)),
+                        color = CockpitDark
                     ) {
                         Row(
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.NotificationsActive, null, tint = RadarCyan)
-                            Column {
-                                Text(
-                                    text = "Live Alerts Active",
-                                    color = TextWhite,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Monitoring gate assignments, ATC flow delays, and boarding milestones.",
-                                    color = TextMuted,
-                                    fontSize = 12.sp
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = RadarCyan,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Live Alerts Active · Gate, Delay & Boarding Push Enabled",
+                                color = TextWhite,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
@@ -137,57 +144,58 @@ fun FavoritesScreen(
                             onToggleTrack = { viewModel.toggleTrackFlight(flight) }
                         )
 
-                        // Quick trigger simulation bar under each favorite card
+                        // Scrollable single-line quick trigger simulation bar under each favorite card
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 6.dp, start = 8.dp, end = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                                .padding(top = 6.dp, start = 4.dp, end = 4.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Test Alerts:",
                                 color = TextSubtle,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                SuggestionChip(
-                                    onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.GATE_CHANGE) },
-                                    label = { Text("Gate", fontSize = 10.sp) },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = InstrumentSurface,
-                                        labelColor = RadarCyan
-                                    )
+                            SuggestionChip(
+                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.GATE_CHANGE) },
+                                label = { Text("Gate", fontSize = 10.sp, maxLines = 1) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = InstrumentSurface,
+                                    labelColor = RadarCyan
                                 )
-                                SuggestionChip(
-                                    onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.DELAY) },
-                                    label = { Text("Delay", fontSize = 10.sp) },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = InstrumentSurface,
-                                        labelColor = StatusDelayed
-                                    )
+                            )
+                            SuggestionChip(
+                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.DELAY) },
+                                label = { Text("Delay", fontSize = 10.sp, maxLines = 1) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = InstrumentSurface,
+                                    labelColor = StatusDelayed
                                 )
-                                SuggestionChip(
-                                    onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.BOARDING) },
-                                    label = { Text("Boarding", fontSize = 10.sp) },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = InstrumentSurface,
-                                        labelColor = StatusBoarding
-                                    )
+                            )
+                            SuggestionChip(
+                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.BOARDING) },
+                                label = { Text("Boarding", fontSize = 10.sp, maxLines = 1) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = InstrumentSurface,
+                                    labelColor = StatusBoarding
                                 )
-                                SuggestionChip(
-                                    onClick = { flightToShare = flight },
-                                    label = { Text("Share", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                                    icon = {
-                                        Icon(Icons.Default.Share, null, tint = RadarCyan, modifier = Modifier.size(12.dp))
-                                    },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = InstrumentSurfaceElevated,
-                                        labelColor = RadarCyan
-                                    )
+                            )
+                            SuggestionChip(
+                                onClick = { flightToShare = flight },
+                                label = { Text("Share", fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                                icon = {
+                                    Icon(Icons.Default.Share, null, tint = RadarCyan, modifier = Modifier.size(12.dp))
+                                },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = InstrumentSurfaceElevated,
+                                    labelColor = RadarCyan
                                 )
-                            }
+                            )
                         }
                     }
                 }

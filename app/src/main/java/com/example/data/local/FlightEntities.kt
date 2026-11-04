@@ -232,4 +232,29 @@ interface FlightDao {
 
     @Query("DELETE FROM destination_weather_cache WHERE airportCode = :airportCode")
     suspend fun deleteDestinationWeather(airportCode: String)
+
+    // Airport Direct Route Connections Cache
+    @Query("SELECT * FROM airport_route_connections WHERE originIata = :originIata ORDER BY dailyFlightsCount DESC")
+    suspend fun getCachedRoutesForOrigin(originIata: String): List<CachedAirportRouteEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedRoutes(routes: List<CachedAirportRouteEntity>)
 }
+
+@Entity(tableName = "airport_route_connections")
+data class CachedAirportRouteEntity(
+    @PrimaryKey val routeId: String, // e.g. "CAI-LHR"
+    val originIata: String,
+    val destinationIata: String,
+    val destinationName: String,
+    val destinationCity: String,
+    val destinationCountry: String,
+    val destinationLat: Double,
+    val destinationLon: Double,
+    val distanceKm: Int,
+    val dailyFlightsCount: Int,
+    val airlinesSummary: String, // e.g. "MS:EgyptAir:MS 777|BA:British Airways:BA 401"
+    val isLiveVerified: Boolean = false,
+    val cachedTimestamp: Long = System.currentTimeMillis()
+)
+

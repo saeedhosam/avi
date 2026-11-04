@@ -91,87 +91,26 @@ fun NotificationsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Firebase & Room status chips
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = StatusLanded.copy(alpha = 0.15f),
-                        border = BorderStroke(0.6.dp, StatusLanded.copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(StatusLanded)
-                            )
-                            Text(
-                                text = "FCM PUSH ACTIVE",
-                                color = StatusLanded,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = RadarCyan.copy(alpha = 0.15f),
-                        border = BorderStroke(0.6.dp, RadarCyan.copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(RadarCyan)
-                            )
-                            Text(
-                                text = "ROOM SCHEDULER",
-                                color = RadarCyan,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = StatusDeparted.copy(alpha = 0.15f),
-                        border = BorderStroke(0.6.dp, StatusDeparted.copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(StatusDeparted)
-                            )
-                            Text(
-                                text = "WORKMANAGER SYNC",
-                                color = StatusDeparted,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(StatusLanded)
+                    )
+                    Text(
+                        text = "FCM Push · Room Scheduler · WorkManager Sync",
+                        color = RadarCyan,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         },

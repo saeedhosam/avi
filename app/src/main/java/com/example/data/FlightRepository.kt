@@ -2,10 +2,20 @@ package com.example.data
 
 import android.content.Context
 import android.util.Log
+import com.example.data.firestore.FirestoreAlert
+import com.example.data.firestore.FirestoreRepository
+import com.example.data.firestore.FirestoreTrackedFlight
+import com.example.data.firestore.FirestoreUserProfile
 import com.example.data.local.*
+import com.example.data.remote.ApiConfig
+import com.example.data.remote.DataSourceMode
+import com.example.data.remote.aerodatabox.AeroDataBoxMapper
+import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
+import com.example.data.remote.aerodatabox.FlightStateDiffer
 import com.example.model.*
 import com.example.notifications.FlightNotificationManager
 import com.example.notifications.FlightNotificationScheduler
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,6 +38,8 @@ class FlightRepository(private val context: Context) {
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
     val scheduler = FlightNotificationScheduler(context)
     val weatherService = com.example.data.weather.DestinationWeatherService(context)
+    val firestoreRepository = FirestoreRepository.getInstance(context)
+    val auth = FirebaseAuth.getInstance()
 
     private val _flights = MutableStateFlow<List<Flight>>(MockFlightData.initialFlights)
     val flights: StateFlow<List<Flight>> = _flights.asStateFlow()
@@ -34,35 +47,38 @@ class FlightRepository(private val context: Context) {
     private val _alerts = MutableStateFlow<List<FlightAlert>>(MockFlightData.sampleAlerts)
     val alerts: StateFlow<List<FlightAlert>> = _alerts.asStateFlow()
 
+    private val _dataSourceMode = MutableStateFlow(
+        ApiConfig.resolveInitialMode(isOffline = false)
+    )
+    val dataSourceMode: StateFlow<DataSourceMode> = _dataSourceMode.asStateFlow()
+
+    private val _isLiveLoading = MutableStateFlow(false)
+    val isLiveLoading: StateFlow<Boolean> = _isLiveLoading.asStateFlow()
+
     val scheduledNotifications: Flow<List<ScheduledNotificationEntity>> = scheduler.scheduledNotifications
     val recentSearches: Flow<List<RecentSearchEntity>> = flightDao.getRecentSearches()
     val trackedFlights: Flow<List<TrackedFlightEntity>> = flightDao.getAllTrackedFlights()
 
     private val _userAccount = MutableStateFlow(
         UserAccount(
-            name = "Capt. Alex Mercer",
-            email = "alex.mercer@aviation.aero",
-            avatarInitial = "A",
-            isSignedIn = true,
+            name = "Guest Aviator",
+            email = "Sign in with Google to sync",
+            avatarInitial = "G",
+            isSignedIn = false,
             isOfflineMode = false,
-            lastSyncTime = "Cached 2m ago"
+            lastSyncTime = "Local Room Cache Active"
         )
     )
     val userAccount: StateFlow<UserAccount> = _userAccount.asStateFlow()
 
     init {
-        // Initialize Notification Channels
         FlightNotificationManager.createNotificationChannel(context)
-
-        // Initialize Firebase Cloud Messaging registration token
         initFcmToken()
 
-        // Initialize WorkManager background sync service for connectivity restore
         com.example.sync.FlightSyncManager.scheduleConnectivitySync(context)
         com.example.sync.FlightSyncManager.schedulePeriodicSync(context)
         com.example.sync.FlightSyncManager.registerConnectivityRestoredMonitor(context)
 
-        // Initialize Room cache in background
         repositoryScope.launch {
             cacheAllFlights(_flights.value)
             loadRoomFavorites()
@@ -71,12 +87,191 @@ class FlightRepository(private val context: Context) {
             observeRoomCachedFlights()
         }
 
-        // Live simulation loop: continuously updates active flights slightly
+        setupFirebaseAuthObserver()
+
+        // Smooth geodesic interpolation for airborne flights between network polls
         repositoryScope.launch {
             while (true) {
                 delay(4000)
                 updateLiveTelemetry()
             }
+        }
+    }
+
+    /**
+     * Queries the live AeroDataBox API for a flight number (e.g., "AA100", "BA 178")
+     * when a valid API key is present and the app is online. Results are merged into
+     * the Room Single Source of Truth cache and diffed for real-time status alerts.
+     */
+    suspend fun fetchLiveFlightByNumber(rawQuery: String): List<Flight> = withContext(Dispatchers.IO) {
+        val cleaned = rawQuery.trim().replace(" ", "").replace("-", "")
+        val flightNumberRegex = Regex("^[A-Za-z0-9]{2,3}[0-9]{1,4}[A-Za-z]?$")
+        if (!flightNumberRegex.matches(cleaned)) {
+            return@withContext emptyList()
+        }
+
+        if (_userAccount.value.isOfflineMode) {
+            _dataSourceMode.value = DataSourceMode.OFFLINE_ROOM_CACHE
+            return@withContext emptyList()
+        }
+
+        if (!ApiConfig.hasValidAeroDataBoxKey()) {
+            _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
+            return@withContext emptyList()
+        }
+
+        _isLiveLoading.value = true
+        try {
+            val response = AeroDataBoxNetworkClient.apiService.getFlightByNumber(cleaned.uppercase(Locale.ROOT))
+            when {
+                response.code() == 429 -> {
+                    _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
+                    emptyList()
+                }
+                response.isSuccessful && !response.body().isNullOrEmpty() -> {
+                    _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                    val mappedFlights = response.body()!!.mapNotNull { dto ->
+                        AeroDataBoxMapper.mapDtoToFlight(dto)
+                    }
+                    if (mappedFlights.isNotEmpty()) {
+                        mergeAndCacheLiveFlights(mappedFlights)
+                    }
+                    mappedFlights
+                }
+                else -> emptyList()
+            }
+        } catch (e: Exception) {
+            Log.d("FlightRepository", "AeroDataBox flight lookup fallback for $cleaned: ${e.message}")
+            emptyList()
+        } finally {
+            _isLiveLoading.value = false
+        }
+    }
+
+    /**
+     * Queries the live AeroDataBox Airport FIDS endpoint (`/airports/iata/{code}/flights`)
+     * for departures and arrivals at the selected airport hub.
+     */
+    suspend fun fetchLiveAirportBoard(airportCode: String): List<Flight> = withContext(Dispatchers.IO) {
+        val code = airportCode.trim().uppercase(Locale.ROOT)
+        if (code.length != 3) return@withContext emptyList()
+
+        if (_userAccount.value.isOfflineMode) {
+            _dataSourceMode.value = DataSourceMode.OFFLINE_ROOM_CACHE
+            return@withContext emptyList()
+        }
+
+        if (!ApiConfig.hasValidAeroDataBoxKey()) {
+            _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
+            return@withContext emptyList()
+        }
+
+        _isLiveLoading.value = true
+        try {
+            val response = AeroDataBoxNetworkClient.apiService.getAirportFlights(code)
+            when {
+                response.code() == 429 -> {
+                    _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
+                    emptyList()
+                }
+                response.isSuccessful && response.body() != null -> {
+                    _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                    val mappedFlights = AeroDataBoxMapper.mapFidsToFlights(code, response.body()!!)
+                    if (mappedFlights.isNotEmpty()) {
+                        mergeAndCacheLiveFlights(mappedFlights)
+                    }
+                    mappedFlights
+                }
+                else -> emptyList()
+            }
+        } catch (e: Exception) {
+            Log.d("FlightRepository", "AeroDataBox FIDS lookup fallback for $code: ${e.message}")
+            emptyList()
+        } finally {
+            _isLiveLoading.value = false
+        }
+    }
+
+    private suspend fun mergeAndCacheLiveFlights(incomingFlights: List<Flight>) {
+        val currentMap = _flights.value.associateBy {
+            it.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
+        }.toMutableMap()
+
+        for (incoming in incomingFlights) {
+            val key = incoming.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
+            val existing = currentMap[key]
+            if (existing != null) {
+                if (existing.isTracked || existing.isFavorite) {
+                    val alerts = FlightStateDiffer.diffFlights(existing, incoming)
+                    alerts.forEach { alert -> addAlert(alert, triggerSystemPush = true) }
+                }
+                currentMap[key] = incoming.copy(
+                    isFavorite = existing.isFavorite,
+                    isTracked = existing.isTracked,
+                    customNotes = existing.customNotes
+                )
+            } else {
+                currentMap[key] = incoming
+            }
+        }
+
+        val updatedList = currentMap.values.toList()
+        _flights.value = updatedList
+        cacheAllFlights(updatedList)
+    }
+
+    private fun setupFirebaseAuthObserver() {
+        auth.addAuthStateListener { firebaseAuth ->
+            val user = firebaseAuth.currentUser
+            if (user != null) {
+                val initial = (user.displayName?.firstOrNull() ?: user.email?.firstOrNull() ?: 'A').uppercaseChar().toString()
+                _userAccount.value = UserAccount(
+                    name = user.displayName ?: ("Capt. " + (user.email?.substringBefore("@") ?: "Aviator")),
+                    email = user.email ?: "pilot@aviation.aero",
+                    avatarInitial = initial,
+                    isSignedIn = true,
+                    isOfflineMode = _userAccount.value.isOfflineMode,
+                    lastSyncTime = "Cloud Sync Active (Firestore)"
+                )
+                repositoryScope.launch {
+                    firestoreRepository.saveUserProfile(
+                        FirestoreUserProfile(
+                            userId = user.uid,
+                            displayName = user.displayName ?: "Aviator",
+                            email = user.email ?: "",
+                            photoUrl = user.photoUrl?.toString() ?: ""
+                        )
+                    )
+                    syncFavoritesWithFirestore(user.uid)
+                }
+            } else {
+                _userAccount.value = UserAccount(
+                    name = "Guest Aviator",
+                    email = "Sign in with Google to sync",
+                    avatarInitial = "G",
+                    isSignedIn = false,
+                    isOfflineMode = _userAccount.value.isOfflineMode,
+                    lastSyncTime = "Local Room Cache Active"
+                )
+            }
+        }
+    }
+
+    private suspend fun syncFavoritesWithFirestore(userId: String) {
+        _flights.value.filter { it.isFavorite || it.isTracked }.forEach { flight ->
+            firestoreRepository.saveTrackedFlight(
+                FirestoreTrackedFlight(
+                    id = flight.id,
+                    userId = userId,
+                    flightNumber = flight.flightNumber,
+                    airline = flight.airline,
+                    originCode = flight.origin.code,
+                    destCode = flight.destination.code,
+                    status = flight.status.name,
+                    customNotes = flight.customNotes,
+                    isFavorite = flight.isFavorite
+                )
+            )
         }
     }
 
@@ -152,7 +347,6 @@ class FlightRepository(private val context: Context) {
                         isRead = entity.isRead
                     )
                 }
-                // Merge Room alerts with sample alerts (avoiding duplicates)
                 val existingIds = mapped.map { it.id }.toSet()
                 val merged = mapped + _alerts.value.filter { it.id !in existingIds }
                 _alerts.value = merged
@@ -181,21 +375,31 @@ class FlightRepository(private val context: Context) {
                 val updated = cachedList.map { entity ->
                     val existing = currentFlights.find { it.flightNumber.equals(entity.flightNumber, ignoreCase = true) }
                         ?: MockFlightData.initialFlights.find { it.flightNumber.equals(entity.flightNumber, ignoreCase = true) }
-                        ?: currentFlights.first()
+
+                    val originAirport = MockFlightData.getAirport(entity.originCode).let { base ->
+                        if (base.code.equals(entity.originCode, ignoreCase = true)) base
+                        else base.copy(code = entity.originCode, city = entity.originCity, name = entity.originName)
+                    }
+                    val destAirport = MockFlightData.getAirport(entity.destCode).let { base ->
+                        if (base.code.equals(entity.destCode, ignoreCase = true)) base
+                        else base.copy(code = entity.destCode, city = entity.destCity, name = entity.destName)
+                    }
 
                     val parsedStatus = try {
                         FlightStatus.valueOf(entity.status)
                     } catch (_: Exception) {
-                        existing.status
+                        existing?.status ?: FlightStatus.SCHEDULED
                     }
 
-                    existing.copy(
+                    val template = existing ?: currentFlights.first()
+
+                    template.copy(
                         id = entity.id,
                         flightNumber = entity.flightNumber,
                         airline = entity.airline,
                         airlineCode = entity.airlineCode,
-                        origin = MockFlightData.getAirport(entity.originCode),
-                        destination = MockFlightData.getAirport(entity.destCode),
+                        origin = originAirport,
+                        destination = destAirport,
                         departureTimeScheduled = entity.departureTimeScheduled,
                         departureTimeEstimated = entity.departureTimeEstimated,
                         arrivalTimeScheduled = entity.arrivalTimeScheduled,
@@ -210,18 +414,18 @@ class FlightRepository(private val context: Context) {
                         terminalArrival = entity.terminalArrival,
                         gateArrival = entity.gateArrival,
                         baggageCarousel = entity.baggageCarousel,
-                        aircraft = existing.aircraft.copy(
+                        aircraft = template.aircraft.copy(
                             model = entity.aircraftModel,
                             registration = entity.aircraftRegistration
                         ),
-                        telemetry = existing.telemetry.copy(
+                        telemetry = template.telemetry.copy(
                             altitudeFeet = entity.altitudeFeet,
                             groundSpeedKnots = entity.groundSpeedKnots,
                             headingDegrees = entity.headingDegrees,
                             progressPercent = entity.progressPercent
                         ),
-                        isFavorite = entity.isFavorite || existing.isFavorite,
-                        customNotes = entity.customNotes.ifBlank { existing.customNotes }
+                        isFavorite = entity.isFavorite || (existing?.isFavorite == true),
+                        customNotes = entity.customNotes.ifBlank { existing?.customNotes ?: "" }
                     )
                 }
                 _flights.value = updated
@@ -240,7 +444,6 @@ class FlightRepository(private val context: Context) {
                 val newSpeed = (flight.telemetry.groundSpeedKnots + speedJitter).coerceIn(480, 565)
                 val etaMinutes = maxOf(1, (newDistRemaining / (newSpeed / 60.0)).toInt())
 
-                // Interpolate latitude and longitude slightly towards destination
                 val dLat = (flight.destination.latitude - flight.origin.latitude) * 0.003
                 val dLon = (flight.destination.longitude - flight.origin.longitude) * 0.003
 
@@ -280,7 +483,22 @@ class FlightRepository(private val context: Context) {
                         customNotes = customNotes
                     )
                 )
-                // Generate a notification confirming favorite alert subscription
+                val user = auth.currentUser
+                if (user != null) {
+                    firestoreRepository.saveTrackedFlight(
+                        FirestoreTrackedFlight(
+                            id = flight.id,
+                            userId = user.uid,
+                            flightNumber = flight.flightNumber,
+                            airline = flight.airline,
+                            originCode = flight.origin.code,
+                            destCode = flight.destination.code,
+                            status = flight.status.name,
+                            customNotes = customNotes.ifBlank { flight.customNotes },
+                            isFavorite = true
+                        )
+                    )
+                }
                 addAlert(
                     FlightAlert(
                         id = UUID.randomUUID().toString(),
@@ -296,6 +514,26 @@ class FlightRepository(private val context: Context) {
             } else {
                 unsubscribeFromFlightPush(flightNumber)
                 flightDao.removeFavorite(flightNumber)
+                val user = auth.currentUser
+                if (user != null) {
+                    if (!flight.isTracked) {
+                        firestoreRepository.deleteTrackedFlight(flight.id)
+                    } else {
+                        firestoreRepository.saveTrackedFlight(
+                            FirestoreTrackedFlight(
+                                id = flight.id,
+                                userId = user.uid,
+                                flightNumber = flight.flightNumber,
+                                airline = flight.airline,
+                                originCode = flight.origin.code,
+                                destCode = flight.destination.code,
+                                status = flight.status.name,
+                                customNotes = flight.customNotes,
+                                isFavorite = false
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -313,6 +551,23 @@ class FlightRepository(private val context: Context) {
                     customNotes = notes
                 )
             )
+            val user = auth.currentUser
+            val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
+            if (user != null && flight != null) {
+                firestoreRepository.saveTrackedFlight(
+                    FirestoreTrackedFlight(
+                        id = flight.id,
+                        userId = user.uid,
+                        flightNumber = flight.flightNumber,
+                        airline = flight.airline,
+                        originCode = flight.origin.code,
+                        destCode = flight.destination.code,
+                        status = flight.status.name,
+                        customNotes = notes,
+                        isFavorite = flight.isFavorite
+                    )
+                )
+            }
         }
     }
 
@@ -344,6 +599,22 @@ class FlightRepository(private val context: Context) {
                     isAutoAlertEnabled = true
                 )
                 flightDao.insertTrackedFlight(entity)
+                val user = auth.currentUser
+                if (user != null) {
+                    firestoreRepository.saveTrackedFlight(
+                        FirestoreTrackedFlight(
+                            id = flight.id,
+                            userId = user.uid,
+                            flightNumber = flight.flightNumber,
+                            airline = flight.airline,
+                            originCode = flight.origin.code,
+                            destCode = flight.destination.code,
+                            status = flight.status.name,
+                            customNotes = customNotes,
+                            isFavorite = flight.isFavorite
+                        )
+                    )
+                }
                 addAlert(
                     FlightAlert(
                         id = UUID.randomUUID().toString(),
@@ -359,6 +630,26 @@ class FlightRepository(private val context: Context) {
             } else {
                 unsubscribeFromFlightPush(flight.flightNumber)
                 flightDao.deleteTrackedFlight(flight.flightNumber)
+                val user = auth.currentUser
+                if (user != null) {
+                    if (!flight.isFavorite) {
+                        firestoreRepository.deleteTrackedFlight(flight.id)
+                    } else {
+                        firestoreRepository.saveTrackedFlight(
+                            FirestoreTrackedFlight(
+                                id = flight.id,
+                                userId = user.uid,
+                                flightNumber = flight.flightNumber,
+                                airline = flight.airline,
+                                originCode = flight.origin.code,
+                                destCode = flight.destination.code,
+                                status = flight.status.name,
+                                customNotes = "",
+                                isFavorite = true
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -427,6 +718,20 @@ class FlightRepository(private val context: Context) {
                     isRead = alert.isRead
                 )
             )
+            val user = auth.currentUser
+            if (user != null) {
+                firestoreRepository.saveAlert(
+                    FirestoreAlert(
+                        id = alert.id,
+                        userId = user.uid,
+                        flightNumber = alert.flightNumber,
+                        alertType = alert.type.name,
+                        title = alert.title,
+                        message = alert.message,
+                        isRead = alert.isRead
+                    )
+                )
+            }
         }
 
         if (triggerSystemPush) {
@@ -448,6 +753,10 @@ class FlightRepository(private val context: Context) {
         }
         repositoryScope.launch {
             flightDao.markAlertRead(alertId)
+            val user = auth.currentUser
+            if (user != null) {
+                firestoreRepository.markAlertRead(alertId)
+            }
         }
     }
 
@@ -458,7 +767,7 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    // Interactive Trigger: Simulate real-time flight changes and post system push notification
+    // Diagnostic Trigger: Test real-time alert notification pipeline
     fun simulateRealtimeEvent(flightNumber: String, eventType: AlertType) {
         val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) } ?: return
 
@@ -598,7 +907,6 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    // Schedule a local alert stored in Room and queued with AlarmManager
     fun scheduleAlert(
         flightNumber: String,
         type: AlertType,
@@ -676,8 +984,8 @@ class FlightRepository(private val context: Context) {
             lastSyncTime = if (willBeOffline) "Offline Mode (Local Cache Active)" else "Connected (WorkManager Sync Active)"
         )
         _userAccount.value = updated
+        _dataSourceMode.value = ApiConfig.resolveInitialMode(isOffline = willBeOffline)
 
-        // Whenever connectivity is restored (offline mode turned off), immediately trigger WorkManager background sync
         if (!willBeOffline) {
             com.example.sync.FlightSyncManager.enqueueImmediateSync(context)
         }
@@ -735,6 +1043,10 @@ class FlightRepository(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         _userAccount.value = _userAccount.value.copy(lastSyncTime = "Synced at $timeStr")
         repositoryScope.launch {
+            if (!_userAccount.value.isOfflineMode && ApiConfig.hasValidAeroDataBoxKey()) {
+                val trackedNumbers = _flights.value.filter { it.isTracked || it.isFavorite }.map { it.flightNumber }.take(5)
+                trackedNumbers.forEach { num -> fetchLiveFlightByNumber(num) }
+            }
             cacheAllFlights(_flights.value)
         }
         com.example.sync.FlightSyncManager.enqueueImmediateSync(context)
