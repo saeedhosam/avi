@@ -6,6 +6,16 @@ Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript**, and **Tail
 
 > The Android project was not modified. This repository is an additive, desktop-first companion experience.
 
+## Preview
+
+| Flight search | Global route network |
+| --- | --- |
+| ![Flight search](docs/screenshots/search-dark.png) | ![Route network](docs/screenshots/routes.png) |
+
+| Flight dossier | Terminal wayfinding |
+| --- | --- |
+| ![Flight dossier](docs/screenshots/flight-dossier.png) | ![Terminal map](docs/screenshots/terminal-map.png) |
+
 ---
 
 ## Feature parity
