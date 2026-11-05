@@ -76,6 +76,8 @@ Caddy terminates HTTPS and proxies:
 - `app.*` → `avi-web:3000`
 - `api.*` → `avi-api:8080`
 
+Current implementation status and remaining work: [`docs/status.md`](docs/status.md).
+
 ## Verification
 
 ```bash
