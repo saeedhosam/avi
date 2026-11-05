@@ -65,7 +65,7 @@ export function AccountDialog({
     toggleOffline,
     refreshData,
     syncing,
-    firebaseReady,
+    supabaseReady,
     aeroConfigured,
     fcmToken,
   } = useApp();
@@ -266,7 +266,7 @@ export function AccountDialog({
                 <p className="flex items-center justify-between gap-3">
                   <span>Environment</span>
                   <span className="font-semibold text-ink">
-                    {firebaseReady ? "Firebase client ready" : "Firebase not initialized"}
+                    {supabaseReady ? "Firebase client ready" : "Firebase not initialized"}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
@@ -276,7 +276,7 @@ export function AccountDialog({
                   </span>
                 </p>
               </div>
-              {!firebaseReady && (
+              {!supabaseReady && (
                 <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
                   Add your Firebase web app values to{" "}
                   <code className="font-mono text-accent">.env.local</code> to
@@ -331,7 +331,7 @@ export function AccountDialog({
             <div className="rounded-xl border border-line bg-surface-2 p-3.5">
               <p className="label-caps text-subtle">Display theme</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                The SkyTrack cockpit palette is preserved across both themes.
+                The Avi cockpit palette is preserved across both themes.
                 Dark mode is the default radar-night experience; light mode uses
                 the same aviation instrument language with high-contrast surfaces.
               </p>

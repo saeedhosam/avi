@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "SkyTrack · Live Flight Tracking & Radar",
-    template: "%s · SkyTrack",
+    default: "Avi · Live Flight Tracking & Radar",
+    template: "%s · Avi",
   },
   description:
-    "SkyTrack is a live flight tracking assistant with interactive radar, global route maps, airport boards, gate navigation, destination weather, and offline watchlists.",
-  applicationName: "SkyTrack",
+    "Avi is a live flight tracking assistant with interactive radar, global route maps, airport boards, gate navigation, destination weather, and offline watchlists.",
+  applicationName: "Avi",
   keywords: [
     "flight tracker",
     "live radar",

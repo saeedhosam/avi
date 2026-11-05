@@ -1,0 +1,511 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Avi API",
+    "description": "Provider gateway for live flights, airports, weather, maps, and alerts.",
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Liveness probe",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "avi-api"
+                      ]
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "uptimeSeconds": {
+                      "type": "number"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "service",
+                    "version",
+                    "uptimeSeconds",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "summary": "Service and provider configuration status",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "avi-api"
+                      ]
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "providers": {
+                      "type": "object",
+                      "properties": {
+                        "aerodatabox": {
+                          "type": "string",
+                          "enum": [
+                            "configured",
+                            "not_configured"
+                          ]
+                        },
+                        "weather": {
+                          "type": "string",
+                          "enum": [
+                            "open-meteo"
+                          ]
+                        },
+                        "supabase": {
+                          "type": "string",
+                          "enum": [
+                            "configured",
+                            "not_configured"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "aerodatabox",
+                        "weather",
+                        "supabase"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "map": {
+                      "type": "object",
+                      "properties": {
+                        "style": {
+                          "type": "string",
+                          "enum": [
+                            "positron"
+                          ]
+                        },
+                        "tileProvider": {
+                          "type": "string",
+                          "enum": [
+                            "openfreemap"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "style",
+                        "tileProvider"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "service",
+                    "version",
+                    "environment",
+                    "providers",
+                    "map",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/flights/search": {
+      "get": {
+        "summary": "Search live flights by flight number",
+        "tags": [
+          "flights"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 12
+            },
+            "in": "query",
+            "name": "number",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "flights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "flightNumber": {
+                            "type": "string"
+                          },
+                          "airline": {
+                            "type": "string"
+                          },
+                          "airlineCode": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "SCHEDULED",
+                              "BOARDING",
+                              "DEPARTED",
+                              "DELAYED",
+                              "LANDED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "statusNote": {
+                            "type": "string"
+                          },
+                          "origin": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "destination": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "scheduledDeparture": {
+                            "type": "string"
+                          },
+                          "estimatedDeparture": {
+                            "type": "string"
+                          },
+                          "scheduledArrival": {
+                            "type": "string"
+                          },
+                          "estimatedArrival": {
+                            "type": "string"
+                          },
+                          "terminalDeparture": {
+                            "type": "string"
+                          },
+                          "gateDeparture": {
+                            "type": "string"
+                          },
+                          "terminalArrival": {
+                            "type": "string"
+                          },
+                          "gateArrival": {
+                            "type": "string"
+                          },
+                          "baggageCarousel": {
+                            "type": "string"
+                          },
+                          "aircraft": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "registration": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "model",
+                              "registration"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "delayMinutes": {
+                            "type": "number"
+                          },
+                          "telemetry": {
+                            "type": "object",
+                            "properties": {
+                              "hasLiveLocation": {
+                                "type": "boolean"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              },
+                              "altitudeFeet": {
+                                "type": "number"
+                              },
+                              "groundSpeedKnots": {
+                                "type": "number"
+                              },
+                              "headingDegrees": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "hasLiveLocation",
+                              "latitude",
+                              "longitude",
+                              "altitudeFeet",
+                              "groundSpeedKnots",
+                              "headingDegrees",
+                              "updatedAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "aerodatabox"
+                            ]
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "flightNumber",
+                          "airline",
+                          "airlineCode",
+                          "status",
+                          "statusNote",
+                          "origin",
+                          "destination",
+                          "scheduledDeparture",
+                          "estimatedDeparture",
+                          "scheduledArrival",
+                          "estimatedArrival",
+                          "terminalDeparture",
+                          "gateDeparture",
+                          "terminalArrival",
+                          "gateArrival",
+                          "baggageCarousel",
+                          "aircraft",
+                          "delayMinutes",
+                          "telemetry",
+                          "source",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "live",
+                            "cached",
+                            "not_configured",
+                            "quota_fallback"
+                          ]
+                        },
+                        "fetchedAt": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        },
+                        "attribution": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "fetchedAt",
+                        "cached",
+                        "attribution"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "flights",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Health and configuration"
+    },
+    {
+      "name": "flights",
+      "description": "Live flight data"
+    }
+  ]
+}

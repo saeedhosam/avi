@@ -1,3 +1,7 @@
+# Avi Web
+
+> This app is now `@avi/web` inside the Avi monorepo. Use the root [`README.md`](../../README.md) and [`docs/supabase.md`](../../docs/supabase.md) for current setup. Firebase/Firestore references below are historical and are being replaced by Supabase.
+
 # SkyTrack Desktop
 
 The desktop web edition of **SkyTrack** — a live flight tracking assistant with an interactive radar, global route network, airport boards, terminal wayfinding, destination weather, push alerts, and an offline watchlist.

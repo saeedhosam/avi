@@ -34,7 +34,7 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
       : "";
 
   return [
-    "✈️ SkyTrack Flight Status Update",
+    "✈️ Avi Flight Status Update",
     "━━━━━━━━━━━━━━━━━━━━━",
     `Flight: ${flight.airline} (${flight.flightNumber})`,
     `Route: ${flight.origin.code} (${flight.origin.city}) ➔ ${flight.destination.code} (${flight.destination.city})`,
@@ -47,7 +47,7 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
     `Aircraft: ${flight.aircraft.model} (${flight.aircraft.registration})`,
   ]
     .filter(Boolean)
-    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nTrack live with SkyTrack: https://skytrack.aero/track/${flight.flightNumber.replace(/\s+/g, "")}`;
+    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nTrack live with Avi: https://app.2-31-110-53.sslip.io/flight/${flight.flightNumber.replace(/\s+/g, "")}`;
 }
 
 export function ShareFlightDialog({

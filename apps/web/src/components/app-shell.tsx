@@ -85,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="min-w-0">
             <p className="text-[17px] font-black leading-none tracking-tight text-ink">
-              SkyTrack
+              Avi
             </p>
             <p className="mt-1 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] text-accent">
               Live radar & flight telemetry
@@ -342,7 +342,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
               to <code className="font-mono text-accent">.env.local</code> to stream
               live global flight numbers and airport FIDS boards. Until then,
-              SkyTrack uses the authentic local cache and live Open-Meteo weather.
+              Avi uses the authentic local cache and live Open-Meteo weather.
             </p>
           )}
         </div>

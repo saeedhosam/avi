@@ -1,0 +1,5 @@
+Avi.xcodeproj/
+DerivedData/
+Config/Secrets.local.xcconfig
+*.xcuserstate
+xcuserdata/

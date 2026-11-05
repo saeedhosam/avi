@@ -1,0 +1,15 @@
+.git
+.gitignore
+.github
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.log
+apps/android
+apps/ios
+docs
+backups
+.env
+.env.*
+!.env.example

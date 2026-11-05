@@ -1,0 +1,2 @@
+-- Intentionally empty. Airport and terminal reference data lives in
+-- packages/catalog and is served by the Avi API, not seeded into user tables.

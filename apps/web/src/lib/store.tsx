@@ -22,16 +22,16 @@ import { normalizeFlightNumber, uid } from "./utils";
 import {
   deleteTrackedFlightCloud,
   fetchCloudWatchlist,
-  firebaseEnabled,
   markAlertReadCloud,
-  observeFirebaseAuth,
+  observeSupabaseAuth,
   requestFcmToken,
   saveAlertCloud,
   saveTrackedFlightCloud,
   saveUserProfile,
-  signInWithGoogleFirebase,
-  signOutFirebase,
-} from "./firebase";
+  signInWithGoogleSupabase,
+  signOutSupabase,
+  supabaseEnabled,
+} from "./supabase";
 
 const STORAGE_KEY = "skytrack.desktop.live.v1";
 const FCM_TOKEN_KEY = "skytrack.fcm.token";
@@ -91,7 +91,7 @@ interface AppContextValue {
   fcmToken: string;
   enableBrowserNotifications: () => Promise<void>;
   notificationPermission: NotificationPermission | "unsupported";
-  firebaseReady: boolean;
+  supabaseReady: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -228,7 +228,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notificationPermission, setNotificationPermission] = useState<
     NotificationPermission | "unsupported"
   >("default");
-  const [firebaseReady, setFirebaseReady] = useState(false);
+  const [supabaseReady, setSupabaseReady] = useState(false);
   const flightsRef = useRef<Flight[]>([]);
   const alertsRef = useRef<FlightAlert[]>([]);
   const refreshingRef = useRef(false);
@@ -339,7 +339,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           Notification.permission === "granted"
         ) {
           try {
-            new Notification(`SkyTrack · ${alert.flightNumber}`, {
+            new Notification(`Avi · ${alert.flightNumber}`, {
               body: alert.message,
               tag: alert.id,
             });
@@ -447,12 +447,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer);
   }, [hydrated, aeroConfigured, offlineMode, refreshTrackedFlights]);
 
-  // Firebase auth observer. Demo accounts are never substituted.
+  // Supabase auth observer. Demo accounts are never substituted.
   useEffect(() => {
-    if (!firebaseEnabled) return;
-    let unsubscribe: (() => void) | undefined;
-    observeFirebaseAuth((next, uidValue) => {
-      setFirebaseReady(true);
+    if (!supabaseEnabled) return;
+    const unsubscribe = observeSupabaseAuth((next, uidValue) => {
+      setSupabaseReady(true);
       if (next && uidValue) {
         setAccount((current) => ({ ...next, isOfflineMode: current.isOfflineMode }));
         void saveUserProfile(next, uidValue);
@@ -508,16 +507,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         setAccount((current) => ({ ...GUEST_ACCOUNT, isOfflineMode: current.isOfflineMode }));
       }
-    })
-      .then((fn) => {
-        unsubscribe = fn;
-      })
-      .catch(() => {});
+    });
     return () => unsubscribe?.();
   }, [upsertFlights]);
 
   useEffect(() => {
-    if (!firebaseEnabled) return;
+    if (!supabaseEnabled) return;
     let cancelled = false;
     async function loadToken() {
       const existing = window.localStorage.getItem(FCM_TOKEN_KEY);
@@ -679,17 +674,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const clearRecents = useCallback(() => setRecents([]), []);
 
   const signIn = useCallback(async () => {
-    if (!firebaseEnabled) {
+    if (!supabaseEnabled) {
       notify(
-        "Firebase is not configured. Add the NEXT_PUBLIC_FIREBASE_* values to .env and restart.",
+        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env and restart.",
         "warning",
       );
       return;
     }
     setAuthBusy(true);
     try {
-      await signInWithGoogleFirebase();
-      notify("Google Sign-In connected. Firestore sync active.", "success");
+      await signInWithGoogleSupabase();
+      notify("Google Sign-In connected. Supabase sync active.", "success");
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "Google Sign-In failed or was cancelled.",
@@ -701,8 +696,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [notify]);
 
   const signOut = useCallback(async () => {
-    if (firebaseEnabled && account.uid) {
-      await signOutFirebase().catch(() => {});
+    if (supabaseEnabled && account.uid) {
+      await signOutSupabase().catch(() => {});
     }
     setAccount({ ...GUEST_ACCOUNT, isOfflineMode: offlineMode });
     notify("Signed out. Cached live data remains available offline.", "info");
@@ -818,7 +813,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fcmToken,
     enableBrowserNotifications,
     notificationPermission,
-    firebaseReady,
+    supabaseReady,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

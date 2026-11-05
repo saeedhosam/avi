@@ -1,0 +1,25 @@
+{
+	admin off
+}
+
+# Temporary bootstrap hostnames until the production domain is connected.
+app.2-31-110-53.sslip.io {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	reverse_proxy web:3000
+}
+
+api.2-31-110-53.sslip.io {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	reverse_proxy api:8080
+}

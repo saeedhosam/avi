@@ -1,0 +1,13 @@
+{
+  "name": "@avi/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAPI contracts and generated client types for Avi.",
+  "scripts": {
+    "build": "node scripts/export-openapi.mjs",
+    "typecheck": "node --check scripts/export-openapi.mjs",
+    "lint": "node --check scripts/export-openapi.mjs",
+    "test": "node scripts/export-openapi.mjs"
+  }
+}

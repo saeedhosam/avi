@@ -1,0 +1,1342 @@
+[
+  {
+    "airportCode": "JFK",
+    "airportName": "John F. Kennedy International",
+    "city": "New York",
+    "terminalId": "T4",
+    "terminalName": "Terminal 4 (International / Delta Hub)",
+    "availableLevels": [
+      1,
+      2,
+      0
+    ],
+    "floors": {
+      "1": {
+        "level": 1,
+        "levelName": "Departures & Gates",
+        "description": "Ticketing, Main Security, Concourse A & Concourse B",
+        "concourseSections": [
+          {
+            "id": "JFK_CONC_A",
+            "name": "Concourse A (Gates A2\u2013A7)",
+            "start": {
+              "x": 0.42,
+              "y": 0.62
+            },
+            "end": {
+              "x": 0.18,
+              "y": 0.28
+            },
+            "width": 0.055,
+            "gatesRange": "A2\u2013A7"
+          },
+          {
+            "id": "JFK_CONC_B1",
+            "name": "Concourse B (Gates B20\u2013B32)",
+            "start": {
+              "x": 0.58,
+              "y": 0.62
+            },
+            "end": {
+              "x": 0.82,
+              "y": 0.38
+            },
+            "width": 0.055,
+            "gatesRange": "B20\u2013B32"
+          },
+          {
+            "id": "JFK_CONC_B2",
+            "name": "Concourse B Extension (Gates B33\u2013B45)",
+            "start": {
+              "x": 0.82,
+              "y": 0.38
+            },
+            "end": {
+              "x": 0.92,
+              "y": 0.16
+            },
+            "width": 0.05,
+            "gatesRange": "B33\u2013B45"
+          },
+          {
+            "id": "JFK_CENTRAL_HALL",
+            "name": "Central Departures Marketplace",
+            "start": {
+              "x": 0.35,
+              "y": 0.65
+            },
+            "end": {
+              "x": 0.65,
+              "y": 0.65
+            },
+            "width": 0.12,
+            "gatesRange": "Security & Retail Plaza"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.65
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.76
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "2": {
+        "level": 2,
+        "levelName": "Mezzanine Lounges",
+        "description": "Airline VIP Lounges, Premium Clubs & Fine Dining",
+        "concourseSections": [
+          {
+            "id": "JFK_MEZZ_A",
+            "name": "Mezzanine West Lounge Gallery",
+            "start": {
+              "x": 0.4,
+              "y": 0.58
+            },
+            "end": {
+              "x": 0.24,
+              "y": 0.36
+            },
+            "width": 0.06,
+            "gatesRange": "Centurion & Virgin Clubhouses"
+          },
+          {
+            "id": "JFK_MEZZ_B",
+            "name": "Mezzanine East Delta Sky Deck",
+            "start": {
+              "x": 0.6,
+              "y": 0.58
+            },
+            "end": {
+              "x": 0.78,
+              "y": 0.4
+            },
+            "width": 0.06,
+            "gatesRange": "Sky Club & Emirates Lounge"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.6
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.7
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.85
+        }
+      },
+      "0": {
+        "level": 0,
+        "levelName": "Arrivals & Ground Transit",
+        "description": "Baggage Claim, Customs, AirTrain & Taxi Stands",
+        "concourseSections": [
+          {
+            "id": "JFK_BAGGAGE_HALL",
+            "name": "International Baggage Claim",
+            "start": {
+              "x": 0.25,
+              "y": 0.55
+            },
+            "end": {
+              "x": 0.75,
+              "y": 0.55
+            },
+            "width": 0.14,
+            "gatesRange": "Carousels 1\u201310"
+          },
+          {
+            "id": "JFK_AIRTRAIN_LINK",
+            "name": "AirTrain Walkway & Taxi Stand",
+            "start": {
+              "x": 0.5,
+              "y": 0.7
+            },
+            "end": {
+              "x": 0.5,
+              "y": 0.9
+            },
+            "width": 0.08,
+            "gatesRange": "AirTrain to Jamaica / Howard Beach"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.55
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.62
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.82
+        }
+      }
+    },
+    "amenities": [
+      {
+        "id": "JFK_SEC_MAIN",
+        "name": "TSA PreCheck & CLEAR Checkpoint 4",
+        "category": "SECURITY",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Main Hall",
+        "level": 1,
+        "locationDescription": "Central Departures, prior to Concourse A/B split",
+        "position": {
+          "x": 0.5,
+          "y": 0.76
+        },
+        "gateNumber": null,
+        "openingHours": "24/7 (PreCheck: 04:30\u201321:30)",
+        "accessInfo": null,
+        "waitTimeMinutes": 6,
+        "walkTimeFromSecurityMinutes": 0,
+        "walkDistanceMeters": 0,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "TSA PreCheck",
+          "CLEAR Plus",
+          "Biometric Boarding"
+        ]
+      },
+      {
+        "id": "JFK_GATE_B22",
+        "name": "Gate B22",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B, near Shake Shack",
+        "position": {
+          "x": 0.66,
+          "y": 0.54
+        },
+        "gateNumber": "B22",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 240,
+        "rating": null,
+        "assignedFlightNumber": "AA 100",
+        "features": [
+          "Jet Bridge",
+          "Power Outlets at Seats",
+          "Priority Boarding Lane"
+        ]
+      },
+      {
+        "id": "JFK_GATE_B24",
+        "name": "Gate B24",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B midway",
+        "position": {
+          "x": 0.72,
+          "y": 0.48
+        },
+        "gateNumber": "B24",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 6,
+        "walkDistanceMeters": 380,
+        "rating": null,
+        "assignedFlightNumber": "DL 401",
+        "features": [
+          "Widebody Capable (A350/B777)",
+          "Facial Recognition Gate"
+        ]
+      },
+      {
+        "id": "JFK_GATE_B28",
+        "name": "Gate B28",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B Outer Pier",
+        "position": {
+          "x": 0.79,
+          "y": 0.4
+        },
+        "gateNumber": "B28",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 8,
+        "walkDistanceMeters": 520,
+        "rating": null,
+        "assignedFlightNumber": "BA 178",
+        "features": [
+          "Dual Jet Bridge",
+          "Accessible Boarding Ramp"
+        ]
+      },
+      {
+        "id": "JFK_GATE_B36",
+        "name": "Gate B36",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B Extension",
+        "level": 1,
+        "locationDescription": "Far end of Concourse B extension",
+        "position": {
+          "x": 0.88,
+          "y": 0.22
+        },
+        "gateNumber": "B36",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 11,
+        "walkDistanceMeters": 720,
+        "rating": null,
+        "assignedFlightNumber": "EK 202",
+        "features": [
+          "A380 Double Decker Gate",
+          "Moving Walkway Connected"
+        ]
+      },
+      {
+        "id": "JFK_GATE_A3",
+        "name": "Gate A3",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse A",
+        "level": 1,
+        "locationDescription": "Concourse A West Wing",
+        "position": {
+          "x": 0.34,
+          "y": 0.5
+        },
+        "gateNumber": "A3",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 260,
+        "rating": null,
+        "assignedFlightNumber": "VS 4",
+        "features": [
+          "Jet Bridge",
+          "Quiet Seating Area"
+        ]
+      },
+      {
+        "id": "JFK_GATE_A5",
+        "name": "Gate A5",
+        "category": "GATE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse A",
+        "level": 1,
+        "locationDescription": "Concourse A Outer Pier",
+        "position": {
+          "x": 0.24,
+          "y": 0.35
+        },
+        "gateNumber": "A5",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 7,
+        "walkDistanceMeters": 440,
+        "rating": null,
+        "assignedFlightNumber": "AF 022",
+        "features": [
+          "International Departures",
+          "Air-conditioned Bridge"
+        ]
+      },
+      {
+        "id": "JFK_LOUNGE_CENTURION",
+        "name": "The Centurion Lounge (American Express)",
+        "category": "LOUNGE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Main Marketplace",
+        "level": 2,
+        "locationDescription": "Post-security, Mezzanine Level beyond Checkpoint 4",
+        "position": {
+          "x": 0.44,
+          "y": 0.58
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 22:00",
+        "accessInfo": "Amex Centurion, Platinum & Delta Reserve Cardmembers",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 120,
+        "rating": 4.8,
+        "assignedFlightNumber": null,
+        "features": [
+          "Signature Speakeasy '1850'",
+          "Chef Ignacio Mattos Menu",
+          "Equinox Body Lab",
+          "Private Shower Suites"
+        ]
+      },
+      {
+        "id": "JFK_LOUNGE_SKYCLUB",
+        "name": "Delta Sky Club & Sky Deck",
+        "category": "LOUNGE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 2,
+        "locationDescription": "Gate B31 Mezzanine, Concourse B",
+        "position": {
+          "x": 0.72,
+          "y": 0.38
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 23:30",
+        "accessInfo": "Delta One, SkyTeam Elite Plus, Delta Reserve",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 6,
+        "walkDistanceMeters": 400,
+        "rating": 4.7,
+        "assignedFlightNumber": null,
+        "features": [
+          "Open-Air Sky Deck Runway View",
+          "Full Buffet & Cocktail Bar",
+          "6 Luxury Showers",
+          "Soundproof Phone Pods"
+        ]
+      },
+      {
+        "id": "JFK_LOUNGE_VIRGIN",
+        "name": "Virgin Atlantic Clubhouse",
+        "category": "LOUNGE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse A",
+        "level": 2,
+        "locationDescription": "Above Gate A5, Concourse A",
+        "position": {
+          "x": 0.26,
+          "y": 0.38
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 08:30 & 14:00 \u2013 23:30",
+        "accessInfo": "Upper Class Passengers & Flying Club Gold",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 7,
+        "walkDistanceMeters": 430,
+        "rating": 4.9,
+        "assignedFlightNumber": null,
+        "features": [
+          "Bespoke Cocktail Bar",
+          "A la carte Dining",
+          "Pool Table",
+          "Bumble and bumble Salon"
+        ]
+      },
+      {
+        "id": "JFK_LOUNGE_EMIRATES",
+        "name": "Emirates First & Business Lounge",
+        "category": "LOUNGE",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse A",
+        "level": 2,
+        "locationDescription": "Near Gate A4, Water Oasis Section",
+        "position": {
+          "x": 0.32,
+          "y": 0.44
+        },
+        "gateNumber": null,
+        "openingHours": "16:00 \u2013 22:30",
+        "accessInfo": "Emirates First/Business & Skywards Gold/Platinum",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 5,
+        "walkDistanceMeters": 310,
+        "rating": 4.8,
+        "assignedFlightNumber": null,
+        "features": [
+          "Gourmet International Buffet",
+          "Direct Jet Bridge Boarding",
+          "Quiet Relaxation Sanctuary"
+        ]
+      },
+      {
+        "id": "JFK_FOOD_SHAKESHACK",
+        "name": "Shake Shack",
+        "category": "DINING",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B, Gate B23",
+        "position": {
+          "x": 0.68,
+          "y": 0.52
+        },
+        "gateNumber": null,
+        "openingHours": "06:00 \u2013 23:00",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 5,
+        "walkDistanceMeters": 280,
+        "rating": 4.6,
+        "assignedFlightNumber": null,
+        "features": [
+          "ShackBurger",
+          "Crinkle-cut Fries",
+          "Mobile Order Ahead",
+          "Beer & Wine"
+        ]
+      },
+      {
+        "id": "JFK_FOOD_STARBUCKS",
+        "name": "Starbucks Reserve Cafe",
+        "category": "DINING",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Main Hall",
+        "level": 1,
+        "locationDescription": "Central Marketplace, opposite Duty Free",
+        "position": {
+          "x": 0.53,
+          "y": 0.63
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 110,
+        "rating": 4.5,
+        "assignedFlightNumber": null,
+        "features": [
+          "Nitro Cold Brew",
+          "Fresh Bakery",
+          "Express Pick-up Counter"
+        ]
+      },
+      {
+        "id": "JFK_FOOD_UPTOWN",
+        "name": "Uptown Brasserie by Marcus Samuelsson",
+        "category": "DINING",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B, Gate B32",
+        "position": {
+          "x": 0.77,
+          "y": 0.42
+        },
+        "gateNumber": null,
+        "openingHours": "06:30 \u2013 22:00",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 7,
+        "walkDistanceMeters": 460,
+        "rating": 4.4,
+        "assignedFlightNumber": null,
+        "features": [
+          "Sit-down Dining",
+          "Handcrafted Cocktails",
+          "Smoked Salmon Benedict"
+        ]
+      },
+      {
+        "id": "JFK_SHOP_DFS",
+        "name": "DFS Duty Free Galleria",
+        "category": "SHOPPING",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Main Hall",
+        "level": 1,
+        "locationDescription": "Immediately after security exit",
+        "position": {
+          "x": 0.48,
+          "y": 0.67
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 1,
+        "walkDistanceMeters": 70,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Perfume & Cosmetics",
+          "Fine Spirits",
+          "Designer Sunglasses",
+          "Tax-Free Savings"
+        ]
+      },
+      {
+        "id": "JFK_SHOP_TUMI",
+        "name": "TUMI Travel Luggage & Tech",
+        "category": "SHOPPING",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B entrance",
+        "position": {
+          "x": 0.61,
+          "y": 0.59
+        },
+        "gateNumber": null,
+        "openingHours": "07:00 \u2013 21:30",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 190,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Luggage Monogramming",
+          "Universal Travel Adapters",
+          "Backpacks"
+        ]
+      },
+      {
+        "id": "JFK_RESTROOM_CENTRAL",
+        "name": "Restrooms & All-Gender Family Suite",
+        "category": "RESTROOM",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Main Hall",
+        "level": 1,
+        "locationDescription": "Behind Starbucks, Central Hall",
+        "position": {
+          "x": 0.44,
+          "y": 0.67
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 1,
+        "walkDistanceMeters": 80,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Wheelchair Accessible",
+          "Baby Changing Station",
+          "Pet Relief Room Nearby"
+        ]
+      },
+      {
+        "id": "JFK_RESTROOM_B",
+        "name": "Restrooms & Water Refill Station",
+        "category": "RESTROOM",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B near Gate B25",
+        "position": {
+          "x": 0.74,
+          "y": 0.46
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 6,
+        "walkDistanceMeters": 390,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Touchless Faucets",
+          "Filtered Hydration Station"
+        ]
+      },
+      {
+        "id": "JFK_TRANSIT_AIRTRAIN",
+        "name": "AirTrain JFK Station",
+        "category": "TRANSIT",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Ground Hub",
+        "level": 0,
+        "locationDescription": "Skybridge connection, follow green signs",
+        "position": {
+          "x": 0.5,
+          "y": 0.88
+        },
+        "gateNumber": null,
+        "openingHours": "24/7 (Every 4\u20138 mins)",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 260,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "OMNY Tap & Go",
+          "Direct to Jamaica LIRR / Subway",
+          "Terminal Connection Free"
+        ]
+      },
+      {
+        "id": "JFK_BAGGAGE_CLAIM",
+        "name": "Baggage Claim Carousels 4\u20138",
+        "category": "TRANSIT",
+        "airportCode": "JFK",
+        "terminal": "T4",
+        "concourse": "Arrivals Hall",
+        "level": 0,
+        "locationDescription": "Level 0 Arrivals Hall",
+        "position": {
+          "x": 0.48,
+          "y": 0.55
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 180,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Oversize Baggage Desk",
+          "Luggage Carts ($6)",
+          "Lost & Found Assistance"
+        ]
+      }
+    ]
+  },
+  {
+    "airportCode": "LHR",
+    "airportName": "London Heathrow Airport",
+    "city": "London",
+    "terminalId": "T5",
+    "terminalName": "Terminal 5 (British Airways Flagship)",
+    "availableLevels": [
+      1
+    ],
+    "floors": {
+      "1": {
+        "level": 1,
+        "levelName": "Departures & Concourse A",
+        "description": "Check-in Zone, North & South Security, Flight Connections",
+        "concourseSections": [
+          {
+            "id": "LHR_MAIN_A_NORTH",
+            "name": "Concourse A North (Gates A1\u2013A11)",
+            "start": {
+              "x": 0.35,
+              "y": 0.48
+            },
+            "end": {
+              "x": 0.2,
+              "y": 0.22
+            },
+            "width": 0.065,
+            "gatesRange": "A1\u2013A11"
+          },
+          {
+            "id": "LHR_MAIN_A_SOUTH",
+            "name": "Concourse A South (Gates A12\u2013A23)",
+            "start": {
+              "x": 0.65,
+              "y": 0.48
+            },
+            "end": {
+              "x": 0.8,
+              "y": 0.22
+            },
+            "width": 0.065,
+            "gatesRange": "A12\u2013A23"
+          },
+          {
+            "id": "LHR_CENTRAL_ATRIUM",
+            "name": "Grand Atrium & Luxury Galleria",
+            "start": {
+              "x": 0.3,
+              "y": 0.52
+            },
+            "end": {
+              "x": 0.7,
+              "y": 0.52
+            },
+            "width": 0.13,
+            "gatesRange": "Airside Galleria"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.74
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      }
+    },
+    "amenities": [
+      {
+        "id": "LHR_SEC_SOUTH",
+        "name": "South Security & First Wing",
+        "category": "SECURITY",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "Main Hall",
+        "level": 1,
+        "locationDescription": "Departures South side, direct entrance to Galleries Club",
+        "position": {
+          "x": 0.58,
+          "y": 0.74
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 22:30",
+        "accessInfo": null,
+        "waitTimeMinutes": 5,
+        "walkTimeFromSecurityMinutes": 0,
+        "walkDistanceMeters": 0,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Fast Track Security",
+          "BA First Wing Private Check-in",
+          "Smart CT Baggage Scanners"
+        ]
+      },
+      {
+        "id": "LHR_GATE_A10",
+        "name": "Gate A10",
+        "category": "GATE",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "Concourse A",
+        "level": 1,
+        "locationDescription": "North pier, near Pret",
+        "position": {
+          "x": 0.25,
+          "y": 0.28
+        },
+        "gateNumber": "A10",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 5,
+        "walkDistanceMeters": 340,
+        "rating": null,
+        "assignedFlightNumber": "BA 117",
+        "features": [
+          "Biometric Smart Gate",
+          "Priority Boarding Groups 1\u20139"
+        ]
+      },
+      {
+        "id": "LHR_GATE_A18",
+        "name": "Gate A18",
+        "category": "GATE",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "Concourse A",
+        "level": 1,
+        "locationDescription": "South pier, near Harrods",
+        "position": {
+          "x": 0.75,
+          "y": 0.28
+        },
+        "gateNumber": "A18",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 290,
+        "rating": null,
+        "assignedFlightNumber": "VS 103",
+        "features": [
+          "Widebody Boarding",
+          "Window views of Runway 09R"
+        ]
+      },
+      {
+        "id": "LHR_LOUNGE_CONCORDE",
+        "name": "The Concorde Room (British Airways)",
+        "category": "LOUNGE",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "South Galleria",
+        "level": 1,
+        "locationDescription": "Post South Security, turn right into First Wing",
+        "position": {
+          "x": 0.68,
+          "y": 0.65
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 22:30",
+        "accessInfo": "British Airways First Class & Concorde Room Cardholders",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 1,
+        "walkDistanceMeters": 90,
+        "rating": 4.9,
+        "assignedFlightNumber": null,
+        "features": [
+          "Private Cabana Booths",
+          "Concorde Dining Terrace",
+          "Laurent-Perrier Grand Siecle",
+          "Full Valet"
+        ]
+      },
+      {
+        "id": "LHR_LOUNGE_GALLERIES",
+        "name": "BA Galleries Club Lounge South",
+        "category": "LOUNGE",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "South Galleria",
+        "level": 1,
+        "locationDescription": "Level 3 Mezzanine above Gate A16",
+        "position": {
+          "x": 0.64,
+          "y": 0.44
+        },
+        "gateNumber": null,
+        "openingHours": "05:00 \u2013 22:30",
+        "accessInfo": "Club World, Club Europe, Silver / Gold Executive Club",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 200,
+        "rating": 4.6,
+        "assignedFlightNumber": null,
+        "features": [
+          "Silver Bar",
+          "Quiet Workstations",
+          "Hot Food Buffet",
+          "Showers"
+        ]
+      },
+      {
+        "id": "LHR_FOOD_RAMSAY",
+        "name": "Gordon Ramsay Plane Food",
+        "category": "DINING",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "Airside Galleria",
+        "level": 1,
+        "locationDescription": "Top of South escalators",
+        "position": {
+          "x": 0.55,
+          "y": 0.46
+        },
+        "gateNumber": null,
+        "openingHours": "05:30 \u2013 21:30",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 180,
+        "rating": 4.5,
+        "assignedFlightNumber": null,
+        "features": [
+          "Plane Food Grab & Go Picnics",
+          "Beef Wellington Bites",
+          "Runway Vista Tables"
+        ]
+      },
+      {
+        "id": "LHR_SHOP_HARRODS",
+        "name": "Harrods Signature Boutique",
+        "category": "SHOPPING",
+        "airportCode": "LHR",
+        "terminal": "T5",
+        "concourse": "Central Galleria",
+        "level": 1,
+        "locationDescription": "Central retail square",
+        "position": {
+          "x": 0.46,
+          "y": 0.5
+        },
+        "gateNumber": null,
+        "openingHours": "06:00 \u2013 21:00",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 130,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Harrods Tea & Hampers",
+          "Designer Fashion",
+          "Tax-Free Shopping"
+        ]
+      }
+    ]
+  },
+  {
+    "airportCode": "SFO",
+    "airportName": "San Francisco International",
+    "city": "San Francisco",
+    "terminalId": "Intl",
+    "terminalName": "International Terminal (Areas A & G)",
+    "availableLevels": [
+      1
+    ],
+    "floors": {
+      "1": {
+        "level": 1,
+        "levelName": "Departures Level",
+        "description": "Main Hall, Boarding Area A (West) & Boarding Area G (East)",
+        "concourseSections": [
+          {
+            "id": "SFO_BOARDING_A",
+            "name": "Boarding Area A (Gates A1\u2013A15)",
+            "start": {
+              "x": 0.4,
+              "y": 0.55
+            },
+            "end": {
+              "x": 0.15,
+              "y": 0.25
+            },
+            "width": 0.06,
+            "gatesRange": "A1\u2013A15"
+          },
+          {
+            "id": "SFO_BOARDING_G",
+            "name": "Boarding Area G (Gates G91\u2013G102)",
+            "start": {
+              "x": 0.6,
+              "y": 0.55
+            },
+            "end": {
+              "x": 0.85,
+              "y": 0.25
+            },
+            "width": 0.06,
+            "gatesRange": "G91\u2013G102"
+          },
+          {
+            "id": "SFO_MAIN_HALL",
+            "name": "International Ticketing & Security Hall",
+            "start": {
+              "x": 0.3,
+              "y": 0.62
+            },
+            "end": {
+              "x": 0.7,
+              "y": 0.62
+            },
+            "width": 0.12,
+            "gatesRange": "Central Marketplace"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.6
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.88
+        }
+      }
+    },
+    "amenities": [
+      {
+        "id": "SFO_SEC_G",
+        "name": "Security Checkpoint G (Star Alliance)",
+        "category": "SECURITY",
+        "airportCode": "SFO",
+        "terminal": "Intl",
+        "concourse": "Boarding Area G",
+        "level": 1,
+        "locationDescription": "East side of Main Hall, leads to United Polaris & Gates G",
+        "position": {
+          "x": 0.62,
+          "y": 0.68
+        },
+        "gateNumber": null,
+        "openingHours": "04:30 \u2013 00:30",
+        "accessInfo": null,
+        "waitTimeMinutes": 4,
+        "walkTimeFromSecurityMinutes": 0,
+        "walkDistanceMeters": 0,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "TSA PreCheck",
+          "CLEAR Plus",
+          "Priority Lane"
+        ]
+      },
+      {
+        "id": "SFO_GATE_G96",
+        "name": "Gate G96",
+        "category": "GATE",
+        "airportCode": "SFO",
+        "terminal": "Intl",
+        "concourse": "Boarding Area G",
+        "level": 1,
+        "locationDescription": "Boarding Area G midway",
+        "position": {
+          "x": 0.75,
+          "y": 0.38
+        },
+        "gateNumber": "G96",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 5,
+        "walkDistanceMeters": 320,
+        "rating": null,
+        "assignedFlightNumber": "UA 890",
+        "features": [
+          "Widebody Bridge (Boeing 777/787)",
+          "Automated Passport Control Gate"
+        ]
+      },
+      {
+        "id": "SFO_GATE_A8",
+        "name": "Gate A8",
+        "category": "GATE",
+        "airportCode": "SFO",
+        "terminal": "Intl",
+        "concourse": "Boarding Area A",
+        "level": 1,
+        "locationDescription": "Boarding Area A outer concourse",
+        "position": {
+          "x": 0.24,
+          "y": 0.34
+        },
+        "gateNumber": "A8",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 6,
+        "walkDistanceMeters": 400,
+        "rating": null,
+        "assignedFlightNumber": "AF 084",
+        "features": [
+          "Jet Bridge",
+          "Quiet Boarding Bay"
+        ]
+      },
+      {
+        "id": "SFO_LOUNGE_POLARIS",
+        "name": "United Polaris Lounge",
+        "category": "LOUNGE",
+        "airportCode": "SFO",
+        "terminal": "Intl",
+        "concourse": "Boarding Area G",
+        "level": 1,
+        "locationDescription": "Past Security G, to the right",
+        "position": {
+          "x": 0.66,
+          "y": 0.52
+        },
+        "gateNumber": null,
+        "openingHours": "06:30 \u2013 22:30",
+        "accessInfo": "Long-haul United Polaris Business & Star Alliance First/Business",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 140,
+        "rating": 4.9,
+        "assignedFlightNumber": null,
+        "features": [
+          "The Dining Room (Sit-down table service)",
+          "Saks Fifth Avenue Daybeds",
+          "Luxurious Showers"
+        ]
+      },
+      {
+        "id": "SFO_FOOD_NAPA",
+        "name": "Napa Farms Market",
+        "category": "DINING",
+        "airportCode": "SFO",
+        "terminal": "Intl",
+        "concourse": "Main Marketplace",
+        "level": 1,
+        "locationDescription": "Central connector near Security G",
+        "position": {
+          "x": 0.54,
+          "y": 0.58
+        },
+        "gateNumber": null,
+        "openingHours": "06:00 \u2013 23:00",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 110,
+        "rating": 4.7,
+        "assignedFlightNumber": null,
+        "features": [
+          "Artisan Cheeses",
+          "Acme Bread Sandwiches",
+          "Cowgirl Creamery",
+          "Espresso Bar"
+        ]
+      }
+    ]
+  },
+  {
+    "airportCode": "DXB",
+    "airportName": "Dubai International Airport",
+    "city": "Dubai",
+    "terminalId": "T3",
+    "terminalName": "Terminal 3 (Emirates Megahub)",
+    "availableLevels": [
+      1
+    ],
+    "floors": {
+      "1": {
+        "level": 1,
+        "levelName": "Departures & Gates",
+        "description": "World's Largest Airport Terminal, Concourse A, B & C",
+        "concourseSections": [
+          {
+            "id": "DXB_CONC_B",
+            "name": "Concourse B (Gates B1\u2013B32)",
+            "start": {
+              "x": 0.2,
+              "y": 0.5
+            },
+            "end": {
+              "x": 0.8,
+              "y": 0.5
+            },
+            "width": 0.08,
+            "gatesRange": "B1\u2013B32"
+          },
+          {
+            "id": "DXB_CONC_A_PIER",
+            "name": "Concourse A (Dedicated A380 Pier)",
+            "start": {
+              "x": 0.5,
+              "y": 0.38
+            },
+            "end": {
+              "x": 0.5,
+              "y": 0.15
+            },
+            "width": 0.07,
+            "gatesRange": "A1\u2013A24 (All A380)"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.7
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.85
+        }
+      }
+    },
+    "amenities": [
+      {
+        "id": "DXB_GATE_B14",
+        "name": "Gate B14",
+        "category": "GATE",
+        "airportCode": "DXB",
+        "terminal": "T3",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Concourse B Center",
+        "position": {
+          "x": 0.42,
+          "y": 0.5
+        },
+        "gateNumber": "B14",
+        "openingHours": "24 Hours",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 270,
+        "rating": null,
+        "assignedFlightNumber": "EK 201",
+        "features": [
+          "Direct Lounge Boarding",
+          "Biometric Smart Tunnel"
+        ]
+      },
+      {
+        "id": "DXB_LOUNGE_EMIRATES_FIRST",
+        "name": "Emirates First Class Lounge",
+        "category": "LOUNGE",
+        "airportCode": "DXB",
+        "terminal": "T3",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Spans entire upper concourse level",
+        "position": {
+          "x": 0.5,
+          "y": 0.42
+        },
+        "gateNumber": null,
+        "openingHours": "24/7",
+        "accessInfo": "Emirates First Class & Skywards Platinum",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 190,
+        "rating": 5.0,
+        "assignedFlightNumber": null,
+        "features": [
+          "Timeless Spa Treatments",
+          "Fine Wine Cellar & Sommelier",
+          "Quiet Sleeping Rooms",
+          "Direct Gate Boarding"
+        ]
+      },
+      {
+        "id": "DXB_SHOP_DUTYFREE",
+        "name": "Dubai Duty Free Mega Pavilion",
+        "category": "SHOPPING",
+        "airportCode": "DXB",
+        "terminal": "T3",
+        "concourse": "Concourse B",
+        "level": 1,
+        "locationDescription": "Central Hub between Concourse A & B",
+        "position": {
+          "x": 0.5,
+          "y": 0.56
+        },
+        "gateNumber": null,
+        "openingHours": "24/7",
+        "accessInfo": null,
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 120,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Gold & Jewelry",
+          "Luxury Electronics",
+          "Finest Dates & Confectionery",
+          "Millennium Millionaire Raffle"
+        ]
+      }
+    ]
+  }
+]
