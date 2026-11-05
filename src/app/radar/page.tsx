@@ -19,28 +19,47 @@ import {
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { RadarMap } from "@/components/radar-map";
-import { StatusBadge } from "@/components/ui";
+import { EmptyState, Panel, StatusBadge } from "@/components/ui";
 
 export default function RadarPage() {
-  const { flights, toggleTrack } = useApp();
+  const { flights, toggleTrack, refreshData, syncing } = useApp();
+  const savedFlights = useMemo(
+    () => flights.filter((flight) => flight.isTracked || flight.isFavorite),
+    [flights],
+  );
   const activeFlights = useMemo(
     () =>
-      flights.filter((flight) =>
+      savedFlights.filter((flight) =>
         ["DEPARTED", "BOARDING", "DELAYED"].includes(flight.status),
       ),
-    [flights],
+    [savedFlights],
   );
 
   const [selectedId, setSelectedId] = useState(
-    () => activeFlights[0]?.id ?? flights[0]?.id ?? "",
+    () => activeFlights[0]?.id ?? "",
   );
   const selected =
-    flights.find((flight) => flight.id === selectedId) ?? activeFlights[0] ?? flights[0];
+    activeFlights.find((flight) => flight.id === selectedId) ?? activeFlights[0] ?? null;
   const [focusMode, setFocusMode] = useState(false);
 
   if (!selected) {
     return (
-      <div className="p-6 text-sm text-muted">No traffic available.</div>
+      <div className="mx-auto max-w-4xl px-4 py-10">
+        <Panel>
+          <EmptyState
+            icon={<RadarIcon className="size-6" />}
+            title="No live airborne traffic"
+            description="Radar only displays live flights you have tracked or saved. Search a flight number, open its dossier, and tap Track. No simulated aircraft are shown."
+            action={
+              <Link href="/search">
+                <button className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-[color:var(--bg)]">
+                  Search live flights
+                </button>
+              </Link>
+            }
+          />
+        </Panel>
+      </div>
     );
   }
 
@@ -59,8 +78,15 @@ export default function RadarPage() {
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-1.5 text-[10px] font-semibold text-muted">
             <Radio className="size-3 animate-pulse text-accent" />
-            {activeFlights.length} targets tracked
+            {activeFlights.length} live saved targets
           </span>
+          <button
+            onClick={() => void refreshData()}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[10px] font-semibold text-muted transition-colors hover:text-accent"
+          >
+            <Radio className={cn("size-3", syncing && "animate-pulse")} />
+            {syncing ? "Refreshing" : "Refresh live"}
+          </button>
           <button
             onClick={() => setFocusMode((value) => !value)}
             className={cn(
@@ -282,9 +308,9 @@ export default function RadarPage() {
                 <BellPlus className="size-3 text-accent" /> Real-time telemetry
               </p>
               <p className="mt-1 text-[9px] leading-relaxed text-subtle">
-                Radar positions advance every 4 seconds with speed jitter and
-                route-progress interpolation. Weather cells and sweep animation
-                are rendered locally at 60 FPS.
+                Aircraft positions come from AeroDataBox when the live feed reports
+                a location. Flights without a reported position are labelled and
+                never simulated.
               </p>
             </div>
           </aside>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cloud,
   CloudFog,
@@ -21,8 +21,8 @@ import type {
   Airport,
   DestinationArrivalForecast,
   FlightCategory,
+  RealtimeAirportWeather,
 } from "@/lib/types";
-import { getRealtimeAirport } from "@/lib/data";
 import { cn, weatherIcon } from "@/lib/utils";
 
 function WeatherGlyph({
@@ -369,6 +369,30 @@ export function AirportWeatherCard({
   destination: Airport;
   className?: string;
 }) {
+  const [weather, setWeather] = useState<
+    Record<string, RealtimeAirportWeather>
+  >({});
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setFailed(false);
+    fetch(
+      `/api/weather/airports?codes=${encodeURIComponent(origin.code)},${encodeURIComponent(destination.code)}`,
+      { signal: controller.signal, cache: "no-store" },
+    )
+      .then((response) => response.json())
+      .then((data: { live?: boolean; weather?: Record<string, RealtimeAirportWeather> }) => {
+        if (data.live && data.weather) setWeather(data.weather);
+        else setFailed(true);
+      })
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [origin.code, destination.code]);
+
   return (
     <div
       className={cn(
@@ -378,14 +402,34 @@ export function AirportWeatherCard({
     >
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-3">
         <p className="text-sm font-bold text-ink">Airport weather conditions</p>
-        <span className="flex items-center gap-1 text-[9px] font-bold text-accent">
-          <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-          METAR LIVE FEED
+        <span
+          className={cn(
+            "flex items-center gap-1 text-[9px] font-bold",
+            failed ? "text-delayed" : "text-landed",
+          )}
+        >
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              failed ? "bg-delayed" : "animate-pulse-dot bg-landed",
+            )}
+          />
+          {loading ? "FETCHING LIVE WEATHER" : failed ? "WEATHER UNAVAILABLE" : "LIVE OPEN-METEO"}
         </span>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">
-        <AirportWeatherPane airport={origin} label="DEPARTURE" />
-        <AirportWeatherPane airport={destination} label="ARRIVAL" />
+        <AirportWeatherPane
+          airport={origin}
+          label="DEPARTURE"
+          live={weather[origin.code]}
+          loading={loading}
+        />
+        <AirportWeatherPane
+          airport={destination}
+          label="ARRIVAL"
+          live={weather[destination.code]}
+          loading={loading}
+        />
       </div>
     </div>
   );
@@ -394,13 +438,15 @@ export function AirportWeatherCard({
 function AirportWeatherPane({
   airport,
   label,
+  live,
+  loading,
 }: {
   airport: Airport;
   label: string;
+  live?: RealtimeAirportWeather;
+  loading: boolean;
 }) {
-  const realtime = getRealtimeAirport(airport.code);
-  const weather = realtime?.weather;
-  const category = weather?.flightCategory ?? "VFR";
+  const category = live?.flightCategory;
 
   return (
     <div className="rounded-xl border border-line/70 bg-surface-2 p-3">
@@ -408,47 +454,61 @@ function AirportWeatherPane({
         <p className="label-caps text-subtle">{label}</p>
         <p className="font-mono text-xs font-black text-accent">{airport.code}</p>
       </div>
-      <div className="mt-1.5 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-lg font-bold text-ink">
-            {airport.weather.tempC}°C{" "}
-            <span className="text-[10px] font-medium text-muted">
-              / {airport.weather.tempF}°F
-            </span>
-          </p>
-          <p className="mt-0.5 text-[11px] font-medium text-accent-2">
-            {airport.weather.condition}
-          </p>
+      {loading ? (
+        <div className="mt-3 flex items-center gap-2 text-[10px] text-muted">
+          <Loader2 className="size-3 animate-spin text-accent" />
+          Loading live conditions…
         </div>
-        <span
-          className="rounded-md border px-1.5 py-0.5 text-[8px] font-bold"
-          style={{
-            color: categoryColor(category),
-            borderColor: `${categoryColor(category)}55`,
-            backgroundColor: `${categoryColor(category)}15`,
-          }}
-        >
-          {category}
-        </span>
-      </div>
-      <div className="mt-2 space-y-1 border-t border-line/50 pt-2 text-[10px] text-muted">
-        <p className="flex items-center gap-1.5">
-          <Wind className="size-3 text-subtle" /> {airport.weather.wind}
+      ) : live ? (
+        <>
+          <div className="mt-1.5 flex items-start justify-between gap-2">
+            <div>
+              <p className="text-lg font-bold text-ink">
+                {live.tempC}°C{" "}
+                <span className="text-[10px] font-medium text-muted">
+                  / {live.tempF}°F
+                </span>
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-accent-2">
+                {live.condition}
+              </p>
+            </div>
+            {category && (
+              <span
+                className="rounded-md border px-1.5 py-0.5 text-[8px] font-bold"
+                style={{
+                  color: categoryColor(category),
+                  borderColor: `${categoryColor(category)}55`,
+                  backgroundColor: `${categoryColor(category)}15`,
+                }}
+              >
+                {category}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 space-y-1 border-t border-line/50 pt-2 text-[10px] text-muted">
+            <p className="flex items-center gap-1.5">
+              <Wind className="size-3 text-subtle" /> {live.wind}
+            </p>
+            <p className="flex items-center gap-1.5">
+              <Eye className="size-3 text-subtle" /> Visibility: {live.visibility}
+            </p>
+            <p className="flex items-center gap-1.5">
+              <Droplets className="size-3 text-subtle" /> Humidity: {live.humidity}%
+            </p>
+            {live.metarRaw && (
+              <p className="mt-1 rounded-md bg-surface px-1.5 py-1 font-mono text-[8px] leading-relaxed text-subtle">
+                {live.metarRaw}
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-[10px] leading-relaxed text-subtle">
+          Live weather is unavailable for {airport.code}. No stale weather is
+          displayed.
         </p>
-        <p className="flex items-center gap-1.5">
-          <Eye className="size-3 text-subtle" /> Visibility:{" "}
-          {airport.weather.visibility}
-        </p>
-        <p className="flex items-center gap-1.5">
-          <Droplets className="size-3 text-subtle" /> Humidity:{" "}
-          {airport.weather.humidity}%
-        </p>
-        {weather?.metarRaw && (
-          <p className="mt-1 rounded-md bg-surface px-1.5 py-1 font-mono text-[8px] leading-relaxed text-subtle">
-            {weather.metarRaw}
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }

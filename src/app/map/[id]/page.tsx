@@ -10,35 +10,15 @@ import {
   Map as MapIcon,
   Maximize2,
   Minimize2,
-  Moon,
   Plane,
-  Sun,
   Telescope,
   TriangleAlert,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { airportNodeByIata } from "@/lib/data";
-import type { Airport, AirportNode, DirectFlightConnection } from "@/lib/types";
 import { cn, geodesicDistanceKm, kmToNm } from "@/lib/utils";
-import { WorldMap } from "@/components/world-map";
+import { GoogleFlightMap } from "@/components/google-flight-map";
+import { OsmFlightMap } from "@/components/osm-map";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
-
-function toNode(airport: Airport): AirportNode {
-  return (
-    airportNodeByIata.get(airport.code) ?? {
-      iata: airport.code,
-      icao: `K${airport.code}`,
-      name: airport.name,
-      city: airport.city,
-      country: airport.country,
-      region: "AMERICAS",
-      latitude: airport.latitude,
-      longitude: airport.longitude,
-      timezone: airport.timezone,
-      hubAirlines: [],
-    }
-  );
-}
 
 export default function FlightMapPage() {
   const params = useParams<{ id: string }>();
@@ -54,7 +34,11 @@ export default function FlightMapPage() {
     );
   }, [flights, params.id]);
 
-  const [variant, setVariant] = useState<"light" | "dark">("dark");
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [provider, setProvider] = useState<"google" | "osm">(
+    googleMapsKey ? "google" : "osm",
+  );
+  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap");
   const [showHud, setShowHud] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -77,29 +61,13 @@ export default function FlightMapPage() {
     );
   }
 
-  const origin = toNode(flight.origin);
-  const destination = toNode(flight.destination);
   const distance = geodesicDistanceKm(
-    origin.latitude,
-    origin.longitude,
-    destination.latitude,
-    destination.longitude,
+    flight.origin.latitude,
+    flight.origin.longitude,
+    flight.destination.latitude,
+    flight.destination.longitude,
   );
-  const connection: DirectFlightConnection = {
-    id: `${origin.iata}-${destination.iata}`,
-    origin,
-    destination,
-    distanceKm: distance,
-    distanceNm: kmToNm(distance),
-    estimatedDurationMinutes: Math.round((distance / 815) * 60 + 32),
-    durationFormatted: `${Math.floor((distance / 815) * 60 + 32) / 60}h`,
-    haulCategory: distance > 4000 ? "LONG_HAUL" : distance > 1500 ? "MEDIUM_HAUL" : "SHORT_HAUL",
-    dailyFlightsCount: 1,
-    hasDepartures: true,
-    hasArrivals: true,
-    operatingCarriers: [],
-    isLiveVerified: true,
-  };
+  const distanceNm = kmToNm(distance);
 
   const toggleFullscreen = async () => {
     try {
@@ -139,25 +107,43 @@ export default function FlightMapPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">
+            {googleMapsKey && (
+              <button
+                onClick={() => setProvider("google")}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 py-1 text-[9px] font-bold transition-colors",
+                  provider === "google" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
+                )}
+              >
+                Google
+              </button>
+            )}
             <button
-              onClick={() => setVariant("light")}
+              onClick={() => setProvider("osm")}
               className={cn(
                 "flex items-center gap-1 rounded-md px-2 py-1 text-[9px] font-bold transition-colors",
-                variant === "light" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
+                provider === "osm" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
               )}
             >
-              <Sun className="size-3" /> Vector
-            </button>
-            <button
-              onClick={() => setVariant("dark")}
-              className={cn(
-                "flex items-center gap-1 rounded-md px-2 py-1 text-[9px] font-bold transition-colors",
-                variant === "dark" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
-              )}
-            >
-              <Moon className="size-3" /> Night
+              OSM
             </button>
           </div>
+          {provider === "google" && (
+            <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">
+              {(["roadmap", "satellite"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMapType(type)}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[9px] font-bold capitalize transition-colors",
+                    mapType === type ? "bg-accent text-[color:var(--bg)]" : "text-muted",
+                  )}
+                >
+                  {type === "roadmap" ? "Road" : "Satellite"}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => setShowHud((value) => !value)}
             className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface-2 px-2.5 text-[9px] font-bold text-muted transition-colors hover:text-accent"
@@ -180,20 +166,15 @@ export default function FlightMapPage() {
       </div>
 
       <div className="relative h-[calc(100vh-160px)] min-h-[520px]">
-        <WorldMap
-          airports={[origin, destination]}
-          connections={[connection]}
-          origin={origin}
-          selected={destination}
-          selectedRoute={connection}
-          onSelectAirport={(iata) => {
-            if (iata === origin.iata || iata === destination.iata) return;
-          }}
-          variant={variant}
-          className="h-full"
-          progress={flight.telemetry.progressPercent}
-          showBadge={false}
-        />
+        {provider === "google" && googleMapsKey ? (
+          <GoogleFlightMap
+            flight={flight}
+            mapTypeId={mapType}
+            className="h-full"
+          />
+        ) : (
+          <OsmFlightMap flight={flight} className="h-full" />
+        )}
 
         {/* Floating flight info */}
         <div className="pointer-events-none absolute left-3 top-3 w-[260px] max-w-[calc(100%-80px)]">
@@ -225,7 +206,9 @@ export default function FlightMapPage() {
               <span className="flex flex-1 flex-col items-center px-2">
                 <Plane className="size-3 rotate-90 text-accent" />
                 <span className="mt-0.5 text-[8px] font-semibold text-accent">
-                  {Math.round(flight.telemetry.progressPercent * 100)}%
+                  {flight.telemetry.hasLiveLocation
+                    ? `${Math.round(flight.telemetry.progressPercent * 100)}%`
+                    : "No position"}
                 </span>
               </span>
               <span className="text-center">
@@ -261,6 +244,12 @@ export default function FlightMapPage() {
               <TriangleAlert className="size-2.5" />
               {flight.statusNote || "Normal operations"}
             </div>
+            {!flight.telemetry.hasLiveLocation && (
+              <div className="mt-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] leading-relaxed text-delayed">
+                Live aircraft position is not reported by AeroDataBox. The route is
+                shown, but no aircraft marker is fabricated.
+              </div>
+            )}
           </div>
         </div>
 
@@ -272,8 +261,8 @@ export default function FlightMapPage() {
               <p className="flex justify-between gap-2">
                 <span className="text-subtle">Distance</span>
                 <span className="font-semibold text-ink">
-                  {connection.distanceKm.toLocaleString()} km ·{" "}
-                  {connection.distanceNm.toLocaleString()} nm
+                  {distance.toLocaleString()} km ·{" "}
+                  {distanceNm.toLocaleString()} nm
                 </span>
               </p>
               <p className="flex justify-between gap-2">
@@ -306,19 +295,20 @@ export default function FlightMapPage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-3">
             <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 px-3 py-2 shadow-xl backdrop-blur">
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                <HudItem label="Altitude" value={`${flight.telemetry.altitudeFeet.toLocaleString()} ft`} accent />
-                <HudItem label="Ground speed" value={`${flight.telemetry.groundSpeedKnots} kt`} />
-                <HudItem label="Mach" value={flight.telemetry.mach.toFixed(2)} />
-                <HudItem label="Vertical speed" value={`${flight.telemetry.verticalSpeedFpm} fpm`} />
-                <HudItem label="Remaining" value={`${flight.telemetry.distanceRemainingNm} nm`} />
-                <HudItem label="ETA" value={`${flight.telemetry.etaMinutesRemaining} min`} accent />
+                <HudItem label="Altitude" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
+                <HudItem label="Ground speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
+                <HudItem label="Mach" value={flight.telemetry.hasLiveLocation ? flight.telemetry.mach.toFixed(2) : "—"} />
+                <HudItem label="Vertical speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.verticalSpeedFpm} fpm` : "—"} />
+                <HudItem label="Remaining" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.distanceRemainingNm} nm` : "—"} />
+                <HudItem label="ETA" value={flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
               </div>
             </div>
           </div>
         )}
 
         <div className="pointer-events-none absolute bottom-20 left-3 flex items-center gap-1.5 rounded-md border border-line/70 bg-surface/85 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-subtle backdrop-blur">
-          <Layers className="size-2.5 text-accent" /> {variant === "dark" ? "Radar night" : "Positron vector"} · drag to pan · scroll to zoom
+          <Layers className="size-2.5 text-accent" />{" "}
+          {provider === "google" ? "Google Maps" : "OpenStreetMap"} · drag to pan · scroll to zoom
         </div>
       </div>
     </div>

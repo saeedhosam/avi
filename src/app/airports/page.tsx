@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,24 +10,26 @@ import {
   Eye,
   Gauge,
   Layers,
+  Loader2,
   MapPin,
   PlaneLanding,
   PlaneTakeoff,
+  RefreshCw,
   Search,
-  ShieldAlert,
-  Thermometer,
   Wind,
   X,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import {
-  getAirportNode,
-  getRealtimeAirport,
-  mockAirports,
-  realtimeAirports,
+  findAirportNode,
+  routeAirports,
 } from "@/lib/data";
-import type { Flight, RealtimeAirportInfo, RealtimeAirportWeather } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type {
+  AirportNode,
+  Flight,
+  RealtimeAirportWeather,
+} from "@/lib/types";
+import { REGION_META, cn } from "@/lib/utils";
 import { SourceBanner } from "@/components/source-banner";
 import {
   Button,
@@ -54,138 +56,232 @@ const BOARD_AIRPORT_CODES = [
   "CAI",
   "IST",
   "ATL",
+  "AMS",
+  "LAX",
+  "SYD",
+  "ORD",
 ];
 
 export default function AirportsPage() {
   const router = useRouter();
-  const { flights } = useApp();
+  const {
+    aeroConfigured,
+    offlineMode,
+    upsertFlights,
+    setQuotaFallback,
+    refreshData,
+    syncing,
+  } = useApp();
+
   const [tab, setTab] = useState<BoardTab>("BOARD");
   const [airportCode, setAirportCode] = useState("JFK");
   const [direction, setDirection] = useState<Direction>("DEPARTURES");
   const [airline, setAirline] = useState("All");
+  const [boardFlights, setBoardFlights] = useState<Flight[]>([]);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const [boardMode, setBoardMode] = useState("");
+  const boardRequestRef = useRef(0);
 
-  // Explorer
   const [explorerQuery, setExplorerQuery] = useState("");
   const [explorerRegion, setExplorerRegion] = useState("All");
-  const [explorerStatus, setExplorerStatus] = useState("All");
-  const [selectedRealtime, setSelectedRealtime] =
-    useState<RealtimeAirportInfo | null>(null);
+  const [explorerCategory, setExplorerCategory] = useState("All");
+  const [searchAirports, setSearchAirports] = useState<AirportNode[] | null>(
+    null,
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [liveWeather, setLiveWeather] = useState<
     Record<string, RealtimeAirportWeather>
   >({});
+  const [selectedAirport, setSelectedAirport] = useState<AirportNode | null>(
+    null,
+  );
 
-  // Read deep links such as /airports?code=CAI from route inspector or terminal maps.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code && code.length === 3) setAirportCode(code.toUpperCase());
-    const view = params.get("view");
-    if (view === "explorer") setTab("EXPLORER");
+    if (params.get("view") === "explorer") setTab("EXPLORER");
   }, []);
 
-  // Open-Meteo live current conditions for every airport in the explorer.
-  useEffect(() => {
-    const controller = new AbortController();
-    const codes = realtimeAirports.map((item) => item.code).join(",");
-    fetch(`/api/weather/airports?codes=${codes}`, {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then((response) => response.json())
-      .then((data: { live?: boolean; weather?: Record<string, RealtimeAirportWeather> }) => {
-        if (data.live && data.weather) setLiveWeather(data.weather);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, []);
-
-  const mergedRealtimeAirports = useMemo(
+  const airport = useMemo(
     () =>
-      realtimeAirports.map((item) =>
-        liveWeather[item.code]
-          ? { ...item, weather: liveWeather[item.code] }
-          : item,
-      ),
-    [liveWeather],
+      findAirportNode(airportCode) ??
+      routeAirports.find((item) => item.iata === airportCode) ??
+      routeAirports[0],
+    [airportCode],
   );
 
-  const airport = useMemo(() => {
-    const known = mockAirports.find((item) => item.code === airportCode);
-    if (known) return known;
-    const live =
-      mergedRealtimeAirports.find(
-        (item) => item.code === airportCode.toUpperCase(),
-      ) ?? getRealtimeAirport(airportCode);
-    if (live) {
-      return {
-        code: live.code,
-        name: live.name,
-        city: live.city,
-        country: live.country,
-        timezone: live.timezone,
-        latitude: live.latitude,
-        longitude: live.longitude,
-        weather: {
-          tempC: live.weather.tempC,
-          tempF: live.weather.tempF,
-          condition: live.weather.condition,
-          wind: live.weather.wind,
-          visibility: live.weather.visibility,
-          humidity: live.weather.humidity,
-        },
+  // Live weather for every reference airport (single Open-Meteo multi-location request).
+  const loadWeather = useCallback(async () => {
+    try {
+      const codes = routeAirports.map((item) => item.iata).join(",");
+      const response = await fetch(`/api/weather/airports?codes=${codes}`, {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        live?: boolean;
+        weather?: Record<string, RealtimeAirportWeather>;
       };
+      if (data.live && data.weather) setLiveWeather(data.weather);
+    } catch {
+      // Weather stays unavailable rather than showing stale values.
     }
-    return mockAirports[0];
-  }, [airportCode, mergedRealtimeAirports]);
+  }, []);
 
-  const realtime = mergedRealtimeAirports.find((item) => item.code === airportCode);
+  useEffect(() => {
+    void loadWeather();
+  }, [loadWeather]);
 
-  const boardFlights = useMemo(() => {
-    return flights.filter((flight) => {
-      const matchesAirport =
-        direction === "DEPARTURES"
-          ? flight.origin.code === airportCode
-          : flight.destination.code === airportCode;
-      const matchesAirline = airline === "All" || flight.airline === airline;
-      return matchesAirport && matchesAirline;
-    });
-  }, [flights, airportCode, direction, airline]);
+  const loadBoard = useCallback(async () => {
+    if (offlineMode) {
+      setBoardLoading(false);
+      setBoardError("Offline mode is active. Live airport boards are paused.");
+      return;
+    }
+    const requestId = ++boardRequestRef.current;
+    setBoardLoading(true);
+    setBoardError(null);
+    setBoardFlights([]);
+    try {
+      const response = await fetch(`/api/airports/${airportCode}/flights`, {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        mode: string;
+        status?: number;
+        flights?: Flight[];
+        error?: string;
+      };
+      if (requestId !== boardRequestRef.current) return;
+      setBoardMode(data.mode);
+      if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+      if (data.mode === "NOT_CONFIGURED") {
+        throw new Error(
+          "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+        );
+      }
+      if (data.error) throw new Error(data.error);
+      const flights = data.flights ?? [];
+      setBoardFlights(flights);
+      if (flights.length) upsertFlights(flights);
+      if (!flights.length) {
+        setBoardError("No live flights were returned for this airport.");
+      }
+    } catch (error) {
+      if (requestId === boardRequestRef.current) {
+        setBoardError(
+          error instanceof Error ? error.message : "Live airport board request failed.",
+        );
+      }
+    } finally {
+      if (requestId === boardRequestRef.current) setBoardLoading(false);
+    }
+  }, [
+    airportCode,
+    offlineMode,
+    setQuotaFallback,
+    upsertFlights,
+  ]);
 
-  const airlines = useMemo(() => {
-    const all = new Set(
-      flights
-        .filter((flight) =>
+  useEffect(() => {
+    void loadBoard();
+  }, [loadBoard]);
+
+  // Live airport search via AeroDataBox; falls back to the reference list when empty.
+  useEffect(() => {
+    const query = explorerQuery.trim();
+    if (query.length < 2) {
+      setSearchAirports(null);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+    if (offlineMode) {
+      setSearchError("Offline mode is active.");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchError(null);
+      try {
+        const response = await fetch(
+          `/api/airports/search?q=${encodeURIComponent(query)}`,
+          { signal: controller.signal, cache: "no-store" },
+        );
+        const data = (await response.json()) as {
+          mode: string;
+          airports?: AirportNode[];
+        };
+        if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+        if (data.mode === "NOT_CONFIGURED") {
+          throw new Error(
+            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+          );
+        }
+        setSearchAirports(data.airports ?? []);
+        if (!(data.airports ?? []).length) {
+          setSearchError("No live airports matched this search.");
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSearchError(
+            error instanceof Error ? error.message : "Airport search failed.",
+          );
+        }
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [explorerQuery, offlineMode, setQuotaFallback]);
+
+  const boardAirlines = useMemo(() => {
+    const names = new Set(
+      boardFlights.map((flight) => flight.airline).filter(Boolean),
+    );
+    return ["All", ...names];
+  }, [boardFlights]);
+
+  const visibleBoardFlights = useMemo(
+    () =>
+      boardFlights.filter((flight) => {
+        const matchesDirection =
           direction === "DEPARTURES"
             ? flight.origin.code === airportCode
-            : flight.destination.code === airportCode,
-        )
-        .map((flight) => flight.airline),
-    );
-    return ["All", ...all];
-  }, [flights, airportCode, direction]);
+            : flight.destination.code === airportCode;
+        const matchesAirline =
+          airline === "All" || flight.airline === airline;
+        return matchesDirection && matchesAirline;
+      }),
+    [boardFlights, direction, airline, airportCode],
+  );
 
+  const explorerBase = searchAirports ?? routeAirports;
   const explorerResults = useMemo(() => {
-    const q = explorerQuery.trim().toLowerCase();
-    return mergedRealtimeAirports.filter((item) => {
-      const matchesQuery =
-        !q ||
-        item.code.toLowerCase().includes(q) ||
-        item.icao.toLowerCase().includes(q) ||
-        item.city.toLowerCase().includes(q) ||
-        item.name.toLowerCase().includes(q) ||
-        item.country.toLowerCase().includes(q) ||
-        item.hubAirlines.some((airlineName) => airlineName.toLowerCase().includes(q));
-      const matchesRegion =
-        explorerRegion === "All" || item.region === explorerRegion;
-      const matchesStatus =
-        explorerStatus === "All" ||
-        (explorerStatus === "On-Time" && !item.isDelayed) ||
-        (explorerStatus === "Delayed" && item.isDelayed) ||
-        (explorerStatus === "Weather Alerts" &&
-          ["IFR", "MVFR"].includes(item.weather.flightCategory));
-      return matchesQuery && matchesRegion && matchesStatus;
-    });
-  }, [explorerQuery, explorerRegion, explorerStatus, mergedRealtimeAirports]);
+    const regionFiltered =
+      explorerRegion === "All"
+        ? explorerBase
+        : explorerBase.filter(
+            (item) =>
+              (REGION_META[item.region]?.label ?? item.region) ===
+                explorerRegion ||
+              item.region === explorerRegion,
+          );
+
+    if (explorerCategory === "All") return regionFiltered;
+    return regionFiltered.filter(
+      (item) => liveWeather[item.iata]?.flightCategory === explorerCategory,
+    );
+  }, [explorerBase, explorerRegion, explorerCategory, liveWeather]);
+
+  const weather = liveWeather[airport.iata];
+  const lastSync = boardLoading ? "Loading…" : `${visibleBoardFlights.length} live flights`;
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6">
@@ -193,15 +289,15 @@ export default function AirportsPage() {
         <div>
           <p className="label-caps text-accent">Airport operations</p>
           <h2 className="mt-1 flex items-center gap-2 text-xl font-black tracking-tight text-ink">
-            {tab === "BOARD" ? "Live airport flight boards" : "Real-time airport explorer"}
+            {tab === "BOARD" ? "Live airport flight boards" : "Live airport explorer"}
             <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-accent">
-              {tab === "BOARD" ? airportCode : "GLOBAL METAR"}
+              {tab === "BOARD" ? airportCode : "AERODATABOX + METEO"}
             </span>
           </h2>
           <p className="mt-1 text-[11px] text-muted">
             {tab === "BOARD"
-              ? `${airport.code} · ${airport.name}`
-              : "Live ATC telemetry · Runway status · Global airport weather"}
+              ? `${airport.iata} · ${airport.name}`
+              : "Search any worldwide airport with live METAR conditions"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -229,28 +325,35 @@ export default function AirportsPage() {
               <Search className="size-3.5" /> Airport explorer
             </button>
           </div>
-          <Link href={`/routes?hub=${airportCode}`}>
-            <Button size="sm" variant="outline">
-              <Compass className="size-3.5" /> Connections
-            </Button>
-          </Link>
+          <Button size="sm" variant="outline" onClick={refreshData} disabled={syncing}>
+            <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
+            Refresh
+          </Button>
         </div>
       </div>
+
+      {!aeroConfigured && !offlineMode && (
+        <div className="mb-3 rounded-xl border border-delayed/40 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
+          <strong className="text-delayed">AeroDataBox is not configured.</strong>{" "}
+          Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code> and{" "}
+          <code className="font-mono text-accent">AERODATABOX_API_HOST</code> to{" "}
+          <code className="font-mono text-accent">.env</code>, then restart the dev
+          server. Weather remains live from Open-Meteo; no demo flights are shown.
+        </div>
+      )}
 
       {tab === "BOARD" ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-1.5 pb-1">
             <button
-              onClick={() => {
-                setTab("EXPLORER");
-                setExplorerQuery("");
-              }}
+              onClick={() => setTab("EXPLORER")}
               className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/50 bg-accent-soft px-2.5 py-2 text-[10px] font-bold text-accent"
             >
               <Search className="size-3.5" /> Search worldwide
             </button>
             {BOARD_AIRPORT_CODES.map((code) => {
-              const node = getAirportNode(code);
+              const node = findAirportNode(code);
+              if (!node) return null;
               const active = code === airportCode;
               return (
                 <button
@@ -310,7 +413,7 @@ export default function AirportsPage() {
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {airlines.slice(0, 6).map((airlineName) => (
+                  {boardAirlines.slice(0, 6).map((airlineName) => (
                     <FilterChip
                       key={airlineName}
                       active={airline === airlineName}
@@ -337,20 +440,32 @@ export default function AirportsPage() {
                     Status
                   </p>
                 </div>
-                {boardFlights.length === 0 ? (
+
+                {boardLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-14 text-xs text-muted">
+                    <Loader2 className="size-4 animate-spin text-accent" />
+                    Fetching live {direction.toLowerCase()} for {airportCode}…
+                  </div>
+                ) : boardError ? (
                   <EmptyState
                     icon={<PlaneTakeoff className="size-6" />}
-                    title={`No ${direction === "DEPARTURES" ? "departures" : "arrivals"} found`}
-                    description={`No cached flights match ${airportCode}${airline !== "All" ? ` · ${airline}` : ""}. Try another airport or airline filter.`}
+                    title="No live board data"
+                    description={boardError}
                     action={
-                      <Button size="sm" variant="outline" onClick={() => setAirline("All")}>
-                        Clear airline filter
+                      <Button size="sm" variant="outline" onClick={loadBoard}>
+                        <RefreshCw className="size-3.5" /> Retry
                       </Button>
                     }
                   />
+                ) : visibleBoardFlights.length === 0 ? (
+                  <EmptyState
+                    icon={<PlaneTakeoff className="size-6" />}
+                    title={`No live ${direction.toLowerCase()} found`}
+                    description={`AeroDataBox returned no ${direction.toLowerCase()} for ${airportCode}${airline !== "All" ? ` operated by ${airline}` : ""}.`}
+                  />
                 ) : (
                   <div className="divide-y divide-line/50">
-                    {boardFlights.map((flight) => (
+                    {visibleBoardFlights.map((flight) => (
                       <BoardRow
                         key={`${flight.id}-${direction}`}
                         flight={flight}
@@ -364,11 +479,16 @@ export default function AirportsPage() {
 
               <div className="flex items-center justify-between rounded-xl border border-line/60 bg-surface px-3 py-2 text-[9px] text-subtle">
                 <span>
-                  {boardFlights.length} {direction.toLowerCase()} · cached FIDS feed
+                  {lastSync} · AeroDataBox {boardMode || "live FIDS"}
                 </span>
-                <span className="flex items-center gap-1 text-landed">
-                  <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                  Live refresh
+                <span className={cn("flex items-center gap-1", boardError ? "text-delayed" : "text-landed")}>
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      boardError ? "bg-delayed" : "animate-pulse-dot bg-landed",
+                    )}
+                  />
+                  {boardError ? "Unavailable" : "Live"}
                 </span>
               </div>
             </div>
@@ -377,7 +497,7 @@ export default function AirportsPage() {
               <Panel className="p-3.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-mono text-2xl font-black text-ink">{airport.code}</p>
+                    <p className="font-mono text-2xl font-black text-ink">{airport.iata}</p>
                     <p className="mt-0.5 text-[11px] font-semibold text-accent-2">
                       {airport.name}
                     </p>
@@ -389,76 +509,56 @@ export default function AirportsPage() {
                     {airport.timezone}
                   </span>
                 </div>
+
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <MetricTile
                     label="Weather"
-                    value={`${airport.weather.tempC}°C`}
-                    sub={airport.weather.condition}
-                    accent
+                    value={weather ? `${weather.tempC}°C` : "—"}
+                    sub={weather?.condition ?? "Live weather unavailable"}
+                    accent={Boolean(weather)}
                   />
                   <MetricTile
                     label="Wind"
-                    value={airport.weather.wind}
-                    sub={`Vis ${airport.weather.visibility}`}
+                    value={weather?.wind ?? "—"}
+                    sub={weather ? `Vis ${weather.visibility}` : "Live weather unavailable"}
                   />
                   <MetricTile
                     label="Departures"
                     value={boardFlights.filter((f) => f.origin.code === airportCode).length}
-                    sub="Cached"
+                    sub="Live feed"
                   />
                   <MetricTile
                     label="Arrivals"
                     value={boardFlights.filter((f) => f.destination.code === airportCode).length}
-                    sub="Cached"
+                    sub="Live feed"
                   />
                 </div>
-                <div className="mt-2 space-y-1 text-[10px] text-muted">
-                  <p className="flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <Wind className="size-3 text-subtle" /> Wind
-                    </span>
-                    <span className="font-semibold text-ink">
-                      {airport.weather.wind}
-                    </span>
-                  </p>
-                  <p className="flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <Eye className="size-3 text-subtle" /> Visibility
-                    </span>
-                    <span className="font-semibold text-ink">
-                      {airport.weather.visibility}
-                    </span>
-                  </p>
-                  <p className="flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <Thermometer className="size-3 text-subtle" /> Humidity
-                    </span>
-                    <span className="font-semibold text-ink">
-                      {airport.weather.humidity}%
-                    </span>
-                  </p>
-                </div>
-                {realtime && (
+
+                {weather ? (
                   <div className="mt-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-2">
-                    <p className="label-caps text-subtle">METAR live</p>
+                    <p className="label-caps text-subtle">METAR · live</p>
                     <p className="mt-1 break-words font-mono text-[8px] leading-relaxed text-muted">
-                      {realtime.weather.metarRaw}
+                      {weather.metarRaw}
                     </p>
                     <p className="mt-1 flex items-center justify-between text-[9px]">
                       <span className="text-subtle">Flight rules</span>
-                      <span className="font-bold text-ink">
-                        {realtime.weather.flightCategory}
-                      </span>
+                      <span className="font-bold text-ink">{weather.flightCategory}</span>
                     </p>
                   </div>
+                ) : (
+                  <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[9px] text-subtle">
+                    Live weather is unavailable for this airport. No cached weather
+                    is displayed.
+                  </p>
                 )}
+
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  <Link href="/routes">
+                  <Link href={`/routes?hub=${airport.iata}`}>
                     <Button size="sm" variant="outline" className="w-full">
                       <Compass className="size-3" /> Route map
                     </Button>
                   </Link>
-                  <Link href={`/terminals?airport=${airport.code}`}>
+                  <Link href={`/terminals?airport=${airport.iata}`}>
                     <Button size="sm" variant="outline" className="w-full">
                       <Layers className="size-3" /> Terminal
                     </Button>
@@ -467,31 +567,31 @@ export default function AirportsPage() {
               </Panel>
 
               <Panel className="p-3">
-                <p className="label-caps text-subtle">Popular cached routes</p>
-                <div className="mt-2 space-y-1">
-                  {flights
-                    .filter(
-                      (flight) =>
-                        flight.origin.code === airportCode ||
-                        flight.destination.code === airportCode,
-                    )
-                    .slice(0, 4)
-                    .map((flight) => (
-                      <Link
-                        key={flight.id}
-                        href={`/flight/${encodeURIComponent(flight.id)}`}
-                        className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5 transition-colors hover:border-accent/40"
-                      >
-                        <span className="font-mono text-[10px] font-bold text-accent">
-                          {flight.flightNumber}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[9px] text-muted">
-                          {flight.origin.code} → {flight.destination.code}
-                        </span>
-                        <StatusBadge status={flight.status} />
-                      </Link>
-                    ))}
+                <p className="label-caps text-subtle">Airport reference</p>
+                <div className="mt-2 space-y-1.5 text-[10px]">
+                  <p className="flex items-center justify-between gap-2">
+                    <span className="text-subtle">IATA / ICAO</span>
+                    <span className="font-mono font-semibold text-ink">
+                      {airport.iata} / {airport.icao}
+                    </span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2">
+                    <span className="text-subtle">Region</span>
+                    <span className="font-semibold text-ink">
+                      {REGION_META[airport.region]?.label ?? airport.region}
+                    </span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2">
+                    <span className="text-subtle">Coordinates</span>
+                    <span className="font-mono text-[9px] font-semibold text-ink">
+                      {airport.latitude.toFixed(3)}, {airport.longitude.toFixed(3)}
+                    </span>
+                  </p>
                 </div>
+                <p className="mt-2 border-t border-line/60 pt-2 text-[8px] leading-relaxed text-subtle">
+                  Coordinates and timezone are geographic reference data. Weather,
+                  flights, and operational status are live feeds.
+                </p>
               </Panel>
             </aside>
           </div>
@@ -505,10 +605,10 @@ export default function AirportsPage() {
                 <input
                   value={explorerQuery}
                   onChange={(event) => setExplorerQuery(event.target.value)}
-                  placeholder="Search airport (e.g. JFK, London, Tokyo, DXB, Cairo)…"
+                  placeholder="Search any airport (code, city, name, country)…"
                   className="h-10 w-full rounded-xl border border-line bg-surface-2 pl-9 pr-9 text-xs text-ink outline-none placeholder:text-subtle focus:border-accent"
                 />
-                {explorerQuery && (
+                {explorerQuery ? (
                   <button
                     onClick={() => setExplorerQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
@@ -516,7 +616,7 @@ export default function AirportsPage() {
                   >
                     <X className="size-3.5" />
                   </button>
-                )}
+                ) : null}
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="flex items-center gap-1.5 rounded-lg border border-landed/35 bg-landed/10 px-2 py-1.5 text-[9px] font-bold text-landed">
@@ -524,64 +624,63 @@ export default function AirportsPage() {
                   LIVE OPEN-METEO
                 </span>
                 <span className="text-[9px] text-subtle">
-                  {explorerResults.length} airports
+                  {searchLoading ? "Searching…" : `${explorerResults.length} airports`}
                 </span>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {["All", "Americas", "Europe", "Asia-Pacific", "Middle East"].map((regionName) => (
-                <FilterChip
-                  key={regionName}
-                  active={explorerRegion === regionName}
-                  onClick={() => setExplorerRegion(regionName)}
-                >
-                  {regionName}
-                </FilterChip>
-              ))}
+              {["All", "Americas", "Europe", "Asia-Pacific", "MENA", "Africa"].map(
+                (regionName) => (
+                  <FilterChip
+                    key={regionName}
+                    active={explorerRegion === regionName}
+                    onClick={() => setExplorerRegion(regionName)}
+                  >
+                    {regionName === "MENA" ? "Middle East & N. Africa" : regionName}
+                  </FilterChip>
+                ),
+              )}
               <span className="mx-1 h-4 w-px bg-line" />
-              {["All", "On-Time", "Delayed", "Weather Alerts"].map((statusName) => (
+              {["All", "VFR", "MVFR", "IFR"].map((category) => (
                 <FilterChip
-                  key={statusName}
-                  active={explorerStatus === statusName}
-                  color={statusName === "Delayed" ? "#EF4444" : undefined}
-                  onClick={() => setExplorerStatus(statusName)}
+                  key={category}
+                  active={explorerCategory === category}
+                  onClick={() => setExplorerCategory(category)}
                 >
-                  {statusName}
+                  {category === "All" ? "All conditions" : category}
                 </FilterChip>
               ))}
             </div>
           </div>
 
+          {searchError && (
+            <div className="rounded-xl border border-delayed/35 bg-delayed/10 px-3 py-2 text-[10px] text-muted">
+              {searchError}
+            </div>
+          )}
+
           {explorerResults.length === 0 ? (
             <Panel>
               <EmptyState
                 icon={<Search className="size-6" />}
-                title="No airports matched"
-                description={`No real-time airport telemetry found for “${explorerQuery}”. Try a hub code like JFK, LHR, HND, DXB, SFO, SIN, CDG, or CAI.`}
-                action={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setExplorerQuery("");
-                      setExplorerRegion("All");
-                      setExplorerStatus("All");
-                    }}
-                  >
-                    Reset explorer
-                  </Button>
+                title={searchLoading ? "Searching live airports…" : "No airports found"}
+                description={
+                  searchLoading
+                    ? "Querying AeroDataBox for matching airports."
+                    : "Try a different IATA code, city, or country. Live airport search requires AeroDataBox."
                 }
               />
             </Panel>
           ) : (
             <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {explorerResults.map((item) => (
-                <RealtimeAirportCard
-                  key={item.code}
+                <AirportCard
+                  key={item.iata}
                   airport={item}
-                  onOpen={() => setSelectedRealtime(item)}
+                  weather={liveWeather[item.iata]}
+                  onOpen={() => setSelectedAirport(item)}
                   onBoard={() => {
-                    setAirportCode(item.code);
+                    setAirportCode(item.iata);
                     setTab("BOARD");
                     setDirection("DEPARTURES");
                     setAirline("All");
@@ -594,14 +693,17 @@ export default function AirportsPage() {
       )}
 
       <AirportDetailModal
-        airport={selectedRealtime}
-        onClose={() => setSelectedRealtime(null)}
+        airport={selectedAirport}
+        weather={
+          selectedAirport ? liveWeather[selectedAirport.iata] : undefined
+        }
+        onClose={() => setSelectedAirport(null)}
         onBoard={(code) => {
           setAirportCode(code);
           setTab("BOARD");
           setDirection("DEPARTURES");
           setAirline("All");
-          setSelectedRealtime(null);
+          setSelectedAirport(null);
         }}
       />
     </div>
@@ -641,7 +743,9 @@ function BoardRow({
       </div>
       <div className="min-w-0">
         <p className="text-sm font-black text-ink">{other.code}</p>
-        <p className="truncate text-[9px] text-muted">{other.city}</p>
+        <p className="truncate text-[9px] text-muted">
+          {other.city && other.city !== other.code ? other.city : other.name}
+        </p>
       </div>
       <div className="min-w-0">
         <p className="truncate text-[10px] font-bold text-ink">{gate}</p>
@@ -654,17 +758,24 @@ function BoardRow({
   );
 }
 
-function RealtimeAirportCard({
+function AirportCard({
   airport,
+  weather,
   onOpen,
   onBoard,
 }: {
-  airport: RealtimeAirportInfo;
+  airport: AirportNode;
+  weather?: RealtimeAirportWeather;
   onOpen: () => void;
   onBoard: () => void;
 }) {
-  const category = airport.weather.flightCategory;
-  const color = airport.isDelayed ? "#F59E0B" : "#10B981";
+  const category = weather?.flightCategory;
+  const color =
+    category === "IFR"
+      ? "#EF4444"
+      : category === "MVFR"
+        ? "#F59E0B"
+        : "#10B981";
 
   return (
     <div className="group overflow-hidden rounded-xl border border-line bg-surface transition-colors hover:border-accent/35">
@@ -672,7 +783,7 @@ function RealtimeAirportCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-1 font-mono text-[11px] font-extrabold text-accent">
-              {airport.code}
+              {airport.iata}
             </span>
             <div>
               <p className="text-[11px] font-bold text-ink">{airport.city}</p>
@@ -682,56 +793,32 @@ function RealtimeAirportCard({
           <span
             className="rounded-md border px-1.5 py-0.5 text-[8px] font-bold"
             style={{
-              color,
-              borderColor: `${color}55`,
-              backgroundColor: `${color}14`,
+              color: weather ? color : "var(--subtle)",
+              borderColor: weather ? `${color}55` : "var(--border)",
+              backgroundColor: weather ? `${color}14` : "transparent",
             }}
           >
-            {airport.isDelayed ? `+${airport.delayMinutes}m` : "ON TIME"}
+            {weather ? weather.flightCategory : "NO WX"}
           </span>
         </div>
         <p className="mt-1.5 truncate text-[9px] text-muted">{airport.name}</p>
         <div className="mt-2 flex items-center justify-between rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5">
           <span>
             <span className="block text-[11px] font-bold text-ink">
-              {airport.weather.tempC}°C
+              {weather ? `${weather.tempC}°C` : "—"}
             </span>
             <span className="block text-[8px] text-subtle">
-              {airport.weather.condition}
+              {weather?.condition ?? "Weather unavailable"}
             </span>
           </span>
           <span className="text-right">
-            <span
-              className="block text-[9px] font-bold"
-              style={{
-                color:
-                  category === "VFR"
-                    ? "#10B981"
-                    : category === "MVFR"
-                      ? "#F59E0B"
-                      : "#EF4444",
-              }}
-            >
-              {category}
+            <span className="block text-[9px] font-bold text-ink">
+              {weather?.wind ?? "—"}
             </span>
             <span className="block text-[8px] text-subtle">
-              {airport.weather.wind}
+              {weather ? `Vis ${weather.visibility}` : "No stale weather"}
             </span>
           </span>
-        </div>
-        <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-          <div className="rounded-md bg-surface-2 py-1">
-            <p className="text-[8px] text-subtle">On time</p>
-            <p className="text-[10px] font-bold text-ink">{airport.onTimePercentage}%</p>
-          </div>
-          <div className="rounded-md bg-surface-2 py-1">
-            <p className="text-[8px] text-subtle">Dep</p>
-            <p className="text-[10px] font-bold text-ink">{airport.activeDeparturesCount}</p>
-          </div>
-          <div className="rounded-md bg-surface-2 py-1">
-            <p className="text-[8px] text-subtle">Arr</p>
-            <p className="text-[10px] font-bold text-ink">{airport.activeArrivalsCount}</p>
-          </div>
         </div>
       </button>
       <div className="border-t border-line/60 bg-surface-2/50 px-3 py-1.5">
@@ -739,7 +826,7 @@ function RealtimeAirportCard({
           onClick={onBoard}
           className="flex w-full items-center justify-between text-[9px] font-bold text-accent"
         >
-          Open flight board <ArrowRight className="size-3" />
+          Open live flight board <ArrowRight className="size-3" />
         </button>
       </div>
     </div>
@@ -748,10 +835,12 @@ function RealtimeAirportCard({
 
 function AirportDetailModal({
   airport,
+  weather,
   onClose,
   onBoard,
 }: {
-  airport: RealtimeAirportInfo | null;
+  airport: AirportNode | null;
+  weather?: RealtimeAirportWeather;
   onClose: () => void;
   onBoard: (code: string) => void;
 }) {
@@ -759,7 +848,7 @@ function AirportDetailModal({
     <Modal
       open={Boolean(airport)}
       onClose={onClose}
-      title={airport ? `${airport.code} · ${airport.city}` : "Airport"}
+      title={airport ? `${airport.iata} · ${airport.city}` : "Airport"}
       subtitle={airport?.name}
       icon={<Building2 className="size-4" />}
       size="lg"
@@ -769,8 +858,8 @@ function AirportDetailModal({
             <Button variant="ghost" size="sm" onClick={onClose}>
               Close
             </Button>
-            <Button size="sm" onClick={() => onBoard(airport.code)}>
-              <PlaneLanding className="size-3.5" /> Open flight board
+            <Button size="sm" onClick={() => onBoard(airport.iata)}>
+              <PlaneLanding className="size-3.5" /> Open live flight board
             </Button>
           </>
         ) : null
@@ -780,87 +869,76 @@ function AirportDetailModal({
         <div className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Operational status</p>
-              <p
-                className={cn(
-                  "mt-1 text-xs font-bold",
-                  airport.isDelayed ? "text-delayed" : "text-landed",
-                )}
-              >
-                {airport.operationalStatus}
+              <p className="label-caps text-subtle">Location</p>
+              <p className="mt-1 text-xs font-bold text-ink">
+                {airport.city}, {airport.country}
+              </p>
+              <p className="mt-1 font-mono text-[9px] text-muted">
+                {airport.latitude.toFixed(4)}, {airport.longitude.toFixed(4)}
+              </p>
+              <p className="mt-1 text-[9px] text-subtle">{airport.timezone}</p>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-2 p-3">
+              <p className="label-caps text-subtle">Live weather</p>
+              {weather ? (
+                <>
+                  <p className="mt-1 text-xs font-bold text-ink">
+                    {weather.tempC}°C · {weather.condition}
+                  </p>
+                  <p className="mt-1 text-[9px] text-muted">
+                    {weather.wind} · {weather.visibility}
+                  </p>
+                  <p className="mt-1 font-mono text-[8px] leading-relaxed text-subtle">
+                    {weather.metarRaw}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-[10px] text-subtle">
+                  Live weather is unavailable.
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-line bg-surface-2 p-3">
+              <p className="label-caps text-subtle">Reference</p>
+              <p className="mt-1 text-xs font-bold text-ink">
+                {REGION_META[airport.region]?.label ?? airport.region}
+              </p>
+              <p className="mt-1 text-[9px] text-muted">
+                IATA {airport.iata} · ICAO {airport.icao}
               </p>
               <p className="mt-1 text-[9px] text-subtle">
-                On-time performance: {airport.onTimePercentage}%
-              </p>
-            </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Weather / METAR</p>
-              <p className="mt-1 text-xs font-bold text-ink">
-                {airport.weather.tempC}°C · {airport.weather.condition}
-              </p>
-              <p className="mt-1 font-mono text-[8px] leading-relaxed text-muted">
-                {airport.weather.metarRaw}
-              </p>
-            </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Traffic snapshot</p>
-              <p className="mt-1 text-xs font-bold text-ink">
-                {airport.activeDeparturesCount} dep · {airport.activeArrivalsCount} arr
-              </p>
-              <p className="mt-1 text-[9px] text-subtle">
-                {airport.terminalCount} terminals · {airport.activeRunways.length} active runways
+                Coordinates are static reference data; operational values are live.
               </p>
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Active runways</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {airport.activeRunways.map((runway) => (
-                  <span
-                    key={runway}
-                    className="rounded-md border border-line bg-surface px-2 py-1 font-mono text-[9px] font-semibold text-ink"
-                  >
-                    {runway}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 label-caps text-subtle">Elevation</p>
-              <p className="mt-0.5 text-[10px] text-ink">
-                {airport.elevationFeet.toLocaleString()} ft · {airport.timezone}
-              </p>
+          {weather && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <DetailMetric icon={<Wind className="size-3.5" />} label="Wind" value={weather.wind} />
+              <DetailMetric icon={<Eye className="size-3.5" />} label="Visibility" value={weather.visibility} />
+              <DetailMetric icon={<Gauge className="size-3.5" />} label="Pressure" value={`${weather.pressureInHg} inHg`} />
+              <DetailMetric icon={<PlaneLanding className="size-3.5" />} label="Flight rules" value={weather.flightCategory} />
             </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Hub airlines</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {airport.hubAirlines.map((airlineName) => (
-                  <span
-                    key={airlineName}
-                    className="rounded-md border border-accent/25 bg-accent-soft px-2 py-1 text-[9px] font-semibold text-accent"
-                  >
-                    {airlineName}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 label-caps text-subtle">Region</p>
-              <p className="mt-0.5 text-[10px] text-ink">{airport.region}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <DetailMetric icon={<Wind className="size-3.5" />} label="Wind" value={airport.weather.wind} />
-            <DetailMetric icon={<Eye className="size-3.5" />} label="Visibility" value={airport.weather.visibility} />
-            <DetailMetric icon={<Gauge className="size-3.5" />} label="Pressure" value={`${airport.weather.pressureInHg} inHg`} />
-            <DetailMetric icon={<PlaneLanding className="size-3.5" />} label="Flight rules" value={airport.weather.flightCategory} />
-          </div>
-
-          {airport.isDelayed && airport.delayReason && (
-            <p className="flex items-start gap-2 rounded-lg border border-delayed/35 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-delayed" />
-              {airport.delayReason} · average delay {airport.delayMinutes} minutes.
-            </p>
           )}
+
+          <div className="flex gap-2">
+            <Link href={`/routes?hub=${airport.iata}`} className="flex-1">
+              <Button size="sm" variant="outline" className="w-full">
+                <Compass className="size-3.5" /> Live route network
+              </Button>
+            </Link>
+            <Link href={`/terminals?airport=${airport.iata}`} className="flex-1">
+              <Button size="sm" variant="outline" className="w-full">
+                <Layers className="size-3.5" /> Terminal map
+              </Button>
+            </Link>
+          </div>
+
+          <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[9px] leading-relaxed text-subtle">
+            Weather is fetched live from Open-Meteo. Flight boards, routes, gates,
+            and statuses are fetched live from AeroDataBox. Nothing on this screen
+            is simulated.
+          </p>
         </div>
       )}
     </Modal>

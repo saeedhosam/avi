@@ -9,7 +9,6 @@ import {
   Luggage,
   MapPin,
   Plane,
-  Sun,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
@@ -32,7 +31,9 @@ export function FlightCard({
       ? 1
       : flight.status === "SCHEDULED" || flight.status === "CANCELLED"
         ? 0
-        : Math.min(0.95, Math.max(0.05, flight.telemetry.progressPercent));
+        : flight.telemetry.hasLiveLocation
+          ? Math.min(0.95, Math.max(0.05, flight.telemetry.progressPercent))
+          : 0;
 
   return (
     <div
@@ -124,7 +125,9 @@ export function FlightCard({
             {flight.origin.code}
           </p>
           <p className="mt-1 truncate text-[11px] font-medium text-muted">
-            {flight.origin.city}
+            {flight.origin.city && flight.origin.city !== flight.origin.code
+              ? flight.origin.city
+              : flight.origin.name}
           </p>
           <p className="mt-1.5 text-xs font-semibold text-accent tabular">
             {flight.departureTimeEstimated}
@@ -152,7 +155,9 @@ export function FlightCard({
           </div>
           {flight.status === "DEPARTED" ? (
             <p className="mt-0.5 text-[10px] font-semibold text-accent-2">
-              {flight.telemetry.etaMinutesRemaining}m to arrival
+              {flight.telemetry.hasLiveLocation
+                ? `${flight.telemetry.etaMinutesRemaining}m to arrival`
+                : "Live position not reported"}
             </p>
           ) : flight.delayMinutes > 0 ? (
             <p className="mt-0.5 text-[10px] font-semibold text-delayed">
@@ -170,29 +175,16 @@ export function FlightCard({
             {flight.destination.code}
           </p>
           <p className="mt-1 truncate text-[11px] font-medium text-muted">
-            {flight.destination.city}
+            {flight.destination.city &&
+            flight.destination.city !== flight.destination.code
+              ? flight.destination.city
+              : flight.destination.name}
           </p>
           <p className="mt-1.5 text-xs font-semibold text-ink tabular">
             {flight.arrivalTimeEstimated}
           </p>
         </div>
       </div>
-
-      {(flight.isTracked || flight.isFavorite) && (
-        <div className="relative z-10 mt-3 flex items-center justify-between gap-2 rounded-lg border border-accent/25 bg-surface-2 px-2.5 py-1.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Sun className="size-3 shrink-0 text-accent" />
-            <p className="truncate text-[10px] font-medium text-ink">
-              Arrival {flight.destination.code}:{" "}
-              {flight.destination.weather.tempC}°C ·{" "}
-              {flight.destination.weather.condition}
-            </p>
-          </div>
-          <span className="shrink-0 text-[9px] font-bold text-accent">
-            Forecast
-          </span>
-        </div>
-      )}
 
       <div className="relative z-10 mt-3 border-t border-line/60 pt-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">

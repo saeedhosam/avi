@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -24,47 +24,171 @@ import {
   X,
 } from "lucide-react";
 import {
-  buildNetworkSummary,
+  findAirportNode,
+  inferRegionFromCoords,
+  QUICK_HUBS,
   searchAirportNodes,
-  getAirportNode,
-  initialFlights,
-  routeAirports,
 } from "@/lib/data";
 import type {
   AirlineFilterChipItem,
-  ConnectionDirection,
+  AirportNode,
+  AirportRouteNetworkSummary,
   DirectFlightConnection,
   HaulCategory,
+  OperatingCarrierRoute,
   RouteRegion,
 } from "@/lib/types";
-import { HAUL_META, REGION_META, cn } from "@/lib/utils";
-import { WorldMap } from "@/components/world-map";
+import {
+  HAUL_META,
+  REGION_META,
+  classifyHaul,
+  cn,
+  estimateDurationMinutes,
+  formatDuration,
+  geodesicDistanceKm,
+  kmToNm,
+} from "@/lib/utils";
+import { useApp } from "@/lib/store";
+import { OsmRouteMap } from "@/components/osm-map";
 import { Button, FilterChip, Modal, TextInput } from "@/components/ui";
 
 const HAULS = Object.keys(HAUL_META) as HaulCategory[];
 const REGIONS = Object.keys(REGION_META) as RouteRegion[];
-const DIRECTIONS: Array<{ value: ConnectionDirection; label: string; short: string }> = [
-  { value: "ALL", label: "All connections", short: "All" },
-  { value: "DEPARTURES", label: "Outbound departures", short: "Departures" },
-  { value: "ARRIVALS", label: "Inbound arrivals", short: "Arrivals" },
-];
 
-const QUICK_HUBS = ["CAI", "DXB", "LHR", "IST", "JFK", "DOH", "FRA", "CDG", "JED", "SIN", "HND", "SFO"];
+interface LiveRoute {
+  destination?: string;
+  destinationName?: string;
+  city?: string;
+  country?: string;
+  icao?: string;
+  timezone?: string;
+  latitude?: number;
+  longitude?: number;
+  dailyFlights?: number;
+  operators?: Array<{ code?: string; name?: string }>;
+}
+
+function toNode(route: LiveRoute): AirportNode | null {
+  if (
+    !route.destination ||
+    route.latitude == null ||
+    route.longitude == null
+  ) {
+    return null;
+  }
+  const known = findAirportNode(route.destination);
+  if (known) return known;
+  return {
+    iata: route.destination.toUpperCase(),
+    icao: route.icao ?? "",
+    name: route.destinationName ?? route.destination,
+    city: route.city ?? route.destination,
+    country: route.country ?? "—",
+    region: inferRegionFromCoords(route.latitude, route.longitude),
+    latitude: route.latitude,
+    longitude: route.longitude,
+    timezone: route.timezone ?? "UTC",
+    hubAirlines: [],
+  };
+}
+
+function toConnections(origin: AirportNode, routes: LiveRoute[]) {
+  const connections: DirectFlightConnection[] = [];
+  const seen = new Set<string>();
+  for (const route of routes) {
+    const destination = toNode(route);
+    if (!destination || destination.iata === origin.iata) continue;
+    if (seen.has(destination.iata)) continue;
+    seen.add(destination.iata);
+    const distanceKm = geodesicDistanceKm(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+    const duration = estimateDurationMinutes(distanceKm);
+    const daily = Math.max(1, Math.round(route.dailyFlights ?? 1));
+    const operators = (route.operators ?? []).filter(
+      (operator) => operator.code && operator.name,
+    );
+    const carriers: OperatingCarrierRoute[] = operators.length
+      ? operators.map((operator) => ({
+          airlineCode: operator.code!.toUpperCase(),
+          airlineName: operator.name!,
+          flightNumbers: [],
+          dailyFrequencies: Math.max(
+            1,
+            Math.round(daily / operators.length),
+          ),
+          aircraftTypes: [],
+        }))
+      : [];
+    connections.push({
+      id: `${origin.iata}-${destination.iata}`,
+      origin,
+      destination,
+      distanceKm,
+      distanceNm: kmToNm(distanceKm),
+      estimatedDurationMinutes: duration,
+      durationFormatted: formatDuration(duration),
+      haulCategory: classifyHaul(distanceKm),
+      dailyFlightsCount: daily,
+      hasDepartures: true,
+      hasArrivals: true,
+      operatingCarriers: carriers,
+      isLiveVerified: true,
+    });
+  }
+  return connections.sort((a, b) => b.dailyFlightsCount - a.dailyFlightsCount);
+}
+
+function buildSummary(
+  origin: AirportNode | null,
+  connections: DirectFlightConnection[],
+): AirportRouteNetworkSummary {
+  const airlineMap = new Map<string, AirlineFilterChipItem>();
+  for (const connection of connections) {
+    for (const carrier of connection.operatingCarriers) {
+      const current = airlineMap.get(carrier.airlineCode);
+      if (current) current.destinationCount += 1;
+      else
+        airlineMap.set(carrier.airlineCode, {
+          code: carrier.airlineCode,
+          name: carrier.airlineName,
+          destinationCount: 1,
+        });
+    }
+  }
+  return {
+    originAirport: origin,
+    connections,
+    totalDirectDestinations: connections.length,
+    totalCountriesServed: new Set(
+      connections.map((connection) => connection.destination.country),
+    ).size,
+    totalOperatingAirlines: airlineMap.size,
+    totalDailyFlights: connections.reduce(
+      (sum, connection) => sum + connection.dailyFlightsCount,
+      0,
+    ),
+    availableAirlines: [...airlineMap.values()].sort(
+      (a, b) => b.destinationCount - a.destinationCount,
+    ),
+  };
+}
 
 export default function RoutesPage() {
   const router = useRouter();
+  const { offlineMode, setQuotaFallback, refreshData } = useApp();
+
   const [originIata, setOriginIata] = useState<string | null>(null);
   const [departureInput, setDepartureInput] = useState("");
   const [destinationInput, setDestinationInput] = useState("");
-  const [departureSuggestions, setDepartureSuggestions] = useState(
-    [] as ReturnType<typeof searchAirportNodes>,
-  );
-  const [destinationSuggestions, setDestinationSuggestions] = useState(
-    [] as ReturnType<typeof searchAirportNodes>,
-  );
+  const [suggestions, setSuggestions] = useState<AirportNode[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<AirportNode[]>([]);
   const [pivotHistory, setPivotHistory] = useState<string[]>([]);
+  const [connections, setConnections] = useState<DirectFlightConnection[]>([]);
   const [selectedDest, setSelectedDest] = useState<string | null>(null);
-  const [direction, setDirection] = useState<ConnectionDirection>("ALL");
   const [airlineCode, setAirlineCode] = useState<string | null>(null);
   const [haul, setHaul] = useState<HaulCategory>("ALL");
   const [region, setRegion] = useState<RouteRegion>("ALL");
@@ -74,20 +198,18 @@ export default function RoutesPage() {
   const [hubQuery, setHubQuery] = useState("");
   const [inspectorExpanded, setInspectorExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const originAirport = originIata ? findAirportNode(originIata) ?? null : null;
   const summary = useMemo(
-    () => buildNetworkSummary(originIata),
-    [originIata],
+    () => buildSummary(originAirport, connections),
+    [originAirport, connections],
   );
 
   const filteredConnections = useMemo(() => {
     const depQ = departureInput.trim().toLowerCase();
     const destQ = destinationInput.trim().toLowerCase();
-    return summary.connections.filter((connection) => {
-      const matchesDirection =
-        direction === "ALL" ||
-        (direction === "DEPARTURES" && connection.hasDepartures) ||
-        (direction === "ARRIVALS" && connection.hasArrivals);
+    return connections.filter((connection) => {
       const matchesAirline =
         !airlineCode ||
         connection.operatingCarriers.some(
@@ -111,16 +233,9 @@ export default function RoutesPage() {
             carrier.airlineName.toLowerCase().includes(destQ) ||
             carrier.airlineCode.toLowerCase().includes(destQ),
         );
-      return (
-        matchesDirection &&
-        matchesAirline &&
-        matchesHaul &&
-        matchesRegion &&
-        matchesDeparture &&
-        matchesDestination
-      );
+      return matchesAirline && matchesHaul && matchesRegion && matchesDeparture && matchesDestination;
     });
-  }, [summary, direction, airlineCode, haul, region, departureInput, destinationInput]);
+  }, [connections, airlineCode, haul, region, departureInput, destinationInput]);
 
   const selectedConnection = useMemo(
     () =>
@@ -133,36 +248,81 @@ export default function RoutesPage() {
     [filteredConnections, selectedDest],
   );
 
-  const availableAirlines = summary.availableAirlines;
+  const loadHub = useCallback(
+    async (iata: string, recordHistory = true) => {
+      const code = iata.trim().toUpperCase();
+      if (code.length !== 3) return;
+      if (offlineMode) {
+        setError("Offline mode is active. Live route data is paused.");
+        return;
+      }
+      if (recordHistory && originIata && originIata !== code) {
+        setPivotHistory((prev) => [...prev, originIata].slice(-6));
+      }
+      const node = findAirportNode(code);
+      setLoading(true);
+      setError(null);
+      setOriginIata(code);
+      setDepartureInput(node ? `${node.iata} · ${node.city}` : code);
+      setSuggestions([]);
+      setDestinationInput("");
+      setDestinationSuggestions([]);
+      setSelectedDest(null);
+      setAirlineCode(null);
+      try {
+        const response = await fetch(`/api/airports/${code}/routes`, {
+          cache: "no-store",
+        });
+        const data = (await response.json()) as {
+          mode: string;
+          routes?: LiveRoute[];
+          error?: string;
+        };
+        if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+        if (data.mode === "NOT_CONFIGURED") {
+          throw new Error(
+            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+          );
+        }
+        if (data.error) throw new Error(data.error);
+        const originNode = findAirportNode(code);
+        if (!originNode) throw new Error(`Unknown origin airport ${code}.`);
+        const next = toConnections(originNode, data.routes ?? []);
+        setConnections(next);
+        if (!next.length) {
+          setError("AeroDataBox returned no daily direct routes for this airport.");
+        }
+      } catch (loadError) {
+        setConnections([]);
+        setError(
+          loadError instanceof Error ? loadError.message : "Live route lookup failed.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [offlineMode, originIata, setQuotaFallback],
+  );
 
-  const loadHub = (iata: string, recordHistory = true) => {
-    const code = iata.trim().toUpperCase();
-    if (code.length !== 3) return;
-    setLoading(true);
-    if (recordHistory && originIata && originIata !== code) {
-      setPivotHistory((prev) => [...prev, originIata].slice(-6));
-    }
-    setOriginIata(code);
-    const node = getAirportNode(code);
-    setDepartureInput(`${node.iata} · ${node.city}`);
-    setDepartureSuggestions([]);
-    setDestinationInput("");
-    setDestinationSuggestions([]);
-    setSelectedDest(null);
-    setAirlineCode(null);
-    setLoading(false);
-  };
+  // Deep links from airport boards: /routes?hub=CAI
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hub = params.get("hub");
+    if (hub && hub.length === 3) void loadHub(hub.toUpperCase(), false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadAllRoutes = () => {
     setOriginIata(null);
     setDepartureInput("");
-    setDepartureSuggestions([]);
+    setSuggestions([]);
     setDestinationInput("");
     setDestinationSuggestions([]);
     setSelectedDest(null);
     setPivotHistory([]);
     setAirlineCode(null);
-    setLoading(false);
+    setConnections([]);
+    setError(null);
   };
 
   const updateDeparture = (value: string) => {
@@ -173,16 +333,14 @@ export default function RoutesPage() {
       return;
     }
     if (trimmed.length === 3) {
-      const exact = routeAirports.find(
-        (airport) => airport.iata.toLowerCase() === trimmed.toLowerCase(),
-      );
+      const exact = findAirportNode(trimmed);
       if (exact) {
-        setDepartureSuggestions([]);
-        loadHub(exact.iata);
+        setSuggestions([]);
+        void loadHub(exact.iata);
         return;
       }
     }
-    setDepartureSuggestions(trimmed.length >= 2 ? searchAirportNodes(trimmed).slice(0, 6) : []);
+    setSuggestions(trimmed.length >= 2 ? searchAirportNodes(trimmed).slice(0, 6) : []);
   };
 
   const updateDestination = (value: string) => {
@@ -193,14 +351,13 @@ export default function RoutesPage() {
       setSelectedDest(null);
       return;
     }
-    const matched = summary.connections.filter((connection) => {
-      const q = trimmed.toLowerCase();
-      return (
+    const q = trimmed.toLowerCase();
+    const matched = filteredConnections.filter(
+      (connection) =>
         connection.destination.iata.toLowerCase().includes(q) ||
         connection.destination.city.toLowerCase().includes(q) ||
-        connection.destination.name.toLowerCase().includes(q)
-      );
-    });
+        connection.destination.name.toLowerCase().includes(q),
+    );
     if (matched.length) {
       setDestinationSuggestions(matched.map((connection) => connection.destination).slice(0, 6));
       setSelectedDest(matched[0].destination.iata);
@@ -210,9 +367,9 @@ export default function RoutesPage() {
   };
 
   const selectDestination = (iata: string) => {
-    const node = getAirportNode(iata);
-    setSelectedDest(node.iata);
-    setDestinationInput(`${node.iata} · ${node.city}`);
+    const node = findAirportNode(iata);
+    setSelectedDest(iata.toUpperCase());
+    setDestinationInput(node ? `${node.iata} · ${node.city}` : iata.toUpperCase());
     setDestinationSuggestions([]);
     setInspectorExpanded(true);
   };
@@ -220,15 +377,21 @@ export default function RoutesPage() {
   const pivotToDestination = (iata: string) => {
     if (iata.toUpperCase() === originIata) return;
     const previous = originIata;
-    loadHub(iata, true);
-    if (previous) setDestinationInput(`${previous} · ${getAirportNode(previous).city}`);
+    void loadHub(iata, true);
+    if (previous) {
+      const node = findAirportNode(previous);
+      setDestinationInput(node ? `${node.iata} · ${node.city}` : previous);
+    }
   };
 
   const swap = () => {
     if (selectedDest) {
       const oldOrigin = originIata;
       pivotToDestination(selectedDest);
-      if (oldOrigin) setDestinationInput(`${oldOrigin} · ${getAirportNode(oldOrigin).city}`);
+      if (oldOrigin) {
+        const node = findAirportNode(oldOrigin);
+        setDestinationInput(node ? `${node.iata} · ${node.city}` : oldOrigin);
+      }
     } else {
       const temp = departureInput;
       setDepartureInput(destinationInput);
@@ -240,32 +403,20 @@ export default function RoutesPage() {
     const history = [...pivotHistory];
     const previous = history.pop();
     setPivotHistory(history);
-    if (previous) loadHub(previous, false);
+    if (previous) void loadHub(previous, false);
     else loadAllRoutes();
   };
 
   const clearFilters = () => {
-    setDirection("ALL");
     setAirlineCode(null);
     setHaul("ALL");
     setRegion("ALL");
   };
 
-  const hasFilters =
-    direction !== "ALL" || Boolean(airlineCode) || haul !== "ALL" || region !== "ALL";
-
+  const hasFilters = Boolean(airlineCode) || haul !== "ALL" || region !== "ALL";
   const hubResults = useMemo(() => searchAirportNodes(hubQuery), [hubQuery]);
 
   const openRouteFlights = (connection: DirectFlightConnection) => {
-    const direct = initialFlights.find(
-      (flight) =>
-        flight.origin.code === connection.origin.iata &&
-        flight.destination.code === connection.destination.iata,
-    );
-    if (direct) {
-      router.push(`/flight/${encodeURIComponent(direct.id)}`);
-      return;
-    }
     router.push(
       `/search?mode=ROUTE&origin=${encodeURIComponent(connection.origin.iata)}&dest=${encodeURIComponent(connection.destination.iata)}`,
     );
@@ -274,47 +425,34 @@ export default function RoutesPage() {
   return (
     <div className="mx-auto max-w-[1680px] px-3 py-3 lg:px-5">
       <div className="relative h-[calc(100vh-150px)] min-h-[640px] overflow-hidden rounded-2xl border border-line">
-        <WorldMap
-          airports={routeAirports}
+        <OsmRouteMap
           connections={filteredConnections}
           origin={summary.originAirport}
           selected={selectedConnection?.destination ?? null}
           selectedRoute={selectedConnection}
           onSelectAirport={(iata) => {
-            if (!originIata) {
-              loadHub(iata);
-            } else if (
-              filteredConnections.some(
-                (connection) => connection.destination.iata === iata,
-              )
-            ) {
+            if (!originIata) void loadHub(iata);
+            else if (filteredConnections.some((c) => c.destination.iata === iata))
               selectDestination(iata);
-            } else {
-              loadHub(iata);
-            }
+            else void loadHub(iata);
           }}
-          onMapClick={() => setInspectorExpanded(false)}
-          variant="light"
           className="h-full rounded-none border-0"
-          showControls
-          showBadge={false}
         />
 
-        {/* Floating top control panel */}
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-center lg:inset-x-4 lg:top-4">
           <div className="pointer-events-auto w-full max-w-[880px] rounded-2xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="rounded-md bg-accent px-1.5 py-1 font-mono text-[11px] font-extrabold text-[color:var(--bg)]">
                   {summary.originAirport?.iata ??
-                    (departureInput ? departureInput.slice(0, 3).toUpperCase() : "ALL")}
+                    (departureInput ? departureInput.slice(0, 3).toUpperCase() : "—")}
                 </span>
                 <p className="truncate text-[11px] font-bold text-ink">
                   {selectedConnection
                     ? `${selectedConnection.origin.iata} → ${selectedConnection.destination.iata} · ${selectedConnection.destination.city}`
                     : summary.originAirport
-                      ? `${filteredConnections.length} direct routes from ${summary.originAirport.city}`
-                      : `${filteredConnections.length} global routes worldwide`}
+                      ? `${filteredConnections.length} live direct routes from ${summary.originAirport.city}`
+                      : "Select an origin hub to load live direct routes"}
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -348,11 +486,7 @@ export default function RoutesPage() {
                   )}
                   title="Toggle filter strip"
                 >
-                  {filtersOpen ? (
-                    <ChevronUp className="size-3.5" />
-                  ) : (
-                    <Filter className="size-3.5" />
-                  )}
+                  {filtersOpen ? <ChevronUp className="size-3.5" /> : <Filter className="size-3.5" />}
                 </button>
                 <button
                   onClick={() => setFilterSheetOpen(true)}
@@ -375,11 +509,11 @@ export default function RoutesPage() {
                 <input
                   value={departureInput}
                   onChange={(event) => updateDeparture(event.target.value)}
-                  placeholder="Departure (code/city)"
+                  placeholder="Origin hub (IATA/city)"
                   className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-ink outline-none placeholder:text-subtle"
                 />
                 {departureInput && (
-                  <button onClick={loadAllRoutes} aria-label="Clear departure">
+                  <button onClick={loadAllRoutes} aria-label="Clear origin">
                     <X className="size-3 text-subtle hover:text-ink" />
                   </button>
                 )}
@@ -387,7 +521,7 @@ export default function RoutesPage() {
               <button
                 onClick={swap}
                 className="flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/45 bg-surface-3 text-accent transition-transform hover:rotate-180"
-                aria-label="Swap departure and destination"
+                aria-label="Swap origin and destination"
               >
                 <ArrowLeftRight className="size-3.5" />
               </button>
@@ -396,7 +530,7 @@ export default function RoutesPage() {
                 <input
                   value={destinationInput}
                   onChange={(event) => updateDestination(event.target.value)}
-                  placeholder="Destination (code/city)"
+                  placeholder="Filter destination (IATA/city)"
                   className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-ink outline-none placeholder:text-subtle"
                 />
                 {destinationInput && (
@@ -413,24 +547,21 @@ export default function RoutesPage() {
               </div>
             </div>
 
-            {/* Suggestions */}
-            {departureSuggestions.length > 0 && (
+            {suggestions.length > 0 && (
               <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1">
                 <span className="shrink-0 text-[8px] font-bold uppercase tracking-wider text-subtle">
-                  Departure:
+                  Origin:
                 </span>
-                {departureSuggestions.map((airport) => (
+                {suggestions.map((airport) => (
                   <button
                     key={airport.iata}
                     onClick={() => {
                       setDepartureInput(`${airport.iata} · ${airport.city}`);
-                      loadHub(airport.iata);
+                      void loadHub(airport.iata);
                     }}
                     className="flex shrink-0 items-center gap-1 rounded-md border border-accent/40 bg-surface-2 px-1.5 py-1 text-[9px] transition-colors hover:bg-accent-soft"
                   >
-                    <span className="font-mono font-bold text-accent">
-                      {airport.iata}
-                    </span>
+                    <span className="font-mono font-bold text-accent">{airport.iata}</span>
                     <span className="text-ink">{airport.city}</span>
                   </button>
                 ))}
@@ -447,9 +578,7 @@ export default function RoutesPage() {
                     onClick={() => selectDestination(airport.iata)}
                     className="flex shrink-0 items-center gap-1 rounded-md border border-accent-2/40 bg-surface-2 px-1.5 py-1 text-[9px] transition-colors hover:bg-accent-soft"
                   >
-                    <span className="font-mono font-bold text-accent-2">
-                      {airport.iata}
-                    </span>
+                    <span className="font-mono font-bold text-accent-2">{airport.iata}</span>
                     <span className="text-ink">{airport.city}</span>
                   </button>
                 ))}
@@ -459,16 +588,6 @@ export default function RoutesPage() {
             {filtersOpen && (
               <div className="mt-2 space-y-1.5 border-t border-line/60 pt-2">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {DIRECTIONS.map((item) => (
-                    <FilterChip
-                      key={item.value}
-                      active={direction === item.value}
-                      onClick={() => setDirection(item.value)}
-                    >
-                      {item.short}
-                    </FilterChip>
-                  ))}
-                  <span className="mx-0.5 h-4 w-px bg-line" />
                   {HAULS.filter((item) => item !== "ALL").map((item) => (
                     <FilterChip
                       key={item}
@@ -480,15 +599,12 @@ export default function RoutesPage() {
                     </FilterChip>
                   ))}
                 </div>
-                {availableAirlines.length > 0 && (
+                {summary.availableAirlines.length > 0 && (
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                    <FilterChip
-                      active={!airlineCode}
-                      onClick={() => setAirlineCode(null)}
-                    >
-                      All airlines ({availableAirlines.length})
+                    <FilterChip active={!airlineCode} onClick={() => setAirlineCode(null)}>
+                      All airlines ({summary.availableAirlines.length})
                     </FilterChip>
-                    {availableAirlines.slice(0, 12).map((airline) => (
+                    {summary.availableAirlines.slice(0, 12).map((airline) => (
                       <FilterChip
                         key={airline.code}
                         active={airlineCode === airline.code}
@@ -507,18 +623,21 @@ export default function RoutesPage() {
         {loading && (
           <div className="absolute left-1/2 top-28 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-accent/50 bg-surface/90 px-2.5 py-1 backdrop-blur">
             <Loader2 className="size-3 animate-spin text-accent" />
-            <span className="text-[9px] font-semibold text-ink">
-              Syncing {originIata}…
-            </span>
+            <span className="text-[9px] font-semibold text-ink">Loading live routes for {originIata}…</span>
           </div>
         )}
 
-        {/* Legend */}
+        {error && (
+          <div className="absolute left-1/2 top-32 z-10 w-[min(600px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-delayed/40 bg-surface/95 px-3 py-2 text-[10px] text-muted shadow-xl backdrop-blur">
+            {error}
+          </div>
+        )}
+
         <div className="pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-xl border border-line/80 bg-surface/92 p-2.5 shadow-lg backdrop-blur md:block">
           <div className="flex items-center gap-1.5">
             <Globe2 className="size-3 text-accent" />
             <p className="text-[9px] font-bold uppercase tracking-wider text-ink">
-              Direct route network
+              Live direct route network
             </p>
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[8px] text-muted">
@@ -532,17 +651,15 @@ export default function RoutesPage() {
               <span className="size-1.5 rounded-full bg-[#FFB800]" /> Selected
             </span>
             <span className="flex items-center gap-1">
-              <span className="h-px w-3 bg-[#D94A6A]" /> Direct route
+              <span className="h-px w-3 bg-[#D94A6A]" /> Live route
             </span>
           </div>
           <p className="mt-1.5 text-[8px] text-subtle">
-            {summary.totalDirectDestinations} destinations ·{" "}
-            {summary.totalCountriesServed} countries ·{" "}
+            {summary.totalDirectDestinations} destinations · {summary.totalCountriesServed} countries ·{" "}
             {summary.totalDailyFlights} daily flights
           </p>
         </div>
 
-        {/* Route inspector (desktop side card) */}
         <div className="absolute bottom-3 right-3 z-10 w-[320px] max-w-[calc(100%-24px)]">
           <div className="overflow-hidden rounded-xl border border-line/80 bg-surface/95 shadow-2xl backdrop-blur-xl">
             <button
@@ -551,32 +668,26 @@ export default function RoutesPage() {
             >
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex size-6 items-center justify-center rounded-md bg-accent-soft text-accent">
-                  {selectedConnection ? (
-                    <Building2 className="size-3.5" />
-                  ) : (
-                    <Compass className="size-3.5" />
-                  )}
+                  {selectedConnection ? <Building2 className="size-3.5" /> : <Compass className="size-3.5" />}
                 </span>
                 <div className="min-w-0 text-left">
                   <p className="truncate text-[10px] font-bold text-ink">
                     {selectedConnection
                       ? `${selectedConnection.origin.iata} → ${selectedConnection.destination.iata}`
                       : summary.originAirport
-                        ? `Top routes from ${summary.originAirport.iata}`
-                        : "Global route network"}
+                        ? `Live routes from ${summary.originAirport.iata}`
+                        : "Live route network"}
                   </p>
                   <p className="text-[8px] text-subtle">
                     {selectedConnection
                       ? `${selectedConnection.destination.city}, ${selectedConnection.destination.country}`
-                      : `${filteredConnections.length} connections available`}
+                      : summary.originAirport
+                        ? `${filteredConnections.length} direct connections`
+                        : "Select a hub"}
                   </p>
                 </div>
               </div>
-              {inspectorExpanded ? (
-                <Shrink className="size-3.5 text-subtle" />
-              ) : (
-                <Expand className="size-3.5 text-subtle" />
-              )}
+              {inspectorExpanded ? <Shrink className="size-3.5 text-subtle" /> : <Expand className="size-3.5 text-subtle" />}
             </button>
 
             {inspectorExpanded && (
@@ -605,24 +716,30 @@ export default function RoutesPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="label-caps text-subtle">Operating carriers</p>
+                      <p className="label-caps text-subtle">Live operating carriers</p>
                       <div className="mt-1 space-y-1">
-                        {selectedConnection.operatingCarriers.map((carrier) => (
-                          <div
-                            key={carrier.airlineCode}
-                            className="flex items-center gap-1.5 rounded-md border border-line/60 bg-surface-2 px-1.5 py-1"
-                          >
-                            <span className="font-mono text-[9px] font-bold text-accent">
-                              {carrier.airlineCode}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-[9px] text-ink">
-                              {carrier.airlineName}
-                            </span>
-                            <span className="text-[8px] text-subtle">
-                              {carrier.dailyFrequencies}/day
-                            </span>
-                          </div>
-                        ))}
+                        {selectedConnection.operatingCarriers.length ? (
+                          selectedConnection.operatingCarriers.map((carrier) => (
+                            <div
+                              key={carrier.airlineCode}
+                              className="flex items-center gap-1.5 rounded-md border border-line/60 bg-surface-2 px-1.5 py-1"
+                            >
+                              <span className="font-mono text-[9px] font-bold text-accent">
+                                {carrier.airlineCode}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-[9px] text-ink">
+                                {carrier.airlineName}
+                              </span>
+                              <span className="text-[8px] text-subtle">
+                                {carrier.dailyFrequencies}/day
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[9px] text-subtle">
+                            Carrier data was not included in the live route feed.
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -649,8 +766,8 @@ export default function RoutesPage() {
                 ) : summary.originAirport ? (
                   <div>
                     <p className="mb-1.5 text-[9px] leading-relaxed text-muted">
-                      Select a destination pin or one of the busiest direct routes
-                      from {summary.originAirport.city}.
+                      Select a destination pin or one of the live direct routes from{" "}
+                      {summary.originAirport.city}.
                     </p>
                     <div className="space-y-1">
                       {filteredConnections.slice(0, 7).map((connection) => (
@@ -676,14 +793,13 @@ export default function RoutesPage() {
                 ) : (
                   <div>
                     <p className="mb-1.5 text-[9px] leading-relaxed text-muted">
-                      Pick a hub to pivot the network, or tap any airport dot on
-                      the world map.
+                      Pick an origin hub to load live direct routes from AeroDataBox.
                     </p>
                     <div className="grid grid-cols-3 gap-1">
                       {QUICK_HUBS.map((code) => (
                         <button
                           key={code}
-                          onClick={() => loadHub(code)}
+                          onClick={() => void loadHub(code)}
                           className="rounded-md border border-line/60 bg-surface-2 px-1.5 py-1.5 text-center font-mono text-[9px] font-bold text-accent transition-colors hover:border-accent/40"
                         >
                           {code}
@@ -702,27 +818,26 @@ export default function RoutesPage() {
         <div className="flex flex-wrap items-center gap-3 text-[9px] text-muted">
           <span className="flex items-center gap-1">
             <MapPin className="size-3 text-accent" />
-            {summary.totalDirectDestinations} destinations
+            {summary.totalDirectDestinations} live destinations
           </span>
           <span>{summary.totalCountriesServed} countries</span>
           <span>{summary.totalOperatingAirlines} airlines</span>
-          <span>{summary.totalDailyFlights} daily departures</span>
+          <span>{summary.totalDailyFlights} daily flights</span>
         </div>
         <div className="flex items-center gap-2 text-[9px] text-subtle">
-          <span className="flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-landed" /> Nonstop catalog
-          </span>
+          <button onClick={() => void refreshData()} className="font-semibold text-accent hover:underline">
+            Refresh live data
+          </button>
           <span>·</span>
           <span>Click destination to inspect</span>
         </div>
       </div>
 
-      {/* Hub search sheet */}
       <Modal
         open={hubSheetOpen}
         onClose={() => setHubSheetOpen(false)}
         title="Select origin airport hub"
-        subtitle="Enter any IATA code or city to load all direct connections radiating from it."
+        subtitle="Enter an IATA code or city to load live direct routes from AeroDataBox."
         icon={<Search className="size-4" />}
         size="md"
       >
@@ -742,7 +857,7 @@ export default function RoutesPage() {
               <button
                 key={airport.iata}
                 onClick={() => {
-                  loadHub(airport.iata);
+                  void loadHub(airport.iata);
                   setHubSheetOpen(false);
                 }}
                 className={cn(
@@ -759,9 +874,7 @@ export default function RoutesPage() {
                   <span className="block truncate text-[11px] font-bold text-ink">
                     {airport.city}, {airport.country}
                   </span>
-                  <span className="block truncate text-[9px] text-subtle">
-                    {airport.name}
-                  </span>
+                  <span className="block truncate text-[9px] text-subtle">{airport.name}</span>
                 </span>
                 <span className="shrink-0 text-[8px] font-semibold text-accent-2">
                   {REGION_META[airport.region]?.short ?? airport.region}
@@ -770,19 +883,18 @@ export default function RoutesPage() {
             ))}
             {hubResults.length === 0 && (
               <p className="py-6 text-center text-xs text-muted">
-                No airports matched “{hubQuery}”.
+                No reference airport matched “{hubQuery}”. Use the airport explorer for a live worldwide search.
               </p>
             )}
           </div>
         </div>
       </Modal>
 
-      {/* Filter sheet */}
       <Modal
         open={filterSheetOpen}
         onClose={() => setFilterSheetOpen(false)}
-        title="Filter route network"
-        subtitle="Refine by distance, destination region, direction, or airline."
+        title="Filter live route network"
+        subtitle="Refine by distance, destination region, or operating airline."
         icon={<SlidersHorizontal className="size-4" />}
         size="md"
         footer={
@@ -816,38 +928,20 @@ export default function RoutesPage() {
             <p className="label-caps text-subtle">Destination region</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {REGIONS.map((item) => (
-                <FilterChip
-                  key={item}
-                  active={region === item}
-                  onClick={() => setRegion(item)}
-                >
+                <FilterChip key={item} active={region === item} onClick={() => setRegion(item)}>
                   {REGION_META[item].label}
                 </FilterChip>
               ))}
             </div>
           </div>
-          <div>
-            <p className="label-caps text-subtle">Connection direction</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DIRECTIONS.map((item) => (
-                <FilterChip
-                  key={item.value}
-                  active={direction === item.value}
-                  onClick={() => setDirection(item.value)}
-                >
-                  {item.label}
-                </FilterChip>
-              ))}
-            </div>
-          </div>
-          {availableAirlines.length > 0 && (
+          {summary.availableAirlines.length > 0 && (
             <div>
               <p className="label-caps text-subtle">Operating airline</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <FilterChip active={!airlineCode} onClick={() => setAirlineCode(null)}>
                   All airlines
                 </FilterChip>
-                {availableAirlines.map((airline: AirlineFilterChipItem) => (
+                {summary.availableAirlines.map((airline) => (
                   <FilterChip
                     key={airline.code}
                     active={airlineCode === airline.code}
@@ -868,9 +962,7 @@ export default function RoutesPage() {
 function InspectorMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-line/60 bg-surface-2 px-2 py-1.5">
-      <p className="text-[8px] font-bold uppercase tracking-wider text-subtle">
-        {label}
-      </p>
+      <p className="text-[8px] font-bold uppercase tracking-wider text-subtle">{label}</p>
       <p className="mt-0.5 text-[10px] font-bold text-ink">{value}</p>
     </div>
   );

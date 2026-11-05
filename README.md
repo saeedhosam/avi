@@ -10,7 +10,7 @@ Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript**, and **Tail
 
 | Flight search | Global route network |
 | --- | --- |
-| ![Flight search](docs/screenshots/search-dark.png) | ![Route network](docs/screenshots/routes.png) |
+| ![Flight search](docs/screenshots/search.png) | ![Route network](docs/screenshots/routes.png) |
 
 | Flight dossier | Terminal wayfinding |
 | --- | --- |
@@ -26,10 +26,10 @@ Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript**, and **Tail
 | Route lookup | `/search` route mode with origin/destination inputs, swap, reset-all, popular routes, and deep links from the route inspector |
 | Status + tracked filters | Status chips and local tracked-flight filter, plus all cached results and empty states |
 | Recent searches | Last 5 searches persisted in local storage, one-tap reopen, per-item delete and clear-all |
-| Live tactical radar | `/radar` with animated radar sweep, range rings, weather cells, aircraft silhouette, heading vector, zoom/pan, and 4-second telemetry ticks |
+| Live tactical radar | `/radar` with animated radar sweep, range rings, live aircraft positions when reported, heading vector, and zoom/pan |
 | Flight dossier | `/flight/[id]` with status header, route progress, gate/terminal tiles, live radar, destination weather, METAR comparison, timeline, aircraft specs, notes, sharing, and alert simulation |
-| Live flight map | `/map/[id]` with a full-height vector world map, great-circle route, aircraft marker, route stats, night/vector styles, and telemetry HUD |
-| Global route network | `/routes` with 50 airports, 70+ nonstop route specs, hub search, origin/destination autocomplete, pivot history, direction/haul/region/airline filters, route inspector, and airport-board links |
+| Live flight map | `/map/[id]` with Google Maps when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is set, plus an OpenStreetMap fallback, great-circle route, live aircraft marker, route stats, and telemetry HUD |
+| Global route network | `/routes` with real AeroDataBox daily routes, OpenStreetMap tiles, hub search, origin/destination filtering, pivot history, haul/region/airline filters, route inspector, and airport-board links |
 | Airport boards | `/airports` with 11 hub boards, departures/arrivals, airline filters, cached FIDS rows, airport METAR/runway panel, and a global airport explorer |
 | Terminal maps | `/terminals` with terminal layouts (JFK T4, LHR T5, SFO International, DXB T3), floor switching, category filters, amenity directory, walking route, gate deep links |
 | Watchlist / favorites | `/watchlist` with favorites, tracked, and all-saved views, quick alert tests, share actions, and alert inbox |
@@ -37,6 +37,7 @@ Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript**, and **Tail
 | Account & settings | Google sign-in through Firebase Auth, theme mode (System/Light/Dark), offline mode, sync status, and FCM token |
 | Offline caching | Flights, favorites, tracked flights, notes, recent searches, alerts, and schedules persist in local storage; all screens remain navigable offline |
 | Firestore sync | `users/{uid}`, `users/{uid}/trackedFlights/{flightId}`, `users/{uid}/alerts/{alertId}` with the Android app's validation rules |
+| Maps | Google Maps (browser key) for the flight map, plus OpenStreetMap tiles for the live route network and as a no-key fallback. |
 | Theme / colors | Same deep-space cockpit palette, radar cyan, aero blue, instrument surfaces/borders, and aviation status colors; light theme uses the app's light palette |
 
 ### Desktop UX adaptations
@@ -61,19 +62,32 @@ The desktop app uses the same service family as the Android app. **No production
 | Cloud Firestore | `NEXT_PUBLIC_FIRESTORE_DATABASE_ID` + Firebase vars | Profile, watchlist, notes, and alerts. Uses the named database from the Android app. |
 | Firebase App Check | `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` | reCAPTCHA v3 attestation (optional, gracefully skipped). |
 | Firebase Cloud Messaging | `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | Web push token registration; falls back to an in-app/local device token. |
-| Google Maps | `MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Reserved for parity with the Android Google Maps key. The shipped map uses a bundled Natural Earth vector basemap so it works without a key. |
+| Google Maps | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (browser key), `MAPS_API_KEY` | Live Google basemap and route overlays on the flight map. OpenStreetMap is used automatically when the browser key is absent. |
 
-When AeroDataBox is not configured, the app serves the authentic local cache and shows a clear data-source diagnostic instead of failing. Weather remains live via Open-Meteo.
+No demo data is seeded. Without AeroDataBox, flight/route/board screens show a configuration notice and only previously fetched live results from the local cache. Weather remains live via Open-Meteo.
+
+### Where to find the remaining values
+
+| Variable | Where to get it |
+| --- | --- |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Cloud Console → **APIs & Services → Credentials → API key**. Enable **Maps JavaScript API**. Create a browser key restricted to HTTP referrers (`http://localhost:3000/*`, your domain). The Android `MAPS_API_KEY` may be Android-restricted and not usable on the web. |
+| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase Console → **Project settings → General → Your apps → Web app → SDK setup and configuration**. Value starts with `G-`. Only present when Google Analytics is enabled. Optional. |
+| `NEXT_PUBLIC_FIRESTORE_DATABASE_ID` | Firebase Console → **Firestore Database → Data**. The Android project uses `ai-studio-android-skytrack-ca7ba412-a398-4ae9-99ef-a0b19d1bc846`; set that unless you created a new default database (leave blank for `(default)`). |
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | Firebase Console → **Project settings → Cloud Messaging → Web configuration → Web Push certificates → Key pair**. Generate one if missing. Public key. |
+| `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` | Firebase Console → **App Check → Apps → Web app → reCAPTCHA v3 → Site key**. Or register the domain at <https://www.google.com/recaptcha/admin> (v3). Optional unless App Check is enforced. |
+| `FIREBASE_APPCHECK_DEBUG_TOKEN` | Firebase Console → **App Check → Apps → Web app → Manage debug tokens**. Debug-only; leave empty in production. |
+
+Also add your dev and production domains under **Firebase Console → Authentication → Settings → Authorized domains** for Google sign-in.
 
 ---
 
 ## Getting started
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env.local
-# fill in your own service values (optional for a local demo)
-npm run dev
+# fill in your own service values (AeroDataBox is required for live flights)
+pnpm dev
 ```
 
 Open <http://localhost:3000>.
@@ -81,10 +95,10 @@ Open <http://localhost:3000>.
 Production checks:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run build
-npm start
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm start
 ```
 
 ---
@@ -110,14 +124,14 @@ The Firestore schema is documented in `firebase-blueprint.json`, and the rules i
 
 ## Data & caching model
 
-- `src/data/flights.json` — 12 realistic mock flights with full telemetry, weather, gates, timelines, and notes.
-- `src/data/airports.json` — 50 global airport nodes used by the route network.
-- `src/data/routes.json` — 70 nonstop route specs with operating carriers, flight numbers, frequencies, and aircraft types.
-- `src/data/realtime-airports.json` — 13 airport telemetry/METAR records.
-- `src/data/terminal-layouts.json` — extracted terminal floors, concourses, gates, and 35 amenities.
-- `src/data/world-countries.json` — Natural Earth country polygons for the zero-request vector maps.
+- Live AeroDataBox data — flight search, airport FIDS boards, and daily airport routes.
+- Live Open-Meteo data — current airport conditions and destination arrival forecasts.
+- `src/data/airports.json` — 50 real airport reference nodes (names, coords, timezones) used for suggestions and map search.
+- `src/data/terminal-layouts.json` — schematic terminal floors, concourses, gates, and amenities, explicitly labelled as a reference layout.
 
-The app hydrates local state after the first paint, avoiding hydration mismatches while keeping SSR content meaningful. The air-telemetry simulator advances en-route flights every 4 seconds, matching the Android refresh cadence.
+No mock flights, alerts, telemetry, device tokens, or demo accounts are bundled. Cached values are only ever real API responses from earlier requests.
+
+The app hydrates local state after the first paint, avoiding hydration mismatches. Tracked and favourite flights are refreshed from AeroDataBox every five minutes (and on demand), and alerts are generated by diffing real successive snapshots. Aircraft positions are shown only when AeroDataBox reports a live location.
 
 ---
 
@@ -165,4 +179,4 @@ Firebase Hosting can also be used, but Vercel is recommended for Next.js App Rou
 
 - Android app left untouched.
 - All desktop routes build and render with no runtime or hydration errors.
-- Local-cache demo works without any keys; live AeroDataBox and Firestore activate automatically when configured.
+- Flight data requires `AERODATABOX_API_KEY`; weather is live without a key. Google Maps requires a browser key; OpenStreetMap works without one.

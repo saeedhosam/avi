@@ -52,6 +52,8 @@ export interface Waypoint {
 }
 
 export interface FlightTelemetry {
+  hasLiveLocation?: boolean;
+  locationUpdatedAt?: number;
   currentLatitude: number;
   currentLongitude: number;
   altitudeFeet: number;
@@ -113,16 +115,6 @@ export interface FlightAlert {
   message: string;
   timestamp: string;
   isRead: boolean;
-}
-
-export interface ScheduledAlert {
-  id: string;
-  flightNumber: string;
-  type: AlertType;
-  title: string;
-  message: string;
-  firesAt: number;
-  createdAt: number;
 }
 
 export interface RecentSearch {

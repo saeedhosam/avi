@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+import {
+  fetchAeroJson,
+  type AeroAirportDto,
+} from "@/lib/aerodatabox";
+import { inferRegionFromCoords } from "@/lib/data";
+import type { AirportNode } from "@/lib/types";
+
+interface AeroAirportSearchResponse {
+  items?: AeroAirportDto[];
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const q = (searchParams.get("q") ?? "").trim();
+  if (q.length < 2) {
+    return NextResponse.json({ mode: "LIVE_AERODATABOX", airports: [] });
+  }
+
+  const { data, status, mode } = await fetchAeroJson<AeroAirportSearchResponse>(
+    `/airports/search/term?q=${encodeURIComponent(q)}&limit=20`,
+  );
+
+  const airports: AirportNode[] = (data?.items ?? [])
+    .filter(
+      (item) =>
+        item.iata &&
+        item.location?.lat != null &&
+        item.location?.lon != null,
+    )
+    .map((item) => ({
+      iata: item.iata!.toUpperCase(),
+      icao: item.icao ?? "",
+      name: item.name ?? item.shortName ?? item.iata!,
+      city: item.municipalityName ?? "",
+      country: item.countryCode ?? "",
+      region: inferRegionFromCoords(
+        item.location!.lat!,
+        item.location!.lon!,
+      ),
+      latitude: item.location!.lat!,
+      longitude: item.location!.lon!,
+      timezone: item.timeZone ?? "UTC",
+      hubAirlines: [],
+    }));
+
+  return NextResponse.json({ mode, status, airports });
+}

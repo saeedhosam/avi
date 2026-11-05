@@ -1,40 +1,40 @@
 export type DataSourceMode =
   | "LIVE_AERODATABOX"
-  | "OFFLINE_ROOM_CACHE"
+  | "OFFLINE_CACHE"
   | "QUOTA_FALLBACK"
-  | "DEMO_CACHE_NO_KEY";
+  | "NOT_CONFIGURED";
 
 export const DATA_SOURCE_META = {
   LIVE_AERODATABOX: {
     badge: "LIVE AERODATABOX + METEO",
-    summary: "Live Flights, FIDS & Weather",
-    title: "Live AeroDataBox & Open-Meteo Connected",
+    summary: "Live flights, FIDS & weather",
+    title: "Live AeroDataBox & Open-Meteo connected",
     subtitle:
-      "Streaming real-time global flights, airport FIDS boards, delay indexes, and live destination weather.",
+      "Streaming real-time global flights, airport FIDS boards, hourly delay changes, and destination weather. Cached results remain available offline.",
     color: "#10B981",
   },
-  OFFLINE_ROOM_CACHE: {
-    badge: "OFFLINE · LOCAL CACHE",
-    summary: "Offline cache active",
-    title: "Offline Mode (Local Browser Cache)",
+  OFFLINE_CACHE: {
+    badge: "OFFLINE · CACHED LIVE DATA",
+    summary: "Serving cached live results",
+    title: "Offline mode",
     subtitle:
-      "Network disconnected or airplane mode active. Serving cached flights, watchlists, and arrival weather from local storage.",
+      "Live API calls are paused. Previously fetched flights, routes, weather, alerts, and watchlists are served from the local cache.",
     color: "#00E5FF",
   },
   QUOTA_FALLBACK: {
-    badge: "RATE LIMIT · CACHE ACTIVE",
-    summary: "Local cache + live weather",
-    title: "AeroDataBox Quota Reached (HTTP 429)",
+    badge: "RATE LIMIT · CACHED LIVE DATA",
+    summary: "AeroDataBox quota reached",
+    title: "AeroDataBox rate limit reached (HTTP 429)",
     subtitle:
-      "Serving cached flights from local storage + live Open-Meteo destination weather until RapidAPI quota resets.",
+      "New flight lookups are paused until the RapidAPI quota resets. Cached live results and Open-Meteo weather remain available.",
     color: "#F59E0B",
   },
-  DEMO_CACHE_NO_KEY: {
-    badge: "LOCAL CACHE + LIVE WEATHER",
-    summary: "Cached flights + live weather",
-    title: "Local Cache + Live Open-Meteo Weather",
+  NOT_CONFIGURED: {
+    badge: "AERODATABOX NOT CONFIGURED",
+    summary: "Add your RapidAPI key",
+    title: "Live flight data is not configured",
     subtitle:
-      "Add AERODATABOX_API_KEY to the server environment to enable live RapidAPI flight and FIDS queries.",
-    color: "#F59E0B",
+      "Add AERODATABOX_API_KEY and AERODATABOX_API_HOST to .env and restart the server to enable live flight search, airport boards, and route data.",
+    color: "#EF4444",
   },
 } as const;

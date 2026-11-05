@@ -6,7 +6,7 @@ import type {
   FlightTelemetry,
   FlightTimelineEvent,
 } from "./types";
-import { mockAirportByCode, getAirportNode, routeAirportToAirport } from "./data";
+import { findAirportNode } from "./data";
 
 export interface AeroAirportDto {
   iata?: string;
@@ -35,6 +35,7 @@ interface AeroMovementDto {
   gate?: string;
   baggageBelt?: string;
   runway?: string;
+  quality?: string[];
 }
 
 export interface AeroFlightDto {
@@ -78,41 +79,66 @@ export function aeroHost() {
 
 function timeHHmm(iso: string | undefined, fallback: string) {
   if (!iso) return fallback;
-  const match = iso.match(/T(\d{2}):(\d{2})/);
+  const match = iso.match(/[T ](\d{2}):(\d{2})/);
   return match ? `${match[1]}:${match[2]}` : fallback;
 }
 
 function normalizeFlightNumber(raw: string) {
   const compact = raw.replace(/\s+/g, "").toUpperCase();
-  const match = compact.match(/^([A-Z0-9]{2,3})(\d{1,4}[A-Z]?)$/);
+  const match = compact.match(/^([A-Z0-9]{2})(\d{1,4}[A-Z]?)$/);
   return match ? `${match[1]} ${match[2]}` : compact;
 }
 
 function resolveAirport(
   dto: AeroAirportDto | undefined,
   fallbackIata: string | undefined,
-  defaultIata: string,
-): Airport {
-  const code = (dto?.iata ?? fallbackIata ?? defaultIata).toUpperCase();
-  const known = mockAirportByCode.get(code);
-  if (known) {
-    return {
-      ...known,
-      latitude: dto?.location?.lat ?? known.latitude,
-      longitude: dto?.location?.lon ?? known.longitude,
-      name: dto?.name ?? known.name,
-      city: dto?.municipalityName ?? known.city,
-    };
-  }
-  const node = getAirportNode(code);
-  const base = routeAirportToAirport(node);
+  defaultIata?: string,
+): Airport | null {
+  const rawCode = dto?.iata ?? fallbackIata ?? defaultIata;
+  if (!rawCode) return null;
+  const code = rawCode.trim().toUpperCase();
+  const node = findAirportNode(code);
+  const latitude = dto?.location?.lat ?? node?.latitude;
+  const longitude = dto?.location?.lon ?? node?.longitude;
+
+  // A flight without both endpoints cannot be plotted or tracked honestly.
+  if (latitude == null || longitude == null) return null;
+
   return {
-    ...base,
-    latitude: dto?.location?.lat ?? base.latitude,
-    longitude: dto?.location?.lon ?? base.longitude,
-    name: dto?.name ?? base.name,
-    city: dto?.municipalityName ?? base.city,
+    code,
+    name: dto?.name ?? node?.name ?? `${code} Airport`,
+    city: dto?.municipalityName ?? node?.city ?? code,
+    country: dto?.countryCode ?? node?.country ?? "—",
+    timezone: dto?.timeZone ?? node?.timezone ?? "UTC",
+    latitude,
+    longitude,
+    // Operational weather is fetched live from Open-Meteo by the UI.
+    weather: {
+      tempC: 0,
+      tempF: 32,
+      condition: "Live weather not loaded",
+      wind: "—",
+      visibility: "—",
+      humidity: 0,
+    },
   };
+}
+
+function distanceNmBetween(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+) {
+  const R = 3440.065;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const rLat1 = (lat1 * Math.PI) / 180;
+  const rLat2 = (lat2 * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function delayMinutes(
@@ -120,8 +146,8 @@ function delayMinutes(
   revised: string | undefined,
 ) {
   if (!scheduled || !revised) return 0;
-  const start = new Date(scheduled).getTime();
-  const end = new Date(revised).getTime();
+  const start = new Date(scheduled.replace(" ", "T")).getTime();
+  const end = new Date(revised.replace(" ", "T")).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
   return Math.max(0, Math.round((end - start) / 60000));
 }
@@ -165,26 +191,47 @@ function buildTelemetry(
       ),
     );
   const distanceNm = dto.greatCircleDistance?.nm ?? Math.round(distanceKm * 0.539957);
+  const hasLiveLocation =
+    dto.location?.lat != null && dto.location?.lon != null;
+  const currentLatitude = dto.location?.lat ?? origin.latitude;
+  const currentLongitude = dto.location?.lon ?? origin.longitude;
+  const flownNm = hasLiveLocation
+    ? distanceNmBetween(
+        origin.latitude,
+        origin.longitude,
+        currentLatitude,
+        currentLongitude,
+      )
+    : 0;
   const progress =
-    status === "LANDED" ? 1 : status === "DEPARTED" ? 0.55 : 0.02;
+    status === "LANDED"
+      ? 1
+      : status === "DEPARTED" && hasLiveLocation && distanceNm > 0
+        ? Math.min(0.98, Math.max(0, flownNm / distanceNm))
+        : 0;
+  const remainingNm = hasLiveLocation
+    ? Math.max(0, Math.round(distanceNm - flownNm))
+    : distanceNm;
+  const groundSpeed = Math.round(dto.location?.groundSpeed?.kt ?? 0);
+  const eta =
+    hasLiveLocation && groundSpeed > 0
+      ? Math.round((remainingNm / groundSpeed) * 60)
+      : 0;
 
   return {
-    currentLatitude:
-      dto.location?.lat ??
-      origin.latitude + (destination.latitude - origin.latitude) * progress,
-    currentLongitude:
-      dto.location?.lon ??
-      origin.longitude + (destination.longitude - origin.longitude) * progress,
-    altitudeFeet: Math.round(dto.location?.altitude?.feet ?? (status === "DEPARTED" ? 36000 : 0)),
-    groundSpeedKnots: Math.round(dto.location?.groundSpeed?.kt ?? (status === "DEPARTED" ? 510 : 0)),
-    headingDegrees: dto.location?.trueTrack?.deg ?? 90,
+    hasLiveLocation,
+    locationUpdatedAt: hasLiveLocation ? Date.now() : undefined,
+    currentLatitude,
+    currentLongitude,
+    altitudeFeet: Math.round(dto.location?.altitude?.feet ?? 0),
+    groundSpeedKnots: groundSpeed,
+    headingDegrees: dto.location?.trueTrack?.deg ?? 0,
     verticalSpeedFpm: 0,
-    mach: status === "DEPARTED" ? 0.84 : 0,
+    mach: 0,
     progressPercent: progress,
-    distanceCoveredNm: Math.round(distanceNm * progress),
-    distanceRemainingNm: Math.round(distanceNm * (1 - progress)),
-    etaMinutesRemaining:
-      status === "DEPARTED" ? Math.round((distanceKm * (1 - progress)) / 815 * 60) : 0,
+    distanceCoveredNm: Math.round(flownNm),
+    distanceRemainingNm: remainingNm,
+    etaMinutesRemaining: eta,
     waypoints: [],
   };
 }
@@ -192,43 +239,82 @@ function buildTelemetry(
 function buildTimeline(
   flight: Omit<Flight, "timeline">,
 ): FlightTimelineEvent[] {
-  return [
-    {
-      title: "Check-in & bag drop",
-      time: flight.departureTimeScheduled,
-      isCompleted: flight.status !== "SCHEDULED",
-      isCurrent: flight.status === "SCHEDULED",
-      description: `${flight.checkInCounter} · Terminal ${flight.terminalDeparture}`,
-    },
-    {
-      title: "Boarding",
-      time: flight.departureTimeEstimated,
-      isCompleted: ["DEPARTED", "LANDED"].includes(flight.status),
-      isCurrent: flight.status === "BOARDING",
-      description: `${flight.gateDeparture} · Terminal ${flight.terminalDeparture}`,
-    },
-    {
-      title: "Takeoff",
-      time: flight.departureTimeActual ?? flight.departureTimeEstimated,
-      isCompleted: ["DEPARTED", "LANDED"].includes(flight.status),
-      isCurrent: false,
-      description: `Departure from ${flight.origin.code}`,
-    },
-    {
-      title: "En route",
-      time: flight.arrivalTimeEstimated,
-      isCompleted: flight.status === "LANDED",
-      isCurrent: flight.status === "DEPARTED",
-      description: `${flight.origin.code} → ${flight.destination.code}`,
-    },
-    {
-      title: "Arrival",
-      time: flight.arrivalTimeEstimated,
-      isCompleted: flight.status === "LANDED",
-      isCurrent: false,
-      description: `${flight.gateArrival} · ${flight.baggageCarousel}`,
-    },
-  ];
+  const events: FlightTimelineEvent[] = [];
+  const add = (
+    title: string,
+    time: string,
+    description: string,
+    current = false,
+  ) => {
+    if (!time || time === "—") return;
+    events.push({
+      title,
+      time,
+      isCompleted: !current,
+      isCurrent: current,
+      description,
+    });
+  };
+
+  add(
+    "Scheduled departure",
+    flight.departureTimeScheduled,
+    `${flight.origin.code} · live AeroDataBox schedule`,
+  );
+  if (flight.departureTimeEstimated !== flight.departureTimeScheduled) {
+    add(
+      "Estimated departure",
+      flight.departureTimeEstimated,
+      `${flight.gateDeparture} · Terminal ${flight.terminalDeparture}`,
+      flight.status === "SCHEDULED" || flight.status === "BOARDING",
+    );
+  }
+  add(
+    "Actual departure",
+    flight.departureTimeActual ?? "",
+    `${flight.origin.code} runway departure`,
+  );
+  add(
+    "Scheduled arrival",
+    flight.arrivalTimeScheduled,
+    `${flight.destination.code} · live AeroDataBox schedule`,
+  );
+  if (flight.arrivalTimeEstimated !== flight.arrivalTimeScheduled) {
+    add(
+      "Estimated arrival",
+      flight.arrivalTimeEstimated,
+      `${flight.gateArrival} · Terminal ${flight.terminalArrival}`,
+      flight.status === "DEPARTED",
+    );
+  }
+  add(
+    "Actual arrival",
+    flight.arrivalTimeActual ?? "",
+    `${flight.destination.code} runway arrival`,
+  );
+  if (flight.gateDeparture !== "Gate TBD") {
+    add(
+      "Departure gate assigned",
+      flight.departureTimeScheduled,
+      `${flight.gateDeparture} · Terminal ${flight.terminalDeparture}`,
+    );
+  }
+  if (flight.gateArrival !== "Gate TBD") {
+    add(
+      "Arrival gate assigned",
+      flight.arrivalTimeEstimated,
+      `${flight.gateArrival} · Terminal ${flight.terminalArrival}`,
+    );
+  }
+  if (flight.baggageCarousel !== "Carousel TBD" && flight.baggageCarousel !== "N/A") {
+    add(
+      "Baggage belt assigned",
+      flight.arrivalTimeEstimated,
+      flight.baggageCarousel,
+    );
+  }
+
+  return events;
 }
 
 export function mapAeroFlight(
@@ -244,12 +330,13 @@ export function mapAeroFlight(
   const dep = dto.departure ?? (isDeparture ? dto.movement : undefined);
   const arr = dto.arrival ?? (!isDeparture ? dto.movement : undefined);
 
-  const origin = resolveAirport(dep?.airport, isDeparture ? fallbackIata : undefined, "JFK");
-  const destination = resolveAirport(arr?.airport, !isDeparture ? fallbackIata : undefined, "LHR");
+  const origin = resolveAirport(dep?.airport, isDeparture ? fallbackIata : undefined);
+  const destination = resolveAirport(arr?.airport, !isDeparture ? fallbackIata : undefined);
+  if (!origin || !destination) return null;
 
   const depScheduled = timeHHmm(
     dep?.scheduledTime?.local ?? dep?.scheduledTime?.utc,
-    "12:00",
+    "—",
   );
   const depEstimated = timeHHmm(
     dep?.revisedTime?.local ?? dep?.predictedTime?.local ?? dep?.runwayTime?.local,
@@ -257,7 +344,7 @@ export function mapAeroFlight(
   );
   const arrScheduled = timeHHmm(
     arr?.scheduledTime?.local ?? arr?.scheduledTime?.utc,
-    "16:30",
+    "—",
   );
   const arrEstimated = timeHHmm(
     arr?.revisedTime?.local ?? arr?.predictedTime?.local ?? arr?.runwayTime?.local,
@@ -272,15 +359,15 @@ export function mapAeroFlight(
     dto.airline?.iata?.toUpperCase() ??
     flightNumber.split(" ")[0]?.slice(0, 2) ??
     "XX";
-  const airline = dto.airline?.name ?? `${airlineCode} Airlines`;
+  const airline = dto.airline?.name ?? airlineCode;
 
   const aircraft: AircraftInfo = {
-    model: dto.aircraft?.model ?? "Boeing 787-9 Dreamliner",
-    registration: dto.aircraft?.reg ?? `N${100 + Math.floor(Math.random() * 900)}ST`,
-    age: "4.5 yrs",
-    wifiAvailable: true,
-    powerOutlets: true,
-    seatLayout: "Business, Premium, Economy",
+    model: dto.aircraft?.model ?? "Not reported",
+    registration: dto.aircraft?.reg ?? "Not reported",
+    age: "Not reported",
+    wifiAvailable: false,
+    powerOutlets: false,
+    seatLayout: "Not reported by the live feed",
   };
 
   const baseFlight: Omit<Flight, "timeline"> = {
@@ -299,20 +386,20 @@ export function mapAeroFlight(
     status,
     statusNote:
       status === "DELAYED"
-        ? `Delayed ${delay} mins · ATC flow management`
+        ? `Delayed ${delay} mins${dep?.quality?.length ? ` · ${dep.quality.join(", ")}` : ""}`
         : status === "BOARDING"
           ? `Boarding at ${gate(dep?.gate)}`
           : status === "DEPARTED"
             ? `En route to ${destination.code}`
             : status === "LANDED"
               ? `Landed at ${destination.code}`
-              : "On schedule",
+              : "Scheduled",
     delayMinutes: delay,
     delayReason: delay >= 15 ? "Operational / Air Traffic Control revision" : null,
-    terminalDeparture: dep?.terminal ?? "1",
+    terminalDeparture: dep?.terminal ?? "—",
     gateDeparture: gate(dep?.gate),
-    checkInCounter: dep?.checkInDesk ?? "Zone A",
-    terminalArrival: arr?.terminal ?? "1",
+    checkInCounter: dep?.checkInDesk ?? "—",
+    terminalArrival: arr?.terminal ?? "—",
     gateArrival: gate(arr?.gate),
     baggageCarousel: carousel(arr?.baggageBelt),
     aircraft,
@@ -338,10 +425,10 @@ export function mapAeroFids(code: string, dto: AeroFidsResponseDto) {
 export async function fetchAeroJson<T>(path: string): Promise<{
   data: T | null;
   status: number;
-  mode: "LIVE_AERODATABOX" | "QUOTA_FALLBACK" | "DEMO_CACHE_NO_KEY" | "ERROR";
+  mode: "LIVE_AERODATABOX" | "QUOTA_FALLBACK" | "NOT_CONFIGURED" | "ERROR";
 }> {
   if (!hasValidAeroKey()) {
-    return { data: null, status: 0, mode: "DEMO_CACHE_NO_KEY" };
+    return { data: null, status: 0, mode: "NOT_CONFIGURED" };
   }
   try {
     const response = await fetch(`https://${aeroHost()}${path}`, {

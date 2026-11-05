@@ -7,12 +7,12 @@ import {
   Bookmark,
   Heart,
   Plane,
+  RefreshCw,
   Share2,
   Sparkles,
-  TriangleAlert,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import type { AlertType, Flight } from "@/lib/types";
+import type { Flight } from "@/lib/types";
 import { ALERT_META, cn } from "@/lib/utils";
 import { FlightCard } from "@/components/flight-card";
 import { ShareFlightDialog } from "@/components/share-dialog";
@@ -20,22 +20,16 @@ import { Button, EmptyState, Panel, Tabs } from "@/components/ui";
 
 type WatchTab = "FAVORITES" | "TRACKED" | "ALL";
 
-const QUICK_ACTIONS: Array<{ type: AlertType; label: string }> = [
-  { type: "GATE_CHANGE", label: "Gate" },
-  { type: "DELAY", label: "Delay" },
-  { type: "BOARDING", label: "Boarding" },
-  { type: "BAGGAGE", label: "Baggage" },
-];
-
 export default function WatchlistPage() {
   const {
     favorites,
     tracked,
     flights,
-    simulateAlert,
     alerts,
     unreadAlertCount,
     markAllAlertsRead,
+    refreshData,
+    syncing,
   } = useApp();
   const [tab, setTab] = useState<WatchTab>("FAVORITES");
   const [shareFlight, setShareFlight] = useState<Flight | null>(null);
@@ -132,25 +126,18 @@ export default function WatchlistPage() {
                   <FlightCard flight={flight} />
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 px-1">
                     <span className="text-[9px] font-semibold text-subtle">
-                      Test alerts:
+                      Live tracking:
                     </span>
-                    {QUICK_ACTIONS.map((action) => (
-                      <button
-                        key={action.type}
-                        onClick={() => simulateAlert(flight.flightNumber, action.type)}
-                        className="rounded-md border px-2 py-1 text-[9px] font-semibold transition-colors hover:brightness-110"
-                        style={{
-                          color: ALERT_META[action.type].color,
-                          backgroundColor: `${ALERT_META[action.type].color}12`,
-                          borderColor: `${ALERT_META[action.type].color}45`,
-                        }}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
+                    <button
+                      onClick={() => void refreshData()}
+                      className="flex items-center gap-1 rounded-md border border-accent/35 bg-accent-soft px-2 py-1 text-[9px] font-bold text-accent transition-colors hover:bg-accent/15"
+                    >
+                      <RefreshCw className={cn("size-2.5", syncing && "animate-spin")} />
+                      {syncing ? "Refreshing" : "Refresh live"}
+                    </button>
                     <button
                       onClick={() => setShareFlight(flight)}
-                      className="flex items-center gap-1 rounded-md border border-accent/35 bg-accent-soft px-2 py-1 text-[9px] font-bold text-accent transition-colors hover:bg-accent/15"
+                      className="flex items-center gap-1 rounded-md border border-line bg-surface-2 px-2 py-1 text-[9px] font-bold text-muted transition-colors hover:border-accent/40 hover:text-accent"
                     >
                       <Share2 className="size-2.5" /> Share
                     </button>
@@ -238,17 +225,12 @@ export default function WatchlistPage() {
           </Panel>
 
           <Panel className="p-3">
-            <p className="label-caps text-subtle">Quick alert simulation</p>
+            <p className="label-caps text-subtle">Real alerts</p>
             <p className="mt-1 text-[9px] leading-relaxed text-muted">
-              Use the test chips below each saved flight to push a gate, delay,
-              boarding, or baggage alert through the live pipeline.
+              Alerts are generated only when a tracked or saved flight changes in
+              the live AeroDataBox feed: gate, delay, boarding, cancellation, or
+              baggage. There is no alert simulator.
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <TriangleAlert className="size-3.5 text-delayed" />
-              <span className="text-[9px] text-subtle">
-                Alerts persist locally and mirror to Firestore.
-              </span>
-            </div>
           </Panel>
 
           <div className="rounded-xl border border-dashed border-line bg-surface-2/50 px-3 py-2.5">

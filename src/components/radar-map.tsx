@@ -6,7 +6,6 @@ import {
   Minimize2,
   LocateFixed,
   Radar as RadarIcon,
-  CloudLightning,
 } from "lucide-react";
 import type { Flight } from "@/lib/types";
 import { STATUS_META, cn } from "@/lib/utils";
@@ -26,17 +25,20 @@ export function RadarMap({
 }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [weather, setWeather] = useState(true);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(
     null,
   );
 
+  const hasPosition =
+    flight.telemetry.hasLiveLocation || flight.status === "LANDED";
   const progress =
     flight.status === "LANDED"
       ? 1
       : flight.status === "SCHEDULED" || flight.status === "CANCELLED"
-        ? 0.05
-        : Math.min(0.98, Math.max(0.05, flight.telemetry.progressPercent));
+        ? 0
+        : hasPosition
+          ? Math.min(0.98, Math.max(0.05, flight.telemetry.progressPercent))
+          : 0;
 
   const geometry = useMemo(() => {
     const startX = 150;
@@ -205,25 +207,6 @@ export function RadarMap({
             />
           </g>
 
-          {/* Weather cells */}
-          {weather && (
-            <g>
-              <circle cx={520} cy={160} r={95} fill="url(#storm-cell)" />
-              <circle cx={250} cy={350} r={70} fill="url(#rain-cell)" />
-              <circle cx={590} cy={350} r={55} fill="url(#rain-cell)" />
-              <ellipse
-                cx={520}
-                cy={160}
-                rx={48}
-                ry={22}
-                fill="none"
-                stroke="#EF4444"
-                strokeOpacity={0.18}
-                strokeDasharray="4 5"
-              />
-            </g>
-          )}
-
           {/* Flight path */}
           <path
             d={`M${geometry.startX},${geometry.startY} Q${geometry.controlX},${geometry.controlY} ${geometry.endX},${geometry.endY}`}
@@ -325,7 +308,8 @@ export function RadarMap({
             </text>
           </g>
 
-          {/* Aircraft */}
+          {/* Aircraft (only when AeroDataBox reports a live position) */}
+          {hasPosition && (
           <g transform={`translate(${geometry.planeX} ${geometry.planeY})`}>
             <circle r={36} fill="url(#radar-halo)" />
             <circle
@@ -345,7 +329,7 @@ export function RadarMap({
               />
               <circle cy={-4} r={1.8} fill="#FFFFFF" />
             </g>
-            <g transform="translate(26 -26)">
+                      <g transform="translate(26 -26)">
               <rect
                 x={0}
                 y={0}
@@ -363,7 +347,23 @@ export function RadarMap({
                 {flight.telemetry.groundSpeedKnots} kt · {flight.telemetry.altitudeFeet.toLocaleString()} ft
               </text>
             </g>
-          </g>
+                    </g>
+          )}
+
+          {!hasPosition && flight.status === "DEPARTED" && (
+            <g>
+              <text
+                x={400}
+                y={60}
+                textAnchor="middle"
+                fill="#F59E0B"
+                fontSize={10}
+                fontWeight={700}
+              >
+                Live position not reported by AeroDataBox
+              </text>
+            </g>
+          )}
         </g>
       </svg>
 
@@ -384,13 +384,6 @@ export function RadarMap({
         </div>
         {!hideControls && (
           <div className="pointer-events-auto flex items-center gap-1.5">
-            <MapControl
-              label="Toggle weather radar"
-              active={weather}
-              onClick={() => setWeather((value) => !value)}
-            >
-              <CloudLightning className="size-3.5" />
-            </MapControl>
             <MapControl
               label="Center on aircraft"
               onClick={() => {
@@ -420,13 +413,13 @@ export function RadarMap({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
         <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 px-3 py-2 backdrop-blur">
           <div className="grid grid-cols-4 divide-x divide-line/70">
-            <HudItem label="Altitude" value={`${flight.telemetry.altitudeFeet.toLocaleString()} ft`} accent />
-            <HudItem label="Speed" value={`${flight.telemetry.groundSpeedKnots} kts`} />
-            <HudItem label="Mach" value={`M ${flight.telemetry.mach.toFixed(2)}`} />
+            <HudItem label="Altitude" value={hasPosition ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
+            <HudItem label="Speed" value={hasPosition ? `${flight.telemetry.groundSpeedKnots} kts` : "—"} />
+            <HudItem label="Mach" value={hasPosition ? `M ${flight.telemetry.mach.toFixed(2)}` : "—"} />
             <HudItem
               label="Remaining"
               value={`${flight.telemetry.distanceRemainingNm} nm`}
-              sub={`${flight.telemetry.etaMinutesRemaining}m`}
+              sub={flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining}m` : "—"}
             />
           </div>
         </div>

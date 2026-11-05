@@ -5,18 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  BellPlus,
   Bookmark,
   BookmarkCheck,
-  CalendarClock,
   ChevronRight,
-  Clock,
-  DoorOpen,
   Edit3,
   Expand,
   Heart,
   Layers,
-  Luggage,
   Map as MapIcon,
   MapPin,
   NotebookPen,
@@ -26,13 +21,10 @@ import {
   Radio,
   Share2,
   StickyNote,
-  Ticket,
-  TriangleAlert,
-  XCircle,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { fetchDestinationForecast } from "@/lib/weather";
-import type { AlertType, DestinationArrivalForecast, Flight } from "@/lib/types";
+import type { DestinationArrivalForecast, Flight } from "@/lib/types";
 import { STATUS_META, cn } from "@/lib/utils";
 import { RadarMap } from "@/components/radar-map";
 import { ShareFlightDialog } from "@/components/share-dialog";
@@ -50,50 +42,6 @@ import {
   StatusBadge,
 } from "@/components/ui";
 
-const SIMULATE_ACTIONS: Array<{
-  type: AlertType;
-  label: string;
-  description: string;
-  icon: typeof DoorOpen;
-  color: string;
-}> = [
-  {
-    type: "GATE_CHANGE",
-    label: "Push gate change",
-    description: "Assign a new departure gate and push the alert",
-    icon: DoorOpen,
-    color: "#00E5FF",
-  },
-  {
-    type: "DELAY",
-    label: "Push schedule delay",
-    description: "Add a 20–50 minute ATC delay and push the alert",
-    icon: Clock,
-    color: "#F59E0B",
-  },
-  {
-    type: "BOARDING",
-    label: "Push boarding call",
-    description: "Move the flight to boarding and push the call",
-    icon: Ticket,
-    color: "#38BDF8",
-  },
-  {
-    type: "CANCELLATION",
-    label: "Push cancellation",
-    description: "Cancel the flight and push the alert",
-    icon: XCircle,
-    color: "#EF4444",
-  },
-  {
-    type: "BAGGAGE",
-    label: "Push baggage update",
-    description: "Assign a baggage carousel and push the update",
-    icon: Luggage,
-    color: "#10B981",
-  },
-];
-
 export default function FlightDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -102,8 +50,11 @@ export default function FlightDetailPage() {
     toggleFavorite,
     toggleTrack,
     updateNotes,
-    simulateAlert,
-    scheduleAlert,
+    upsertFlights,
+    aeroConfigured,
+    offlineMode,
+    refreshData,
+    syncing,
   } = useApp();
 
   const flight = useMemo(() => {
@@ -120,12 +71,45 @@ export default function FlightDetailPage() {
   const [mapExpanded, setMapExpanded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [simulateOpen, setSimulateOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
+  const [lookupState, setLookupState] = useState<"idle" | "loading" | "notfound">("idle");
+
+  // Direct links to live flights that are not in the local cache yet.
+  useEffect(() => {
+    if (flight || lookupState !== "idle") return;
+    const rawId = decodeURIComponent(params.id ?? "").replace(/\s+/g, "");
+    if (!/^[A-Za-z0-9]{5,8}$/.test(rawId)) {
+      setLookupState("notfound");
+      return;
+    }
+    if (offlineMode || !aeroConfigured) {
+      setLookupState("notfound");
+      return;
+    }
+    let active = true;
+    setLookupState("loading");
+    fetch(`/api/flights/search?flight=${encodeURIComponent(rawId)}`, {
+      cache: "no-store",
+    })
+      .then((response) => response.json())
+      .then((data: { flights?: Flight[] }) => {
+        if (!active) return;
+        if (data.flights?.length) upsertFlights(data.flights);
+        else setLookupState("notfound");
+      })
+      .catch(() => {
+        if (active) setLookupState("notfound");
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id, flight?.id, lookupState, offlineMode, aeroConfigured, upsertFlights]);
 
   useEffect(() => {
     if (!flight) return;
     let active = true;
+    setForecast(null);
     setForecastLoading(true);
     fetchDestinationForecast(flight.destination, flight.arrivalTimeEstimated)
       .then((next) => {
@@ -145,16 +129,30 @@ export default function FlightDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
         <Panel>
-          <EmptyState
-            icon={<Plane className="size-6" />}
-            title="Flight not found"
-            description="This flight is not in the local cache. Search by flight number or airline to load it again."
-            action={
-              <Link href="/search">
-                <Button size="sm">Back to flight search</Button>
-              </Link>
-            }
-          />
+          {lookupState === "loading" ? (
+            <EmptyState
+              icon={<Radio className="size-6 animate-pulse" />}
+              title="Loading live flight"
+              description="Querying AeroDataBox for this flight number. Only live data is shown."
+            />
+          ) : (
+            <EmptyState
+              icon={<Plane className="size-6" />}
+              title="Flight not available"
+              description={
+                offlineMode
+                  ? "Offline mode is active and this flight is not cached. Reconnect to fetch it live."
+                  : !aeroConfigured
+                    ? "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart."
+                    : "AeroDataBox returned no live flight for this number. It may not be operating today."
+              }
+              action={
+                <Link href="/search">
+                  <Button size="sm">Search live flights</Button>
+                </Link>
+              }
+            />
+          )}
         </Panel>
       </div>
     );
@@ -219,9 +217,9 @@ export default function FlightDetailPage() {
             onClick={() => toggleTrack(flight)}
           />
           <ActionButton
-            icon={<BellPlus className="size-3.5" />}
-            label="Simulate"
-            onClick={() => setSimulateOpen(true)}
+            icon={<Radio className={cn("size-3.5", syncing && "animate-pulse")} />}
+            label={syncing ? "Refreshing" : "Refresh"}
+            onClick={() => void refreshData()}
           />
           <Link href={`/map/${encodeURIComponent(flight.id)}`}>
             <Button size="sm" variant="outline">
@@ -321,13 +319,21 @@ export default function FlightDetailPage() {
                 />
                 <InlineMetric
                   label="Duration"
-                  value={`${Math.floor(flight.telemetry.etaMinutesRemaining / 60)}h ${flight.telemetry.etaMinutesRemaining % 60}m`}
-                  sub={isLive ? "Remaining" : "Estimated"}
+                  value={
+                    flight.telemetry.etaMinutesRemaining > 0
+                      ? `${Math.floor(flight.telemetry.etaMinutesRemaining / 60)}h ${flight.telemetry.etaMinutesRemaining % 60}m`
+                      : "—"
+                  }
+                  sub={isLive ? "Remaining" : "Not reported"}
                 />
                 <InlineMetric
                   label="Progress"
-                  value={`${Math.round(flight.telemetry.progressPercent * 100)}%`}
-                  sub={`${flight.telemetry.distanceRemainingNm} nm remaining`}
+                  value={flight.telemetry.hasLiveLocation ? `${Math.round(flight.telemetry.progressPercent * 100)}%` : "—"}
+                  sub={
+                    flight.telemetry.hasLiveLocation
+                      ? `${flight.telemetry.distanceRemainingNm} nm remaining`
+                      : "Live position not reported"
+                  }
                   accent
                 />
               </div>
@@ -404,7 +410,9 @@ export default function FlightDetailPage() {
             destination={flight.destination}
           />
 
-          <FlightTimelineView events={flight.timeline} />
+          {flight.timeline.length > 0 && (
+            <FlightTimelineView events={flight.timeline} />
+          )}
         </div>
 
         {/* Right rail */}
@@ -451,9 +459,9 @@ export default function FlightDetailPage() {
                 onClick={openNotes}
               />
               <MiniAction
-                icon={<BellPlus className="size-3.5" />}
-                label="Test alert"
-                onClick={() => setSimulateOpen(true)}
+                icon={<Radio className={cn("size-3.5", syncing && "animate-pulse")} />}
+                label="Refresh live"
+                onClick={() => void refreshData()}
               />
               <MiniAction
                 icon={<Layers className="size-3.5" />}
@@ -472,16 +480,16 @@ export default function FlightDetailPage() {
               <p className="label-caps text-subtle">Live telemetry</p>
               <span className="flex items-center gap-1 text-[9px] font-bold text-landed">
                 <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                4s refresh
+                {flight.telemetry.hasLiveLocation ? "LIVE POSITION" : "AWAITING POSITION"}
               </span>
             </div>
             <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <Snapshot label="Altitude" value={`${flight.telemetry.altitudeFeet.toLocaleString()} ft`} accent />
-              <Snapshot label="Ground speed" value={`${flight.telemetry.groundSpeedKnots} kt`} />
-              <Snapshot label="Mach" value={flight.telemetry.mach.toFixed(2)} />
-              <Snapshot label="Heading" value={`${Math.round(flight.telemetry.headingDegrees)}°`} />
-              <Snapshot label="Vertical speed" value={`${flight.telemetry.verticalSpeedFpm} fpm`} />
-              <Snapshot label="ETA" value={`${flight.telemetry.etaMinutesRemaining} min`} accent />
+              <Snapshot label="Altitude" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
+              <Snapshot label="Ground speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
+              <Snapshot label="Mach" value={flight.telemetry.hasLiveLocation ? flight.telemetry.mach.toFixed(2) : "—"} />
+              <Snapshot label="Heading" value={flight.telemetry.hasLiveLocation ? `${Math.round(flight.telemetry.headingDegrees)}°` : "—"} />
+              <Snapshot label="Vertical speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.verticalSpeedFpm} fpm` : "—"} />
+              <Snapshot label="ETA" value={flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
             </div>
             {flight.customNotes && (
               <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-2">
@@ -534,25 +542,6 @@ export default function FlightDetailPage() {
         onSave={() => {
           updateNotes(flight.flightNumber, noteDraft);
           setNotesOpen(false);
-        }}
-      />
-      <SimulateModal
-        open={simulateOpen}
-        flight={flight}
-        onClose={() => setSimulateOpen(false)}
-        onSimulate={(type) => {
-          simulateAlert(flight.flightNumber, type);
-          setSimulateOpen(false);
-        }}
-        onSchedule={(type, seconds) => {
-          scheduleAlert(
-            flight.flightNumber,
-            type,
-            `Scheduled ${type.replace("_", " ").toLowerCase()}: ${flight.flightNumber}`,
-            `Scheduled alert for ${flight.flightNumber} (${flight.origin.code} → ${flight.destination.code}).`,
-            seconds,
-          );
-          setSimulateOpen(false);
         }}
       />
     </div>
@@ -744,101 +733,6 @@ function NotesModal({
         Notes are private to your profile and capped at 500 characters by
         Firestore rules.
       </p>
-    </Modal>
-  );
-}
-
-function SimulateModal({
-  open,
-  flight,
-  onClose,
-  onSimulate,
-  onSchedule,
-}: {
-  open: boolean;
-  flight: Flight;
-  onClose: () => void;
-  onSimulate: (type: AlertType) => void;
-  onSchedule: (type: AlertType, seconds: number) => void;
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Simulate real-time alerts"
-      subtitle={`${flight.flightNumber} · ${flight.origin.code} → ${flight.destination.code}`}
-      icon={<BellPlus className="size-4" />}
-      size="md"
-      footer={
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          Close
-        </Button>
-      }
-    >
-      <div className="space-y-3">
-        <div>
-          <p className="label-caps text-subtle">Instant push notification</p>
-          <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-            {SIMULATE_ACTIONS.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.type}
-                  onClick={() => onSimulate(action.type)}
-                  className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 p-2.5 text-left transition-colors hover:border-accent/40"
-                >
-                  <span
-                    className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border"
-                    style={{
-                      color: action.color,
-                      backgroundColor: `${action.color}14`,
-                      borderColor: `${action.color}44`,
-                    }}
-                  >
-                    <Icon className="size-3.5" />
-                  </span>
-                  <span>
-                    <span className="block text-[11px] font-bold text-ink">
-                      {action.label}
-                    </span>
-                    <span className="mt-0.5 block text-[9px] leading-relaxed text-subtle">
-                      {action.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-line/60 pt-3">
-          <p className="label-caps text-subtle">Scheduled local alerts</p>
-          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            {(
-              [
-                ["GATE_CHANGE", 10, "Gate · 10s"],
-                ["DELAY", 20, "Delay · 20s"],
-                ["BOARDING", 30, "Boarding · 30s"],
-              ] as Array<[AlertType, number, string]>
-            ).map(([type, seconds, label]) => (
-              <button
-                key={type}
-                onClick={() => onSchedule(type, seconds)}
-                className="flex items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 px-2 py-2 text-[10px] font-semibold text-muted transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <CalendarClock className="size-3" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-start gap-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[9px] leading-relaxed text-subtle">
-          <TriangleAlert className="mt-0.5 size-3 shrink-0" />
-          Simulated alerts update the flight state, mirror to Firestore, and
-          trigger a desktop browser notification when permission is granted.
-        </div>
-      </div>
     </Modal>
   );
 }

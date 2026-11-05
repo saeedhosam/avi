@@ -14,18 +14,25 @@ export async function GET(
   const code = rawCode.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(code)) {
     return NextResponse.json(
-      { mode: "DEMO_CACHE_NO_KEY", flights: [], error: "Invalid IATA code" },
+      { mode: "NOT_CONFIGURED", flights: [], error: "Invalid IATA code" },
       { status: 400 },
     );
   }
 
   const { data, status, mode } = await fetchAeroJson<AeroFidsResponseDto>(
-    `/airports/iata/${code}/flights?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
+    `/flights/airports/iata/${code}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
   );
 
   if (!data) {
     return NextResponse.json({ mode, status, flights: [] });
   }
 
-  return NextResponse.json({ mode, flights: mapAeroFids(code, data) });
+  const mapped = mapAeroFids(code, data);
+  const departures = mapped
+    .filter((flight) => flight.origin.code === code)
+    .slice(0, 100);
+  const arrivals = mapped
+    .filter((flight) => flight.destination.code === code)
+    .slice(0, 100);
+  return NextResponse.json({ mode, flights: [...departures, ...arrivals] });
 }

@@ -266,7 +266,7 @@ export function AccountDialog({
                 <p className="flex items-center justify-between gap-3">
                   <span>Environment</span>
                   <span className="font-semibold text-ink">
-                    {firebaseReady ? "Firebase client ready" : "Local demo mode"}
+                    {firebaseReady ? "Firebase client ready" : "Firebase not initialized"}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">

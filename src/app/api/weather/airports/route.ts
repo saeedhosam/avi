@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { realtimeAirports } from "@/lib/data";
+import { routeAirports } from "@/lib/data";
 import { conditionFromWmo, determineFlightCategory } from "@/lib/weather";
 
 interface OpenMeteoCurrent {
@@ -24,8 +24,8 @@ export async function GET(request: Request) {
     .map((code) => code.trim().toUpperCase())
     .filter(Boolean);
   const codes = requested.length
-    ? realtimeAirports.filter((airport) => requested.includes(airport.code))
-    : realtimeAirports;
+    ? routeAirports.filter((airport) => requested.includes(airport.iata))
+    : routeAirports;
 
   if (!codes.length) {
     return NextResponse.json({ live: false, weather: {} });
@@ -55,11 +55,9 @@ export async function GET(request: Request) {
     codes.forEach((airport, index) => {
       const current: OpenMeteoCurrent | undefined = results[index]?.current;
       if (!current) return;
-      const tempC = Math.round(current.temperature_2m ?? airport.weather.tempC);
+      const tempC = Math.round(current.temperature_2m ?? 0);
       const tempF = Math.round((tempC * 9) / 5 + 32);
-      const humidity = Math.round(
-        current.relative_humidity_2m ?? airport.weather.humidity,
-      );
+      const humidity = Math.round(current.relative_humidity_2m ?? 0);
       const windSpeed = Math.round(current.wind_speed_10m ?? 10);
       const windDirection = Math.round(current.wind_direction_10m ?? 270);
       const visibilityMeters = current.visibility ?? 16000;
@@ -68,7 +66,7 @@ export async function GET(request: Request) {
       const condition = conditionFromWmo(current.weather_code);
       const category = determineFlightCategory(visibilityMeters, current.weather_code);
 
-      weather[airport.code] = {
+      weather[airport.iata] = {
         tempC,
         tempF,
         condition,
@@ -84,7 +82,7 @@ export async function GET(request: Request) {
           : category.startsWith("MVFR")
             ? "MVFR"
             : "VFR",
-        metarRaw: `${airport.weather.metarRaw} · LIVE ${condition.toUpperCase()} ${tempC}C ${windSpeed}KT`,
+        metarRaw: `LIVE ${condition.toUpperCase()} ${tempC}C ${windSpeed}KT ${directionLabel(windDirection)} · VIS ${visibilityMiles.toFixed(1)}MI`,
       };
     });
 

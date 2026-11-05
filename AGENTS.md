@@ -17,4 +17,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - All flight/route/terminal catalogs live in `src/data/`. Types are in `src/lib/types.ts`.
 - App state, local caching, alert scheduling, and theme persistence live in `src/lib/store.tsx`.
 - API routes are server-side only; never expose AeroDataBox or other private keys to the client.
-- Validate changes with `npm run typecheck`, `npm run lint`, and `npm run build`.
+- Validate changes with `pnpm typecheck`, `pnpm lint`, and `pnpm build`.

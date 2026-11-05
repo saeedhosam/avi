@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const cleaned = raw.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
   if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(cleaned)) {
     return NextResponse.json(
-      { mode: "DEMO_CACHE_NO_KEY", flights: [], error: "Invalid flight number" },
+      { mode: "NOT_CONFIGURED", flights: [], error: "Invalid flight number" },
       { status: 400 },
     );
   }

@@ -14,10 +14,8 @@ import {
   Search,
   Shield,
   ShoppingBag,
-  Star,
   Ticket,
   Toilet,
-  Users,
   Footprints,
   X,
 } from "lucide-react";
@@ -164,6 +162,9 @@ export default function TerminalsPage() {
             {layout.airportCode} Terminal Map
             <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-bold text-accent">
               {layout.terminalId}
+            </span>
+            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 text-[8px] font-bold text-subtle">
+              REFERENCE LAYOUT
             </span>
           </h2>
           <p className="mt-1 max-w-xl text-[11px] text-muted">
@@ -421,23 +422,10 @@ export default function TerminalsPage() {
                       value={selected.gateNumber}
                     />
                   )}
-                  {selected.waitTimeMinutes != null && (
-                    <MiniDetail
-                      icon={<Users className="size-3" />}
-                      label="Wait time"
-                      value={`${selected.waitTimeMinutes} min`}
-                    />
-                  )}
                 </div>
                 {selected.accessInfo && (
                   <p className="rounded-md border border-accent/25 bg-accent-soft px-2 py-1.5 text-[9px] leading-relaxed text-accent">
                     {selected.accessInfo}
-                  </p>
-                )}
-                {selected.rating != null && (
-                  <p className="flex items-center gap-1 text-[9px] font-semibold text-delayed">
-                    <Star className="size-3 fill-current" /> {selected.rating.toFixed(1)} guest
-                    rating
                   </p>
                 )}
                 {selected.features.length > 0 && (

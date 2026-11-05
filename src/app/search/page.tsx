@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -17,11 +16,9 @@ import {
   Sparkles,
   Tag,
   Trash2,
-  TrendingUp,
   X,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { POPULAR_ROUTES, QUICK_FLIGHTS } from "@/lib/data";
 import type { Flight, FlightStatus } from "@/lib/types";
 import {
   STATUS_META,
@@ -46,9 +43,9 @@ const STATUSES = Object.keys(STATUS_META) as FlightStatus[];
 export default function SearchPage() {
   const router = useRouter();
   const {
-    flights,
     favorites,
     tracked,
+    flights,
     recents,
     addRecent,
     deleteRecent,
@@ -58,6 +55,9 @@ export default function SearchPage() {
     offlineMode,
     unreadAlertCount,
     alerts,
+    upsertFlights,
+    refreshData,
+    syncing,
   } = useApp();
 
   const [mode, setMode] = useState<SearchMode>("FLIGHT_NUMBER");
@@ -65,11 +65,12 @@ export default function SearchPage() {
   const [statusFilter, setStatusFilter] = useState<FlightStatus | null>(null);
   const [onlyTracked, setOnlyTracked] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState("JFK");
-  const [routeDestination, setRouteDestination] = useState("LHR");
-  const [liveFlights, setLiveFlights] = useState<Flight[]>([]);
-  const [liveLoading, setLiveLoading] = useState(false);
+  const [routeDestination, setRouteDestination] = useState("");
+  const [results, setResults] = useState<Flight[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resultMode, setResultMode] = useState("");
 
-  // Deep links from the route inspector: /search?mode=ROUTE&origin=JFK&dest=LHR
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
@@ -80,105 +81,150 @@ export default function SearchPage() {
     if (dest) setRouteDestination(dest.toUpperCase());
   }, []);
 
-  const filtered = useMemo(() => {
-    return flights.filter((flight) => {
-      let matchesMode = true;
-      if (mode === "FLIGHT_NUMBER") {
-        const q = query.trim().toLowerCase();
-        const compact = q.replace(/\s+/g, "");
-        if (q) {
-          matchesMode =
-            flight.flightNumber.toLowerCase().includes(q) ||
-            normalizeFlightNumber(flight.flightNumber).toLowerCase().includes(compact) ||
-            flight.airline.toLowerCase().includes(q) ||
-            flight.airlineCode.toLowerCase().includes(q) ||
-            flight.origin.code.toLowerCase().includes(q) ||
-            flight.origin.city.toLowerCase().includes(q) ||
-            flight.destination.code.toLowerCase().includes(q) ||
-            flight.destination.city.toLowerCase().includes(q) ||
-            flight.aircraft.model.toLowerCase().includes(q);
-        }
-      } else {
-        const origin = routeOrigin.trim().toLowerCase();
-        const destination = routeDestination.trim().toLowerCase();
-        const originMatch =
-          !origin ||
-          origin === "all" ||
-          flight.origin.code.toLowerCase().includes(origin) ||
-          flight.origin.city.toLowerCase().includes(origin) ||
-          flight.origin.name.toLowerCase().includes(origin);
-        const destinationMatch =
-          !destination ||
-          destination === "all" ||
-          flight.destination.code.toLowerCase().includes(destination) ||
-          flight.destination.city.toLowerCase().includes(destination) ||
-          flight.destination.name.toLowerCase().includes(destination);
-        matchesMode = originMatch && destinationMatch;
-      }
-      const matchesStatus = !statusFilter || flight.status === statusFilter;
-      const matchesTracked = !onlyTracked || flight.isTracked;
-      return matchesMode && matchesStatus && matchesTracked;
-    });
-  }, [flights, mode, query, statusFilter, onlyTracked, routeOrigin, routeDestination]);
-
-  const displayFlights = useMemo(() => {
-    if (!liveFlights.length) return filtered;
-    const liveIds = new Set(liveFlights.map((flight) => flight.id));
-    return [...liveFlights, ...filtered.filter((flight) => !liveIds.has(flight.id))];
-  }, [filtered, liveFlights]);
-
-  // Debounced live AeroDataBox lookup, mirroring the Android 450ms trigger.
+  // Flight-number search: AeroDataBox live lookup, 450 ms debounce.
   useEffect(() => {
-    setLiveFlights([]);
-    if (mode !== "FLIGHT_NUMBER" || offlineMode || !aeroConfigured) return;
+    if (mode !== "FLIGHT_NUMBER") return;
+    setResults([]);
+    setError(null);
+    setResultMode("");
     const cleaned = query.trim().replace(/\s+/g, "").replace(/-/g, "");
-    if (cleaned.length < 3) return;
+    if (cleaned.length < 3) {
+      setLoading(false);
+      return;
+    }
+    if (offlineMode) {
+      setError("Offline mode is active. Live lookups are paused.");
+      return;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      setLiveLoading(true);
+      setLoading(true);
+      setError(null);
       try {
         const response = await fetch(
           `/api/flights/search?flight=${encodeURIComponent(cleaned)}`,
-          { signal: controller.signal },
+          { signal: controller.signal, cache: "no-store" },
         );
         const data = (await response.json()) as {
           mode: string;
           flights?: Flight[];
+          error?: string;
         };
+        setResultMode(data.mode);
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
-        if (Array.isArray(data.flights) && data.flights.length) {
-          setLiveFlights((prev) => {
-            const merged = new Map(prev.map((flight) => [flight.id, flight]));
-            data.flights!.forEach((flight) => merged.set(flight.id, flight));
-            return [...merged.values()];
-          });
+        if (data.mode === "NOT_CONFIGURED") {
+          throw new Error(
+            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+          );
         }
-      } catch {
-        // Local results remain available when the live edge is unreachable.
+        if (data.error) throw new Error(data.error);
+        const incoming = data.flights ?? [];
+        setResults(incoming);
+        if (incoming.length) upsertFlights(incoming);
+        else setError("AeroDataBox returned no live flights for this number.");
+      } catch (searchError) {
+        if (!controller.signal.aborted) {
+          setError(
+            searchError instanceof Error
+              ? searchError.message
+              : "Live flight lookup failed.",
+          );
+        }
       } finally {
-        setLiveLoading(false);
+        setLoading(false);
       }
     }, 450);
     return () => {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [query, mode, aeroConfigured, offlineMode, setQuotaFallback]);
+  }, [query, mode, offlineMode, setQuotaFallback, upsertFlights]);
 
-  const applyQuickFlight = (flightNumber: string) => {
-    setMode("FLIGHT_NUMBER");
-    setStatusFilter(null);
-    setOnlyTracked(false);
-    setQuery(flightNumber);
-  };
+  // Route lookup: live airport departures from AeroDataBox, filtered by destination.
+  useEffect(() => {
+    if (mode !== "ROUTE") return;
+    setResults([]);
+    setError(null);
+    setResultMode("");
+    const origin = routeOrigin.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(origin)) {
+      setError("Enter a 3-letter origin IATA code (e.g. JFK).");
+      setLoading(false);
+      return;
+    }
+    if (offlineMode) {
+      setError("Offline mode is active. Live lookups are paused.");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/airports/${origin}/flights`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const data = (await response.json()) as {
+          mode: string;
+          flights?: Flight[];
+          error?: string;
+        };
+        setResultMode(data.mode);
+        if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+        if (data.mode === "NOT_CONFIGURED") {
+          throw new Error(
+            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+          );
+        }
+        if (data.error) throw new Error(data.error);
+        const destination = routeDestination.trim().toLowerCase();
+        const departures = (data.flights ?? []).filter((flight) => {
+          if (flight.origin.code !== origin) return false;
+          if (!destination) return true;
+          return (
+            flight.destination.code.toLowerCase().includes(destination) ||
+            flight.destination.city.toLowerCase().includes(destination) ||
+            flight.destination.name.toLowerCase().includes(destination)
+          );
+        });
+        setResults(departures);
+        if (departures.length) upsertFlights(departures);
+        else setError("No live direct departures matched this route.");
+      } catch (routeError) {
+        if (!controller.signal.aborted) {
+          setError(
+            routeError instanceof Error
+              ? routeError.message
+              : "Live route lookup failed.",
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [
+    mode,
+    routeOrigin,
+    routeDestination,
+    offlineMode,
+    setQuotaFallback,
+    upsertFlights,
+  ]);
 
-  const applyRoute = (origin: string, destination: string) => {
-    setMode("ROUTE");
-    setStatusFilter(null);
-    setOnlyTracked(false);
-    setRouteOrigin(origin);
-    setRouteDestination(destination);
-  };
+  const displayFlights = useMemo(
+    () =>
+      results.filter((flight) => {
+        const matchesStatus = !statusFilter || flight.status === statusFilter;
+        const matchesTracked = !onlyTracked || flight.isTracked;
+        return matchesStatus && matchesTracked;
+      }),
+    [results, statusFilter, onlyTracked],
+  );
 
   const openRecent = (flightNumber: string) => {
     setMode("FLIGHT_NUMBER");
@@ -197,16 +243,20 @@ export default function SearchPage() {
     }
   };
 
-  const airborne = flights.filter((flight) => flight.status === "DEPARTED");
-  const upcoming = flights
+  const savedFlights = useMemo(
+    () => flights.filter((flight) => flight.isFavorite || flight.isTracked),
+    [flights],
+  );
+  const airborne = savedFlights.filter((flight) => flight.status === "DEPARTED");
+  const upcoming = savedFlights
     .filter((flight) => ["SCHEDULED", "BOARDING", "DELAYED"].includes(flight.status))
     .slice(0, 4);
   const latestAlerts = alerts.slice(0, 3);
+  const hasLookup = mode === "FLIGHT_NUMBER" ? query.trim().length >= 3 : /^[A-Za-z]{3}$/.test(routeOrigin.trim());
 
   return (
     <div className="mx-auto max-w-[1680px] px-4 py-4 lg:px-6 lg:py-5">
       <div className="grid gap-4 xl:grid-cols-[268px_minmax(0,1fr)_300px]">
-        {/* Left rail */}
         <aside className="space-y-3 xl:sticky xl:top-[88px] xl:self-start">
           <SourceBanner />
           <Panel className="p-3">
@@ -259,51 +309,36 @@ export default function SearchPage() {
                     </button>
                   )}
                 </div>
-                {liveLoading && (
-                  <p className="flex items-center gap-1.5 text-[10px] font-semibold text-accent">
-                    <Radio className="size-3 animate-pulse" /> Querying
-                    AeroDataBox live…
-                  </p>
-                )}
-                <div>
-                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    Popular flights
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {QUICK_FLIGHTS.map((flightNumber) => (
-                      <button
-                        key={flightNumber}
-                        onClick={() => applyQuickFlight(flightNumber)}
-                        className="rounded-md border border-line bg-surface-2 px-1.5 py-1 font-mono text-[10px] font-bold text-accent transition-colors hover:border-accent/50 hover:bg-accent-soft"
-                      >
-                        {flightNumber}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-[9px] leading-relaxed text-subtle">
+                  Requires a live AeroDataBox result. Try a flight number such as{" "}
+                  <span className="font-mono text-accent">MS985</span>,{" "}
+                  <span className="font-mono text-accent">BA286</span>, or{" "}
+                  <span className="font-mono text-accent">EK202</span>.
+                </p>
               </div>
             ) : (
               <div className="mt-3 space-y-2">
                 <div className="flex items-end gap-1.5">
                   <label className="min-w-0 flex-1">
                     <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-subtle">
-                      Departure
+                      Origin
                     </span>
                     <div className="relative">
                       <PlaneTakeoff className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-accent" />
                       <TextInput
-                        value={routeOrigin === "ALL" ? "" : routeOrigin}
-                        onChange={(event) => setRouteOrigin(event.target.value)}
-                        placeholder="JFK / city"
-                        className="h-9 pl-8 text-xs"
+                        value={routeOrigin}
+                        onChange={(event) => setRouteOrigin(event.target.value.toUpperCase())}
+                        placeholder="JFK"
+                        maxLength={3}
+                        className="h-9 pl-8 font-mono text-xs uppercase"
                       />
                     </div>
                   </label>
                   <button
                     onClick={() => {
-                      const previousOrigin = routeOrigin;
-                      setRouteOrigin(routeDestination);
-                      setRouteDestination(previousOrigin);
+                      const previous = routeOrigin;
+                      setRouteOrigin(routeDestination.toUpperCase().slice(0, 3));
+                      setRouteDestination(previous.toUpperCase());
                     }}
                     className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-surface-3 text-accent transition-transform hover:rotate-180"
                     aria-label="Swap origin and destination"
@@ -317,54 +352,19 @@ export default function SearchPage() {
                     <div className="relative">
                       <PlaneLanding className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-accent-2" />
                       <TextInput
-                        value={routeDestination === "ALL" ? "" : routeDestination}
+                        value={routeDestination}
                         onChange={(event) => setRouteDestination(event.target.value)}
-                        placeholder="LHR / city"
-                        className="h-9 pl-8 text-xs"
+                        placeholder="Any / LHR"
+                        maxLength={3}
+                        className="h-9 pl-8 font-mono text-xs uppercase"
                       />
                     </div>
                   </label>
                 </div>
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setRouteOrigin("ALL");
-                      setRouteDestination("ALL");
-                    }}
-                    className="text-[10px] font-semibold text-muted hover:text-accent"
-                  >
-                    Reset / all airports
-                  </button>
-                  <span className="text-[9px] text-subtle">Code or city</span>
-                </div>
-                <div>
-                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    Popular routes
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {POPULAR_ROUTES.map(([origin, destination]) => {
-                      const active =
-                        routeOrigin.toUpperCase() === origin &&
-                        routeDestination.toUpperCase() === destination;
-                      return (
-                        <button
-                          key={`${origin}-${destination}`}
-                          onClick={() => applyRoute(origin, destination)}
-                          className={cn(
-                            "flex items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] font-bold transition-colors",
-                            active
-                              ? "border-accent bg-accent-soft text-accent"
-                              : "border-line bg-surface-2 text-muted hover:border-accent/40",
-                          )}
-                        >
-                          <span className="text-accent">{origin}</span>
-                          <ArrowRight className="size-2.5 text-subtle" />
-                          <span className="text-accent-2">{destination}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <p className="text-[9px] leading-relaxed text-subtle">
+                  Loads live departures from the origin airport and filters by the
+                  optional destination.
+                </p>
               </div>
             )}
           </Panel>
@@ -392,7 +392,7 @@ export default function SearchPage() {
                   setOnlyTracked(false);
                 }}
               >
-                All flights
+                All results
               </FilterChip>
               <FilterChip
                 active={onlyTracked}
@@ -438,7 +438,7 @@ export default function SearchPage() {
             </div>
             {recents.length === 0 ? (
               <p className="py-2 text-[10px] leading-relaxed text-subtle">
-                Searched flights are cached locally (last 5) for one-tap recall.
+                Live flights you open are cached here for one-tap recall.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -476,57 +476,101 @@ export default function SearchPage() {
           </Panel>
         </aside>
 
-        {/* Main results */}
         <section className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <p className="label-caps text-accent">
                 {mode === "ROUTE"
-                  ? `Route results · ${routeOrigin || "ALL"} → ${routeDestination || "ALL"}`
-                  : "Flight results"}
+                  ? `Live departures · ${routeOrigin || "—"}${routeDestination ? ` → ${routeDestination}` : " → any"}`
+                  : "Live flight lookup"}
               </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
-                {mode === "ROUTE" ? "Direct route lookup" : "Global flight lookup"}
+                {mode === "ROUTE" ? "Live route departures" : "AeroDataBox flight lookup"}
                 <span className="ml-2 text-sm font-semibold text-muted">
                   ({displayFlights.length})
                 </span>
               </h2>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-1.5">
-              <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-              <span className="text-[10px] font-semibold text-muted">
-                Real-time updates active
-              </span>
+            <div className="flex items-center gap-2">
+              {resultMode && (
+                <span className="rounded-lg border border-line/60 bg-surface-2 px-2 py-1 text-[9px] font-semibold text-muted">
+                  {resultMode}
+                </span>
+              )}
+              <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-1.5">
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    error ? "bg-delayed" : "animate-pulse-dot bg-landed",
+                  )}
+                />
+                <span className="text-[10px] font-semibold text-muted">
+                  {loading ? "Querying live data…" : error ? "Live lookup unavailable" : "Live data"}
+                </span>
+              </div>
+              <Button size="sm" variant="outline" onClick={refreshData} disabled={syncing}>
+                {syncing ? "Refreshing…" : "Refresh"}
+              </Button>
             </div>
           </div>
 
-          {liveFlights.length > 0 && (
-            <div className="flex items-center gap-2 rounded-xl border border-landed/35 bg-landed/10 px-3 py-2">
-              <Radio className="size-3.5 text-landed" />
-              <p className="text-[10px] font-semibold text-landed">
-                {liveFlights.length} live AeroDataBox result
-                {liveFlights.length === 1 ? "" : "s"} merged into the local cache
-              </p>
+          {!aeroConfigured && !offlineMode && (
+            <div className="rounded-xl border border-delayed/40 bg-delayed/10 px-3 py-2.5 text-[10px] leading-relaxed text-muted">
+              <strong className="text-delayed">Live data is not configured.</strong>{" "}
+              Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
+              and <code className="font-mono text-accent">AERODATABOX_API_HOST</code>{" "}
+              to <code className="font-mono text-accent">.env</code>, then restart the
+              dev server. No demo flights are shown.
             </div>
           )}
 
-          {displayFlights.length === 0 ? (
+          {offlineMode && (
+            <div className="rounded-xl border border-accent/35 bg-accent-soft px-3 py-2.5 text-[10px] leading-relaxed text-muted">
+              Offline mode is active. Only previously cached live flights are shown.
+            </div>
+          )}
+
+          {loading ? (
+            <Panel>
+              <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
+                <Radio className="size-4 animate-pulse text-accent" />
+                Querying live AeroDataBox data…
+              </div>
+            </Panel>
+          ) : error ? (
             <Panel>
               <EmptyState
-                icon={
-                  onlyTracked ? (
-                    <Plane className="size-6" />
-                  ) : (
-                    <PlaneLanding className="size-6" />
-                  )
+                icon={<Plane className="size-6" />}
+                title="No live results"
+                description={error}
+                action={
+                  <Button size="sm" variant="outline" onClick={refreshData}>
+                    Retry live refresh
+                  </Button>
                 }
-                title={onlyTracked ? "No tracked flights" : "No flights found"}
+              />
+            </Panel>
+          ) : !hasLookup ? (
+            <Panel>
+              <EmptyState
+                icon={<Search className="size-6" />}
+                title="Search live flights"
+                description={
+                  mode === "FLIGHT_NUMBER"
+                    ? "Enter a full flight number to query AeroDataBox. Results are never simulated."
+                    : "Enter a 3-letter origin airport code. Live departures will be filtered by the optional destination."
+                }
+              />
+            </Panel>
+          ) : displayFlights.length === 0 ? (
+            <Panel>
+              <EmptyState
+                icon={<PlaneLanding className="size-6" />}
+                title="No flights match"
                 description={
                   onlyTracked
-                    ? "Search for any flight and tap Track to save it to the local cache for offline monitoring."
-                    : mode === "ROUTE"
-                      ? `No direct flights found for ${routeOrigin || "ALL"} → ${routeDestination || "ALL"}. Try JFK → LHR or SFO → HND.`
-                      : "Try a flight number such as AA 100, or search by airline name like Delta, British Airways, or Emirates."
+                    ? "No tracked flights in the live results. Clear the tracked filter or search another flight."
+                    : "The live feed returned flights, but none match the selected status filter."
                 }
                 action={
                   <Button
@@ -535,12 +579,6 @@ export default function SearchPage() {
                     onClick={() => {
                       setStatusFilter(null);
                       setOnlyTracked(false);
-                      if (mode === "ROUTE") {
-                        setRouteOrigin("ALL");
-                        setRouteDestination("ALL");
-                      } else {
-                        setQuery("");
-                      }
                     }}
                   >
                     Reset filters
@@ -557,21 +595,20 @@ export default function SearchPage() {
           )}
         </section>
 
-        {/* Right rail */}
         <aside className="space-y-3 xl:sticky xl:top-[88px] xl:self-start">
           <Panel className="p-3">
             <div className="flex items-center justify-between">
               <p className="label-caps text-subtle">Live operations</p>
               <span className="flex items-center gap-1 text-[9px] font-bold text-landed">
                 <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                FEED
+                LIVE
               </span>
             </div>
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               <MetricTile
                 label="Airborne"
                 value={airborne.length}
-                sub="En route now"
+                sub="Saved live flights"
                 accent
               />
               <MetricTile
@@ -582,12 +619,12 @@ export default function SearchPage() {
               <MetricTile
                 label="Tracked"
                 value={tracked.length}
-                sub="Local cache"
+                sub="Live tracked"
               />
               <MetricTile
                 label="Unread"
                 value={unreadAlertCount}
-                sub="Push alerts"
+                sub="Real alerts"
               />
             </div>
           </Panel>
@@ -595,103 +632,112 @@ export default function SearchPage() {
           <Panel className="p-3">
             <div className="flex items-center justify-between pb-2">
               <p className="label-caps text-subtle">Airborne now</p>
-              <Link
-                href="/radar"
-                className="flex items-center gap-1 text-[9px] font-bold text-accent hover:underline"
-              >
-                Radar <ArrowRight className="size-2.5" />
-              </Link>
+              <span className="text-[9px] text-subtle">{airborne.length} live</span>
             </div>
-            <div className="space-y-1.5">
-              {airborne.slice(0, 4).map((flight) => (
-                <Link
-                  key={flight.id}
-                  href={`/flight/${encodeURIComponent(flight.id)}`}
-                  className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2/60 px-2 py-1.5 transition-colors hover:border-accent/40"
-                >
-                  <span className="flex size-6 items-center justify-center rounded-md bg-surface-3 text-[9px] font-bold text-accent">
-                    {flight.airlineCode}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[10px] font-bold text-ink">
-                      {flight.flightNumber} · {flight.origin.code}→{flight.destination.code}
-                    </span>
-                    <span className="block text-[9px] text-subtle tabular">
-                      {flight.telemetry.altitudeFeet.toLocaleString()} ft ·{" "}
-                      {flight.telemetry.groundSpeedKnots} kt
-                    </span>
-                  </span>
-                  <span className="text-[9px] font-bold text-accent tabular">
-                    {Math.round(flight.telemetry.progressPercent * 100)}%
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Upcoming departures</p>
-            <div className="mt-2 space-y-1.5">
-              {upcoming.map((flight) => (
-                <Link
-                  key={flight.id}
-                  href={`/flight/${encodeURIComponent(flight.id)}`}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
-                >
-                  <Clock className="size-3 text-subtle" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[10px] font-semibold text-ink">
-                      {flight.flightNumber} · {flight.destination.code}
-                    </span>
-                    <span className="block text-[9px] text-subtle">
-                      {flight.departureTimeEstimated} · {flight.gateDeparture}
-                    </span>
-                  </span>
-                  <span
-                    className="text-[9px] font-bold"
-                    style={{ color: STATUS_META[flight.status].color }}
+            {airborne.length === 0 ? (
+              <p className="py-2 text-[10px] leading-relaxed text-subtle">
+                Track a live flight to see its airborne position here.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {airborne.slice(0, 4).map((flight) => (
+                  <button
+                    key={flight.id}
+                    onClick={() => router.push(`/flight/${encodeURIComponent(flight.id)}`)}
+                    className="flex w-full items-center gap-2 rounded-lg border border-line/60 bg-surface-2/60 px-2 py-1.5 text-left transition-colors hover:border-accent/40"
                   >
-                    {statusLabel(flight.status, flight.delayMinutes)}
-                  </span>
-                </Link>
-              ))}
-            </div>
+                    <span className="flex size-6 items-center justify-center rounded-md bg-surface-3 text-[9px] font-bold text-accent">
+                      {flight.airlineCode}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[10px] font-bold text-ink">
+                        {flight.flightNumber} · {flight.origin.code}→{flight.destination.code}
+                      </span>
+                      <span className="block text-[9px] text-subtle tabular">
+                        {flight.telemetry.hasLiveLocation
+                          ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft · ${flight.telemetry.groundSpeedKnots} kt`
+                          : "Live position not reported"}
+                      </span>
+                    </span>
+                    <span className="text-[9px] font-bold text-accent tabular">
+                      {Math.round(flight.telemetry.progressPercent * 100)}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </Panel>
 
           <Panel className="p-3">
-            <div className="flex items-center justify-between pb-2">
-              <p className="label-caps text-subtle">Latest alerts</p>
-              <span className="text-[9px] font-bold text-delayed">
-                {unreadAlertCount} unread
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {latestAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="rounded-lg border border-line/60 bg-surface-2/60 px-2 py-1.5"
-                >
-                  <p className="truncate text-[10px] font-semibold text-ink">
-                    {alert.title}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[9px] text-subtle">
-                    <span className="font-mono text-accent">
-                      {alert.flightNumber}
+            <p className="label-caps text-subtle">Latest alerts</p>
+            {latestAlerts.length === 0 ? (
+              <p className="mt-2 text-[10px] leading-relaxed text-subtle">
+                Real alerts appear when a tracked flight changes status, gate,
+                delay, boarding, or baggage.
+              </p>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                {latestAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="rounded-lg border border-line/60 bg-surface-2/60 px-2 py-1.5"
+                  >
+                    <p className="truncate text-[10px] font-semibold text-ink">
+                      {alert.title}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1 text-[9px] text-subtle">
+                      <span className="font-mono text-accent">{alert.flightNumber}</span>
+                      · {alert.timestamp}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel className="p-3">
+            <p className="label-caps text-subtle">Upcoming saved flights</p>
+            {upcoming.length === 0 ? (
+              <p className="mt-2 text-[10px] leading-relaxed text-subtle">
+                Track a flight to keep it in this panel.
+              </p>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                {upcoming.map((flight) => (
+                  <button
+                    key={flight.id}
+                    onClick={() => router.push(`/flight/${encodeURIComponent(flight.id)}`)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+                  >
+                    <Clock className="size-3 text-subtle" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[10px] font-semibold text-ink">
+                        {flight.flightNumber} · {flight.destination.code}
+                      </span>
+                      <span className="block text-[9px] text-subtle">
+                        {flight.departureTimeEstimated} · {flight.gateDeparture}
+                      </span>
                     </span>
-                    · {alert.timestamp}
-                  </p>
-                </div>
-              ))}
-            </div>
+                    <span
+                      className="text-[9px] font-bold"
+                      style={{ color: STATUS_META[flight.status].color }}
+                    >
+                      {statusLabel(flight.status, flight.delayMinutes)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </Panel>
 
           <div className="rounded-xl border border-dashed border-line bg-surface-2/40 px-3 py-2.5">
             <p className="flex items-center gap-1.5 text-[10px] font-bold text-muted">
-              <TrendingUp className="size-3 text-accent" /> Desktop console
+              <ArrowRight className="size-3 text-accent" /> Real data only
             </p>
             <p className="mt-1 text-[9px] leading-relaxed text-subtle">
-              Multi-pane layout tuned for large screens: search, filters, live
-              telemetry, and watchlist are visible at once.
+              Every flight, gate, delay, status, route, and airport board on this
+              screen comes from AeroDataBox. Weather comes from Open-Meteo. No demo
+              records are seeded.
             </p>
           </div>
         </aside>
