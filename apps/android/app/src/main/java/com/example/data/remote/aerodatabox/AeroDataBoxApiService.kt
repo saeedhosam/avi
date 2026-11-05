@@ -14,7 +14,7 @@ import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 /**
- * Retrofit API definition for AeroDataBox endpoints on RapidAPI.
+ * Retrofit API definition for the AeroDataBox direct API.
  */
 interface AeroDataBoxApiService {
 
@@ -31,7 +31,7 @@ interface AeroDataBoxApiService {
     /**
      * Fetch live airport FIDS departures and arrivals board for a given IATA code.
      */
-    @GET("airports/iata/{code}/flights")
+    @GET("flights/airports/iata/{code}")
     suspend fun getAirportFlights(
         @Path("code") airportIata: String,
         @Query("direction") direction: String = "Both",
@@ -67,8 +67,8 @@ interface AeroDataBoxApiService {
 }
 
 /**
- * Provides a pre-configured Retrofit instance with RapidAPI authentication headers
- * and Moshi JSON serialization.
+ * Provides a pre-configured Retrofit instance with AeroDataBox authentication
+ * headers and Moshi JSON serialization.
  */
 object AeroDataBoxNetworkClient {
 
@@ -86,8 +86,12 @@ object AeroDataBoxNetworkClient {
         val key = ApiConfig.aeroDataBoxApiKey
         val host = ApiConfig.aeroDataBoxApiHost
         if (key.isNotBlank()) {
-            requestBuilder.header("X-RapidAPI-Key", key)
-            requestBuilder.header("X-RapidAPI-Host", host)
+            if (ApiConfig.usesRapidApiGateway) {
+                requestBuilder.header("X-RapidAPI-Key", key)
+                requestBuilder.header("X-RapidAPI-Host", host)
+            } else {
+                requestBuilder.header("X-Api-Key", key)
+            }
         }
 
         chain.proceed(requestBuilder.build())

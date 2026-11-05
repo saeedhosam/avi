@@ -60,7 +60,7 @@ The desktop app uses the same service family as the Android app. **No production
 
 | Service | Variables | Purpose |
 | --- | --- | --- |
-| AeroDataBox (RapidAPI) | `AERODATABOX_API_KEY`, `AERODATABOX_API_HOST` | Live flight lookup, airport FIDS boards, daily route stats. Server-only. |
+| AeroDataBox direct API | `AERODATABOX_API_KEY`, `AERODATABOX_API_HOST` | Live flight lookup, airport FIDS boards, daily route stats. Server-only. |
 | Open-Meteo | none (zero-key) | Destination arrival forecasts, live METAR-style conditions, VFR/MVFR/IFR categorization. |
 | Firebase Auth | `NEXT_PUBLIC_FIREBASE_*` | Google sign-in and verified account state. |
 | Cloud Firestore | `NEXT_PUBLIC_FIRESTORE_DATABASE_ID` + Firebase vars | Profile, watchlist, notes, and alerts. Uses the named database from the Android app. |

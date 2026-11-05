@@ -10,7 +10,7 @@ const ConfigSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:3000"),
   PUBLIC_WEB_URL: z.string().default("http://localhost:3000"),
   AERODATABOX_API_KEY: z.string().optional(),
-  AERODATABOX_API_HOST: z.string().default("aerodatabox.p.rapidapi.com"),
+  AERODATABOX_API_HOST: z.string().default("api.aerodatabox.com"),
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SECRET_KEY: z.string().optional(),
   REDIS_URL: z.string().optional(),

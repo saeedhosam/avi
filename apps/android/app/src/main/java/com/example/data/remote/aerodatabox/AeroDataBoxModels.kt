@@ -3,8 +3,8 @@ package com.example.data.remote.aerodatabox
 import com.squareup.moshi.Json
 
 /**
- * Data Transfer Objects (DTOs) for the AeroDataBox REST API (via RapidAPI).
- * Supports `/flights/number/{flightNumber}`, `/airports/iata/{code}/flights`,
+ * Data Transfer Objects (DTOs) for the AeroDataBox REST API.
+ * Supports `/flights/number/{flightNumber}`, `/flights/airports/iata/{code}`,
  * `/airports/iata/{code}/delays`, and `/airports/search/term`.
  */
 data class AeroFlightDto(
@@ -94,7 +94,7 @@ data class AeroDistanceDto(
 
 /**
  * Airport FIDS (Flight Information Display System) response from
- * `GET /airports/iata/{code}/flights`
+ * `GET /flights/airports/iata/{code}`
  */
 data class AeroFidsResponseDto(
     @Json(name = "departures") val departures: List<AeroFlightDto>? = null,

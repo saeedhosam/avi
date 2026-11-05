@@ -26,15 +26,15 @@ export const DATA_SOURCE_META = {
     summary: "AeroDataBox quota reached",
     title: "AeroDataBox rate limit reached (HTTP 429)",
     subtitle:
-      "New flight lookups are paused until the RapidAPI quota resets. Cached live results and Open-Meteo weather remain available.",
+      "New flight lookups are paused until the AeroDataBox quota resets. Cached live results and Open-Meteo weather remain available.",
     color: "#F59E0B",
   },
   NOT_CONFIGURED: {
     badge: "AERODATABOX NOT CONFIGURED",
-    summary: "Add your RapidAPI key",
+    summary: "Add your AeroDataBox API key",
     title: "Live flight data is not configured",
     subtitle:
-      "Add AERODATABOX_API_KEY and AERODATABOX_API_HOST to .env and restart the server to enable live flight search, airport boards, and route data.",
+      "Add AERODATABOX_API_KEY to .env and restart the server to enable live flight search, airport boards, and route data.",
     color: "#EF4444",
   },
 } as const;

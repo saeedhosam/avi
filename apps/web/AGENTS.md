@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - This app is `@avi/web` in the Avi monorepo. The Android client lives in `../android` and the SwiftUI placeholder in `../ios`.
 - Stack: Next.js App Router, React 19, TypeScript, Tailwind CSS v4, Supabase.
-- The Avi API in `../../services/api` is the provider gateway. Do not ship RapidAPI or Supabase secret keys to the browser.
+- The Avi API in `../../services/api` is the provider gateway. Do not ship provider or Supabase secret keys to the browser.
 - Preserve the aviation cockpit design language: deep-space surfaces, radar cyan, aero blue,
   instrument borders, monospace flight codes, and the universal flight-status palette.
 - All flight/route/terminal catalogs live in `src/data/`. Types are in `src/lib/types.ts`.

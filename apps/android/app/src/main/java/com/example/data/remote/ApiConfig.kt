@@ -26,13 +26,13 @@ enum class DataSourceMode(
     QUOTA_FALLBACK(
         badgeLabel = "RATE LIMIT · CACHE ACTIVE",
         title = "AeroDataBox Quota Reached (HTTP 429)",
-        subtitle = "Serving cached flights from Room SQLite + live Open-Meteo destination weather until RapidAPI quota resets.",
+        subtitle = "Serving cached flights from Room SQLite + live Open-Meteo destination weather until the AeroDataBox quota resets.",
         isLiveAviation = false
     ),
     DEMO_CACHE_NO_KEY(
         badgeLabel = "ROOM CACHE + LIVE WEATHER",
         title = "Room Cache + Live Open-Meteo Weather",
-        subtitle = "Add AERODATABOX_API_KEY in the AI Studio Secrets panel to enable live RapidAPI flight & FIDS queries.",
+        subtitle = "Add AERODATABOX_API_KEY in the AI Studio Secrets panel to enable live AeroDataBox flight & FIDS queries.",
         isLiveAviation = false
     )
 }
@@ -59,7 +59,7 @@ object ApiConfig {
     )
 
     /**
-     * Returns the configured AeroDataBox RapidAPI key from BuildConfig.
+     * Returns the configured AeroDataBox API key from BuildConfig.
      */
     val aeroDataBoxApiKey: String
         get() = try {
@@ -69,15 +69,22 @@ object ApiConfig {
         }
 
     /**
-     * Returns the configured AeroDataBox RapidAPI host from BuildConfig.
+     * Returns the configured AeroDataBox gateway host from BuildConfig.
      */
     val aeroDataBoxApiHost: String
         get() = try {
             val host = BuildConfig.AERODATABOX_API_HOST.trim()
-            if (host.isBlank() || host == "null") "aerodatabox.p.rapidapi.com" else host
+            if (host.isBlank() || host == "null") "api.aerodatabox.com" else host
         } catch (_: Throwable) {
-            "aerodatabox.p.rapidapi.com"
+            "api.aerodatabox.com"
         }
+
+    /**
+     * RapidAPI remains supported as an optional gateway override for rollback,
+     * but direct AeroDataBox access is the default.
+     */
+    val usesRapidApiGateway: Boolean
+        get() = aeroDataBoxApiHost.contains("rapidapi.com")
 
     /**
      * Returns the base HTTPS URL for AeroDataBox API requests.

@@ -196,13 +196,29 @@ export class AeroDataBoxProvider {
   private readonly host: string;
 
   constructor(private readonly config: AppConfig) {
-    this.host = config.AERODATABOX_API_HOST.replace(/^https?:\/\//, "")
+    const host = config.AERODATABOX_API_HOST.replace(/^https?:\/\//, "")
       .replace(/\/$/, "")
       .trim();
+    this.host = host || "api.aerodatabox.com";
   }
 
   get configured(): boolean {
     return hasValidAeroDataBoxKey(this.config.AERODATABOX_API_KEY);
+  }
+
+  private headers(): Record<string, string> {
+    const key = this.config.AERODATABOX_API_KEY ?? "";
+    if (this.host.includes("rapidapi.com")) {
+      return {
+        Accept: "application/json",
+        "X-RapidAPI-Key": key,
+        "X-RapidAPI-Host": this.host,
+      };
+    }
+    return {
+      Accept: "application/json",
+      "X-Api-Key": key,
+    };
   }
 
   async searchFlight(rawNumber: string): Promise<FlightSearchResult> {
@@ -216,7 +232,7 @@ export class AeroDataBoxProvider {
           source: "not_configured",
           fetchedAt,
           cached: false,
-          attribution: "AeroDataBox via RapidAPI",
+          attribution: "AeroDataBox",
         },
       };
     }
@@ -230,7 +246,7 @@ export class AeroDataBoxProvider {
           source: "cached",
           fetchedAt,
           cached: true,
-          attribution: "AeroDataBox via RapidAPI",
+          attribution: "AeroDataBox",
         },
       };
     }
@@ -239,14 +255,35 @@ export class AeroDataBoxProvider {
       flightNumber,
     )}?withAircraftImage=false&withLocation=true`;
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "X-RapidAPI-Key": this.config.AERODATABOX_API_KEY ?? "",
-        "X-RapidAPI-Host": this.host,
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch {
+      throw new ProviderError("AeroDataBox request failed", 502);
+    }
+
+    if (response.status === 204) {
+      this.cache.set(cacheKey, [], 60_000);
+      return {
+        flights: [],
+        meta: {
+          source: "live",
+          fetchedAt,
+          cached: false,
+          attribution: "AeroDataBox",
+        },
+      };
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new ProviderError(
+        "AeroDataBox authentication failed. Check AERODATABOX_API_KEY.",
+        502,
+      );
+    }
 
     if (response.status === 429) {
       return {
@@ -255,7 +292,7 @@ export class AeroDataBoxProvider {
           source: "quota_fallback",
           fetchedAt,
           cached: false,
-          attribution: "AeroDataBox via RapidAPI",
+          attribution: "AeroDataBox",
         },
       };
     }
@@ -280,7 +317,7 @@ export class AeroDataBoxProvider {
         source: "live",
         fetchedAt,
         cached: false,
-        attribution: "AeroDataBox via RapidAPI",
+        attribution: "AeroDataBox",
       },
     };
   }

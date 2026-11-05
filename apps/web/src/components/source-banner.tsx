@@ -91,7 +91,7 @@ export function SourceBanner({ className }: { className?: string }) {
           <p className="text-xs leading-relaxed text-muted">{meta.subtitle}</p>
           <div className="space-y-2">
             <DiagnosticRow
-              title="AeroDataBox RapidAPI"
+              title="AeroDataBox Direct API"
               detail="Flights, FIDS boards, delays, daily route stats"
               active={aeroConfigured && !offlineMode}
               value={aeroConfigured ? "KEY CONFIGURED" : "CACHE FALLBACK"}
@@ -120,7 +120,7 @@ export function SourceBanner({ className }: { className?: string }) {
               <Cloud className="mt-0.5 size-3.5 shrink-0 text-delayed" />
               Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
               to <code className="font-mono text-accent">.env.local</code> for live
-              RapidAPI flight and FIDS data. Weather is already live via Open-Meteo.
+              AeroDataBox flight and FIDS data. Weather is already live via Open-Meteo.
             </p>
           ) : null}
         </div>

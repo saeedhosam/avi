@@ -66,7 +66,8 @@ Updated: 2026-11-05
 - OpenAPI generated at `packages/contracts/openapi.json`.
 - AeroDataBox provider + in-memory cache + quota fallback.
 - Supabase server key loaded (status reports `configured`).
-- AeroDataBox key configured; live flight search currently returns `quota_fallback` because RapidAPI responds 429.
+- AeroDataBox direct API configured (`https://api.aerodatabox.com`, `X-Api-Key`); live flight search, FIDS, airport search, and daily routes verified.
+- Direct Starter plan: 40,000 API units/month at 5 req/s. Flight status/FIDS/search cost 2 units; daily routes cost 6.
 
 ### iOS
 
@@ -81,7 +82,7 @@ Updated: 2026-11-05
 | --- | --- |
 | Google OAuth client ID + secret | Supabase Google sign-in on web/Android/iOS (still not configured) |
 | Android SHA-1/SHA-256 fingerprints | Google sign-in on Android |
-| AeroDataBox quota/plan (or rotated key) | Live flights, boards, routes |
+| AeroDataBox unit headroom / Growth plan | Higher monthly quota if app usage grows |
 | Real domain + DNS | Production HTTPS, shared links, OAuth redirects |
 | Firebase service account (optional) | Legacy Firestore user-data export/import |
 | FCM `google-services.json` (optional) | Android push |
@@ -105,4 +106,4 @@ Updated: 2026-11-05
 - Web Google OAuth works; Android Google sign-in remains deferred until the Android OAuth client, SHA fingerprints, and `GOOGLE_WEB_CLIENT_ID` are added.
 - Indoor/AMDB data and routing are not implemented yet.
 - No production domain is connected; `sslip.io` is staging only.
-- Live flights and airport boards remain on quota fallback until the AeroDataBox RapidAPI plan or key is fixed.
+- The direct Starter plan has a 40,000 unit/month cap with no paid overage, so watchlist refresh frequency and route browsing must stay within budget.

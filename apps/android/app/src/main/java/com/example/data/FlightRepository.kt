@@ -156,7 +156,7 @@ class FlightRepository(private val context: Context) {
     }
 
     /**
-     * Queries the live AeroDataBox Airport FIDS endpoint (`/airports/iata/{code}/flights`)
+     * Queries the live AeroDataBox Airport FIDS endpoint (`/flights/airports/iata/{code}`)
      * for departures and arrivals at the selected airport hub.
      */
     suspend fun fetchLiveAirportBoard(airportCode: String): List<Flight> = withContext(Dispatchers.IO) {

@@ -15,7 +15,7 @@ import kotlin.math.*
 object AeroDataBoxMapper {
 
     /**
-     * Maps an AeroFlightDto from `/flights/number/{flightNumber}` or `/airports/iata/{code}/flights`
+     * Maps an AeroFlightDto from `/flights/number/{flightNumber}` or `/flights/airports/iata/{code}`
      * into a complete SkyTrack [Flight] domain object.
      */
     fun mapDtoToFlight(

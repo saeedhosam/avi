@@ -136,7 +136,7 @@ class AeroDataBoxProductionTest {
     }
 
     @Test
-    fun `ApiConfig rejects default placeholder keys and accepts real RapidAPI keys`() {
+    fun `ApiConfig rejects default placeholder keys and accepts real AeroDataBox keys`() {
         assertFalse(ApiConfig.hasValidAeroDataBoxKey(""))
         assertFalse(ApiConfig.hasValidAeroDataBoxKey("DEFAULT_AERODATABOX_KEY"))
         assertFalse(ApiConfig.hasValidAeroDataBoxKey("YOUR_AERODATABOX_KEY"))

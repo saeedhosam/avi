@@ -310,7 +310,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="text-xs leading-relaxed text-muted">{source.subtitle}</p>
           <div className="space-y-2">
             <DiagnosticRow
-              title="AeroDataBox RapidAPI"
+              title="AeroDataBox Direct API"
               detail="Live flight lookup, FIDS boards, daily route stats"
               active={aeroConfigured && !offlineMode}
               value={aeroConfigured ? "KEY CONFIGURED" : "CACHE FALLBACK"}

@@ -73,8 +73,19 @@ export function hasValidAeroKey() {
 
 export function aeroHost() {
   const host = process.env.AERODATABOX_API_HOST?.trim();
-  if (!host || host === "null") return "aerodatabox.p.rapidapi.com";
+  if (!host || host === "null") return "api.aerodatabox.com";
   return host.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function aeroAuthHeaders(host: string): Record<string, string> {
+  const key = process.env.AERODATABOX_API_KEY ?? "";
+  if (host.includes("rapidapi.com")) {
+    return {
+      "X-RapidAPI-Key": key,
+      "X-RapidAPI-Host": host,
+    };
+  }
+  return { "X-Api-Key": key };
 }
 
 function timeHHmm(iso: string | undefined, fallback: string) {
@@ -429,16 +440,22 @@ export async function fetchAeroJson<T>(path: string): Promise<{
   if (!hasValidAeroKey()) {
     return { data: null, status: 0, mode: "NOT_CONFIGURED" };
   }
+  const host = aeroHost();
   try {
-    const response = await fetch(`https://${aeroHost()}${path}`, {
+    const response = await fetch(`https://${host}${path}`, {
       headers: {
         Accept: "application/json",
-        "X-RapidAPI-Key": process.env.AERODATABOX_API_KEY ?? "",
-        "X-RapidAPI-Host": aeroHost(),
+        ...aeroAuthHeaders(host),
       },
       cache: "no-store",
       signal: AbortSignal.timeout(12000),
     });
+    if (response.status === 204) {
+      return { data: null, status: 204, mode: "LIVE_AERODATABOX" };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { data: null, status: response.status, mode: "ERROR" };
+    }
     if (response.status === 429) {
       return { data: null, status: 429, mode: "QUOTA_FALLBACK" };
     }
