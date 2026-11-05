@@ -107,7 +107,7 @@ export function NotificationsDialog({
               <code className="min-w-0 flex-1 truncate rounded-lg border border-line/70 bg-surface px-2.5 py-2 font-mono text-[10px] text-muted">
                 {fcmToken}
               </code>
-              <IconButton label="Copy FCM token" onClick={copyToken}>
+              <IconButton label="Copy push token" onClick={copyToken}>
                 {copied ? (
                   <Check className="size-3.5 text-landed" />
                 ) : (
@@ -117,10 +117,8 @@ export function NotificationsDialog({
             </div>
           ) : (
             <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
-              No FCM token yet. Add{" "}
-              <code className="font-mono text-accent">NEXT_PUBLIC_FIREBASE_VAPID_KEY</code>{" "}
-              and configure Firebase Cloud Messaging to register this browser.
-              No fake token is generated.
+              Web Push is not configured yet. Browser notifications still work
+              while the app is open. No fake token is generated.
             </p>
           )}
 

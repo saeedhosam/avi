@@ -331,9 +331,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               value="ACTIVE (SSOT)"
             />
             <DiagnosticRow
-              title="Firebase"
-              detail="Auth · Firestore · App Check · FCM push"
-              active={aeroConfigured || Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)}
+              title="Supabase"
+              detail="Auth · Postgres · Realtime · push"
+              active={aeroConfigured || Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)}
               value={aeroConfigured ? "CONFIGURED" : "OPTIONAL"}
             />
           </div>

@@ -139,7 +139,7 @@ export function AccountDialog({
           <div className="mt-3 grid grid-cols-3 gap-2">
             <StatusMini
               icon={<Cloud className="size-3.5" />}
-              label="Firestore"
+              label="Supabase"
               value={account.isSignedIn ? "Synced" : "Not linked"}
               active={account.isSignedIn}
             />
@@ -254,7 +254,7 @@ export function AccountDialog({
             <div className="rounded-xl border border-line bg-surface-2 p-3.5">
               <div className="flex items-center gap-2">
                 <UserRound className="size-4 text-accent" />
-                <p className="label-caps text-ink">Firebase authentication</p>
+                <p className="label-caps text-ink">Supabase authentication</p>
               </div>
               <div className="mt-2 space-y-1.5 text-[11px] text-muted">
                 <p className="flex items-center justify-between gap-3">
@@ -266,11 +266,11 @@ export function AccountDialog({
                 <p className="flex items-center justify-between gap-3">
                   <span>Environment</span>
                   <span className="font-semibold text-ink">
-                    {supabaseReady ? "Firebase client ready" : "Firebase not initialized"}
+                    {supabaseReady ? "Supabase client ready" : "Supabase not initialized"}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
-                  <span>FCM device token</span>
+                  <span>Push token</span>
                   <span className="max-w-[200px] truncate font-mono text-[10px] text-accent">
                     {fcmToken || "—"}
                   </span>
@@ -278,10 +278,10 @@ export function AccountDialog({
               </div>
               {!supabaseReady && (
                 <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
-                  Add your Firebase web app values to{" "}
+                  Add your Supabase URL and publishable key to{" "}
                   <code className="font-mono text-accent">.env.local</code> to
-                  enable Google sign-in, Firestore, App Check, and FCM. The app
-                  gracefully falls back to local storage until then.
+                  enable Google sign-in and cloud sync. The app gracefully falls
+                  back to local storage until then.
                 </p>
               )}
             </div>
