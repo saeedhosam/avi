@@ -257,15 +257,14 @@ export type Database = {
         }
         Relationships: []
       }
-      tracked_flights: {
+      watchlist_items: {
         Row: {
           airline: string
           created_at: string
-          custom_notes: string
           dest_code: string
           flight_id: string
           flight_number: string
-          is_favorite: boolean
+          notes: string
           origin_code: string
           snapshot: Json | null
           status: string
@@ -275,11 +274,10 @@ export type Database = {
         Insert: {
           airline?: string
           created_at?: string
-          custom_notes?: string
           dest_code?: string
           flight_id: string
           flight_number: string
-          is_favorite?: boolean
+          notes?: string
           origin_code?: string
           snapshot?: Json | null
           status?: string
@@ -289,11 +287,10 @@ export type Database = {
         Update: {
           airline?: string
           created_at?: string
-          custom_notes?: string
           dest_code?: string
           flight_id?: string
           flight_number?: string
-          is_favorite?: boolean
+          notes?: string
           origin_code?: string
           snapshot?: Json | null
           status?: string

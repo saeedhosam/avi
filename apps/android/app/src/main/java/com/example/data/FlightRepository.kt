@@ -282,7 +282,7 @@ class FlightRepository(private val context: Context) {
 
     private suspend fun syncFavoritesToCloud(userId: String) {
         _flights.value.filter { it.isFavorite || it.isTracked }.forEach { flight ->
-            cloudRepository.saveTrackedFlight(
+            cloudRepository.saveWatchlistItem(
                 CloudTrackedFlight(
                     id = flight.id,
                     userId = userId,
@@ -300,16 +300,16 @@ class FlightRepository(private val context: Context) {
     }
 
     private suspend fun syncCloudTrackingToLocal(userId: String) {
-        val remoteRows = cloudRepository.fetchTrackedFlights().getOrNull().orEmpty()
+        val remoteRows = cloudRepository.fetchWatchlistItems().getOrNull().orEmpty()
         val remoteFlights = remoteRows.mapNotNull { row ->
             row.snapshot?.let { snapshot ->
                 runCatching {
                     Json.decodeFromJsonElement<CloudFlightSnapshot>(snapshot).toFlight()
                 }.getOrNull()
             }?.copy(
-                isFavorite = row.isFavorite,
+                isFavorite = true,
                 isTracked = true,
-                customNotes = row.customNotes
+                customNotes = row.notes
             )
         }
         if (remoteFlights.isNotEmpty()) {
@@ -557,7 +557,7 @@ class FlightRepository(private val context: Context) {
                 )
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
-                    cloudRepository.saveTrackedFlight(
+                    cloudRepository.saveWatchlistItem(
                         CloudTrackedFlight(
                             id = flight.id,
                             userId = userId ?: "",
@@ -589,9 +589,9 @@ class FlightRepository(private val context: Context) {
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
                     if (!flight.isTracked) {
-                        cloudRepository.deleteTrackedFlight(flight.id)
+                        cloudRepository.deleteWatchlistItem(flight.id)
                     } else {
-                        cloudRepository.saveTrackedFlight(
+                        cloudRepository.saveWatchlistItem(
                             CloudTrackedFlight(
                                 id = flight.id,
                                 userId = userId ?: "",
@@ -626,7 +626,7 @@ class FlightRepository(private val context: Context) {
             val userId = cloudRepository.currentUserId()
             val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
             if (userId != null && flight != null) {
-                cloudRepository.saveTrackedFlight(
+                cloudRepository.saveWatchlistItem(
                     CloudTrackedFlight(
                         id = flight.id,
                         userId = userId ?: "",
@@ -665,7 +665,7 @@ class FlightRepository(private val context: Context) {
                     departureTimeScheduled = flight.departureTimeScheduled,
                     arrivalTimeScheduled = flight.arrivalTimeScheduled,
                     status = flight.status.name,
-                    terminalGate = "T${flight.terminalDeparture} Â· ${flight.gateDeparture}",
+                    terminalGate = "T${flight.terminalDeparture} Ã‚Â· ${flight.gateDeparture}",
                     trackedSinceMillis = System.currentTimeMillis(),
                     notes = customNotes,
                     isAutoAlertEnabled = true
@@ -673,7 +673,7 @@ class FlightRepository(private val context: Context) {
                 flightDao.insertTrackedFlight(entity)
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
-                    cloudRepository.saveTrackedFlight(
+                    cloudRepository.saveWatchlistItem(
                         CloudTrackedFlight(
                             id = flight.id,
                             userId = userId ?: "",
@@ -693,7 +693,7 @@ class FlightRepository(private val context: Context) {
                         flightNumber = flight.flightNumber,
                         type = AlertType.BOARDING,
                         title = "Saved to Room Tracking: ${flight.flightNumber}",
-                        message = "Flight ${flight.flightNumber} (${flight.origin.code} âž” ${flight.destination.code}) saved to local Room database for tracking. FCM push alerts active.",
+                        message = "Flight ${flight.flightNumber} (${flight.origin.code} Ã¢Å¾â€ ${flight.destination.code}) saved to local Room database for tracking. FCM push alerts active.",
                         timestamp = "Just now",
                         isRead = false
                     ),
@@ -701,13 +701,13 @@ class FlightRepository(private val context: Context) {
                 )
             } else {
                 unsubscribeFromFlightPush(flight.flightNumber)
-                flightDao.deleteTrackedFlight(flight.flightNumber)
+                flightDao.deleteWatchlistItem(flight.flightNumber)
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
                     if (!flight.isFavorite) {
-                        cloudRepository.deleteTrackedFlight(flight.id)
+                        cloudRepository.deleteWatchlistItem(flight.id)
                     } else {
-                        cloudRepository.saveTrackedFlight(
+                        cloudRepository.saveWatchlistItem(
                             CloudTrackedFlight(
                                 id = flight.id,
                                 userId = userId ?: "",
@@ -726,7 +726,7 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    fun deleteTrackedFlight(flightNumber: String) {
+    fun deleteWatchlistItem(flightNumber: String) {
         _flights.value = _flights.value.map {
             if (it.flightNumber.equals(flightNumber, ignoreCase = true)) {
                 it.copy(isTracked = false)
@@ -734,7 +734,7 @@ class FlightRepository(private val context: Context) {
         }
         repositoryScope.launch {
             unsubscribeFromFlightPush(flightNumber)
-            flightDao.deleteTrackedFlight(flightNumber)
+            flightDao.deleteWatchlistItem(flightNumber)
         }
     }
 
@@ -873,7 +873,7 @@ class FlightRepository(private val context: Context) {
                             status = FlightStatus.DELAYED,
                             delayMinutes = extraMinutes,
                             delayReason = "ATC Flow Restriction & Thunderstorms",
-                            statusNote = "Delayed $extraMinutes mins Â· ATC flow management"
+                            statusNote = "Delayed $extraMinutes mins Ã‚Â· ATC flow management"
                         )
                     } else it
                 }
@@ -883,7 +883,7 @@ class FlightRepository(private val context: Context) {
                         status = "DELAYED",
                         delayMinutes = extraMinutes,
                         delayReason = "ATC Flow Restriction & Thunderstorms",
-                        statusNote = "Delayed $extraMinutes mins Â· ATC flow management"
+                        statusNote = "Delayed $extraMinutes mins Ã‚Â· ATC flow management"
                     )
                 }
                 addAlert(
@@ -904,7 +904,7 @@ class FlightRepository(private val context: Context) {
                     if (it.flightNumber == flightNumber) {
                         it.copy(
                             status = FlightStatus.BOARDING,
-                            statusNote = "Boarding Group 1 & 2 Â· Gate ${it.gateDeparture}"
+                            statusNote = "Boarding Group 1 & 2 Ã‚Â· Gate ${it.gateDeparture}"
                         )
                     } else it
                 }
@@ -912,7 +912,7 @@ class FlightRepository(private val context: Context) {
                     flightDao.updateFlightStatus(
                         flightNumber = flightNumber,
                         status = "BOARDING",
-                        statusNote = "Boarding Group 1 & 2 Â· Gate ${flight.gateDeparture}"
+                        statusNote = "Boarding Group 1 & 2 Ã‚Â· Gate ${flight.gateDeparture}"
                     )
                 }
                 addAlert(
@@ -951,7 +951,7 @@ class FlightRepository(private val context: Context) {
                     if (it.flightNumber == flightNumber) {
                         it.copy(
                             status = FlightStatus.CANCELLED,
-                            statusNote = "Cancelled Â· Technical Inspection Required",
+                            statusNote = "Cancelled Ã‚Â· Technical Inspection Required",
                             delayReason = "Aircraft Maintenance"
                         )
                     } else it
@@ -960,7 +960,7 @@ class FlightRepository(private val context: Context) {
                     flightDao.updateFlightStatus(
                         flightNumber = flightNumber,
                         status = "CANCELLED",
-                        statusNote = "Cancelled Â· Technical Inspection Required"
+                        statusNote = "Cancelled Ã‚Â· Technical Inspection Required"
                     )
                 }
                 addAlert(
@@ -1087,4 +1087,5 @@ class FlightRepository(private val context: Context) {
         com.example.sync.FlightSyncManager.enqueueImmediateSync(context)
     }
 }
+
 

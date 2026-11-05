@@ -43,8 +43,7 @@ const STATUSES = Object.keys(STATUS_META) as FlightStatus[];
 export default function SearchPage() {
   const router = useRouter();
   const {
-    favorites,
-    tracked,
+    watchlist,
     flights,
     recents,
     addRecent,
@@ -63,7 +62,7 @@ export default function SearchPage() {
   const [mode, setMode] = useState<SearchMode>("FLIGHT_NUMBER");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<FlightStatus | null>(null);
-  const [onlyTracked, setOnlyTracked] = useState(false);
+  const [onlyWatchlisted, setOnlyWatchlisted] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState("JFK");
   const [routeDestination, setRouteDestination] = useState("");
   const [results, setResults] = useState<Flight[]>([]);
@@ -220,16 +219,16 @@ export default function SearchPage() {
     () =>
       results.filter((flight) => {
         const matchesStatus = !statusFilter || flight.status === statusFilter;
-        const matchesTracked = !onlyTracked || flight.isTracked;
-        return matchesStatus && matchesTracked;
+        const matchesWatchlist = !onlyWatchlisted || flight.isWatchlisted;
+        return matchesStatus && matchesWatchlist;
       }),
-    [results, statusFilter, onlyTracked],
+    [results, statusFilter, onlyWatchlisted],
   );
 
   const openRecent = (flightNumber: string) => {
     setMode("FLIGHT_NUMBER");
     setStatusFilter(null);
-    setOnlyTracked(false);
+    setOnlyWatchlisted(false);
     const matched = flights.find(
       (flight) =>
         normalizeFlightNumber(flight.flightNumber) ===
@@ -244,7 +243,7 @@ export default function SearchPage() {
   };
 
   const savedFlights = useMemo(
-    () => flights.filter((flight) => flight.isFavorite || flight.isTracked),
+    () => flights.filter((flight) => flight.isWatchlisted),
     [flights],
   );
   const airborne = savedFlights.filter((flight) => flight.status === "DEPARTED");
@@ -296,7 +295,7 @@ export default function SearchPage() {
                   <TextInput
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Flight # or airline…"
+                    placeholder="Flight # or airlineâ€¦"
                     className="pl-9 pr-8"
                   />
                   {query && (
@@ -372,11 +371,11 @@ export default function SearchPage() {
           <Panel className="p-3">
             <div className="flex items-center justify-between pb-2">
               <p className="label-caps text-subtle">Filters</p>
-              {(statusFilter || onlyTracked) && (
+              {(statusFilter || onlyWatchlisted) && (
                 <button
                   onClick={() => {
                     setStatusFilter(null);
-                    setOnlyTracked(false);
+                    setOnlyWatchlisted(false);
                   }}
                   className="text-[9px] font-semibold text-accent"
                 >
@@ -386,31 +385,31 @@ export default function SearchPage() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <FilterChip
-                active={!statusFilter && !onlyTracked}
+                active={!statusFilter && !onlyWatchlisted}
                 onClick={() => {
                   setStatusFilter(null);
-                  setOnlyTracked(false);
+                  setOnlyWatchlisted(false);
                 }}
               >
                 All results
               </FilterChip>
               <FilterChip
-                active={onlyTracked}
+                active={onlyWatchlisted}
                 onClick={() => {
-                  setOnlyTracked((value) => !value);
+                  setOnlyWatchlisted((value) => !value);
                   setStatusFilter(null);
                 }}
                 color="var(--accent)"
               >
-                <History className="size-3" /> Tracked ({tracked.length})
+                <History className="size-3" /> Watchlisted ({watchlist.length})
               </FilterChip>
               {STATUSES.map((status) => (
                 <FilterChip
                   key={status}
-                  active={statusFilter === status && !onlyTracked}
+                  active={statusFilter === status && !onlyWatchlisted}
                   color={STATUS_META[status].color}
                   onClick={() => {
-                    setOnlyTracked(false);
+                    setOnlyWatchlisted(false);
                     setStatusFilter((current) =>
                       current === status ? null : status,
                     );
@@ -459,7 +458,7 @@ export default function SearchPage() {
                         />
                       </p>
                       <p className="mt-0.5 truncate text-[9px] text-subtle">
-                        {recent.originCode} → {recent.destCode} · {recent.airline}
+                        {recent.originCode} â†’ {recent.destCode} Â· {recent.airline}
                       </p>
                     </button>
                     <button
@@ -481,7 +480,7 @@ export default function SearchPage() {
             <div>
               <p className="label-caps text-accent">
                 {mode === "ROUTE"
-                  ? `Live departures · ${routeOrigin || "—"}${routeDestination ? ` → ${routeDestination}` : " → any"}`
+                  ? `Live departures Â· ${routeOrigin || "â€”"}${routeDestination ? ` â†’ ${routeDestination}` : " â†’ any"}`
                   : "Live flight lookup"}
               </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
@@ -505,11 +504,11 @@ export default function SearchPage() {
                   )}
                 />
                 <span className="text-[10px] font-semibold text-muted">
-                  {loading ? "Querying live data…" : error ? "Live lookup unavailable" : "Live data"}
+                  {loading ? "Querying live dataâ€¦" : error ? "Live lookup unavailable" : "Live data"}
                 </span>
               </div>
               <Button size="sm" variant="outline" onClick={refreshData} disabled={syncing}>
-                {syncing ? "Refreshing…" : "Refresh"}
+                {syncing ? "Refreshingâ€¦" : "Refresh"}
               </Button>
             </div>
           </div>
@@ -534,7 +533,7 @@ export default function SearchPage() {
             <Panel>
               <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
                 <Radio className="size-4 animate-pulse text-accent" />
-                Querying live AeroDataBox data…
+                Querying live AeroDataBox dataâ€¦
               </div>
             </Panel>
           ) : error ? (
@@ -568,8 +567,8 @@ export default function SearchPage() {
                 icon={<PlaneLanding className="size-6" />}
                 title="No flights match"
                 description={
-                  onlyTracked
-                    ? "No tracked flights in the live results. Clear the tracked filter or search another flight."
+                  onlyWatchlisted
+                    ? "No watchlisted flights in the live results. Clear the watchlist filter or search another flight."
                     : "The live feed returned flights, but none match the selected status filter."
                 }
                 action={
@@ -578,7 +577,7 @@ export default function SearchPage() {
                     variant="outline"
                     onClick={() => {
                       setStatusFilter(null);
-                      setOnlyTracked(false);
+                      setOnlyWatchlisted(false);
                     }}
                   >
                     Reset filters
@@ -613,18 +612,18 @@ export default function SearchPage() {
               />
               <MetricTile
                 label="Watchlist"
-                value={favorites.length}
+                value={watchlist.length}
                 sub="Saved flights"
-              />
-              <MetricTile
-                label="Tracked"
-                value={tracked.length}
-                sub="Live tracked"
               />
               <MetricTile
                 label="Unread"
                 value={unreadAlertCount}
                 sub="Real alerts"
+              />
+              <MetricTile
+                label="Alerts"
+                value={alerts.length}
+                sub="Alert inbox"
               />
             </div>
           </Panel>
@@ -651,11 +650,11 @@ export default function SearchPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[10px] font-bold text-ink">
-                        {flight.flightNumber} · {flight.origin.code}→{flight.destination.code}
+                        {flight.flightNumber} Â· {flight.origin.code}â†’{flight.destination.code}
                       </span>
                       <span className="block text-[9px] text-subtle tabular">
                         {flight.telemetry.hasLiveLocation
-                          ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft · ${flight.telemetry.groundSpeedKnots} kt`
+                          ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft Â· ${flight.telemetry.groundSpeedKnots} kt`
                           : "Live position not reported"}
                       </span>
                     </span>
@@ -672,7 +671,7 @@ export default function SearchPage() {
             <p className="label-caps text-subtle">Latest alerts</p>
             {latestAlerts.length === 0 ? (
               <p className="mt-2 text-[10px] leading-relaxed text-subtle">
-                Real alerts appear when a tracked flight changes status, gate,
+                Real alerts appear when a watchlisted flight changes status, gate,
                 delay, boarding, or baggage.
               </p>
             ) : (
@@ -687,7 +686,7 @@ export default function SearchPage() {
                     </p>
                     <p className="mt-0.5 flex items-center gap-1 text-[9px] text-subtle">
                       <span className="font-mono text-accent">{alert.flightNumber}</span>
-                      · {alert.timestamp}
+                      Â· {alert.timestamp}
                     </p>
                   </div>
                 ))}
@@ -712,10 +711,10 @@ export default function SearchPage() {
                     <Clock className="size-3 text-subtle" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[10px] font-semibold text-ink">
-                        {flight.flightNumber} · {flight.destination.code}
+                        {flight.flightNumber} Â· {flight.destination.code}
                       </span>
                       <span className="block text-[9px] text-subtle">
-                        {flight.departureTimeEstimated} · {flight.gateDeparture}
+                        {flight.departureTimeEstimated} Â· {flight.gateDeparture}
                       </span>
                     </span>
                     <span
@@ -745,3 +744,5 @@ export default function SearchPage() {
     </div>
   );
 }
+
+

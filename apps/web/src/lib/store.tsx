@@ -20,15 +20,15 @@ import type {
 import type { DataSourceMode } from "./data-source";
 import { normalizeFlightNumber, uid } from "./utils";
 import {
-  deleteTrackedFlightCloud,
+  deleteWatchlistItemCloud,
   fetchCloudAlerts,
   fetchCloudWatchlist,
   markAlertReadCloud,
   observeSupabaseAuth,
   requestFcmToken,
   saveAlertCloud,
-  saveTrackedFlightCloud,
   saveUserProfile,
+  saveWatchlistItemCloud,
   signInWithGoogleSupabase,
   signOutSupabase,
   subscribeToUserData,
@@ -60,11 +60,9 @@ interface AppContextValue {
   resolvedTheme: "light" | "dark";
   setThemeMode: (mode: ThemeMode) => void;
   flights: Flight[];
-  favorites: Flight[];
-  tracked: Flight[];
+  watchlist: Flight[];
   upsertFlights: (incoming: Flight[]) => void;
-  toggleFavorite: (flightNumber: string, notes?: string) => void;
-  toggleTrack: (flight: Flight, notes?: string) => void;
+  toggleWatchlist: (flight: Flight, notes?: string) => void;
   updateNotes: (flightNumber: string, notes: string) => void;
   alerts: FlightAlert[];
   unreadAlertCount: number;
@@ -82,7 +80,7 @@ interface AppContextValue {
   offlineMode: boolean;
   toggleOffline: () => void;
   refreshData: () => Promise<void>;
-  refreshTrackedFlights: () => Promise<void>;
+  refreshWatchlistFlights: () => Promise<void>;
   syncing: boolean;
   dataSourceMode: DataSourceMode;
   setQuotaFallback: () => void;
@@ -123,7 +121,9 @@ function readPersisted(): PersistedState {
     if (!raw) return defaultPersisted;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
-      flights: Array.isArray(parsed.flights) ? parsed.flights : [],
+      flights: Array.isArray(parsed.flights)
+        ? (parsed.flights as unknown[]).map(normalizePersistedFlight)
+        : [],
       alerts: Array.isArray(parsed.alerts) ? parsed.alerts : [],
       recents: Array.isArray(parsed.recents) ? parsed.recents : [],
       themeMode: parsed.themeMode ?? "SYSTEM",
@@ -132,6 +132,20 @@ function readPersisted(): PersistedState {
   } catch {
     return defaultPersisted;
   }
+}
+
+function normalizePersistedFlight(value: unknown): Flight {
+  const flight = value as Flight & {
+    isFavorite?: boolean;
+    isTracked?: boolean;
+    isWatchlisted?: boolean;
+  };
+  return {
+    ...flight,
+    isWatchlisted: Boolean(
+      flight.isWatchlisted ?? flight.isFavorite ?? flight.isTracked,
+    ),
+  };
 }
 
 function flightKey(flight: Pick<Flight, "flightNumber">) {
@@ -366,8 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (existing) {
           const merged: Flight = {
             ...flight,
-            isFavorite: existing.isFavorite,
-            isTracked: existing.isTracked,
+            isWatchlisted: existing.isWatchlisted,
             customNotes: existing.customNotes,
             // Keep the freshest live location if one source has it.
             telemetry: {
@@ -377,7 +390,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 existing.telemetry.hasLiveLocation,
             },
           };
-          if (existing.isTracked || existing.isFavorite) {
+          if (existing.isWatchlisted) {
             newAlerts.push(...buildChangeAlerts(existing, merged));
           }
           map.set(key, merged);
@@ -426,8 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const record = cloudByNumber.get(flight.flightNumber);
         return {
           ...flight,
-          isFavorite: Boolean(record?.isFavorite),
-          isTracked: true,
+          isWatchlisted: true,
           customNotes: String(record?.customNotes ?? ""),
         };
       });
@@ -438,8 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (!record) return flight;
           return {
             ...flight,
-            isFavorite: Boolean(record.isFavorite) || flight.isFavorite,
-            isTracked: true,
+            isWatchlisted: true,
             customNotes: String(record.customNotes ?? flight.customNotes),
           };
         }),
@@ -471,11 +482,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const refreshTrackedFlights = useCallback(async () => {
+  const refreshWatchlistFlights = useCallback(async () => {
     if (offlineMode || !aeroConfigured || refreshingRef.current) return;
-    const targets = flightsRef.current.filter(
-      (flight) => flight.isTracked || flight.isFavorite,
-    );
+    const targets = flightsRef.current.filter((flight) => flight.isWatchlisted);
     if (!targets.length) return;
     refreshingRef.current = true;
     setSyncing(true);
@@ -507,13 +516,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [aeroConfigured, offlineMode, updateAccountSync, upsertFlights]);
 
-  // Refresh tracked/favorite flights when live data is available.
+  // Refresh watchlisted flights when live data is available.
   useEffect(() => {
     if (!hydrated || !aeroConfigured || offlineMode) return;
-    void refreshTrackedFlights();
-    const timer = window.setInterval(() => void refreshTrackedFlights(), 5 * 60 * 1000);
+    void refreshWatchlistFlights();
+    const timer = window.setInterval(
+      () => void refreshWatchlistFlights(),
+      5 * 60 * 1000,
+    );
     return () => window.clearInterval(timer);
-  }, [hydrated, aeroConfigured, offlineMode, refreshTrackedFlights]);
+  }, [hydrated, aeroConfigured, offlineMode, refreshWatchlistFlights]);
 
   // Supabase auth observer. Demo accounts are never substituted.
   useEffect(() => {
@@ -565,56 +577,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setThemeModeState(mode);
   }, []);
 
-  const toggleFavorite = useCallback(
-    (flightNumber: string, notes = "") => {
+  const toggleWatchlist = useCallback(
+    (flight: Flight, notes = "") => {
       const current = flightsRef.current.find(
-        (flight) =>
-          normalizeFlightNumber(flight.flightNumber) ===
-          normalizeFlightNumber(flightNumber),
+        (item) =>
+          normalizeFlightNumber(item.flightNumber) ===
+          normalizeFlightNumber(flight.flightNumber),
       );
       if (!current) return;
-      const newFavorite = !current.isFavorite;
-      const updated = flightsRef.current.map((flight) =>
-        normalizeFlightNumber(flight.flightNumber) ===
-        normalizeFlightNumber(flightNumber)
-          ? {
-              ...flight,
-              isFavorite: newFavorite,
-              customNotes: notes || flight.customNotes,
-            }
-          : flight,
-      );
-      flightsRef.current = updated;
-      setFlights(updated);
-      const nextFlight = updated.find(
-        (flight) =>
-          normalizeFlightNumber(flight.flightNumber) ===
-          normalizeFlightNumber(flightNumber),
-      );
-      if (nextFlight && account.uid) {
-        if (nextFlight.isFavorite || nextFlight.isTracked) {
-          void saveTrackedFlightCloud(account.uid, nextFlight);
-        } else {
-          void deleteTrackedFlightCloud(account.uid, nextFlight.id);
-        }
-      }
-      notify(
-        newFavorite
-          ? `Watching ${flightNumber}. Live status changes will create alerts.`
-          : `Removed ${flightNumber} from favorites.`,
-        newFavorite ? "success" : "info",
-      );
-    },
-    [account.uid, notify],
-  );
-
-  const toggleTrack = useCallback(
-    (flight: Flight, notes = "") => {
-      const willTrack = !flight.isTracked;
+      const willWatch = !current.isWatchlisted;
       const updated = flightsRef.current.map((item) =>
         normalizeFlightNumber(item.flightNumber) ===
         normalizeFlightNumber(flight.flightNumber)
-          ? { ...item, isTracked: willTrack, customNotes: notes || item.customNotes }
+          ? {
+              ...item,
+              isWatchlisted: willWatch,
+              customNotes: notes || item.customNotes,
+            }
           : item,
       );
       flightsRef.current = updated;
@@ -625,17 +604,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           normalizeFlightNumber(flight.flightNumber),
       );
       if (nextFlight && account.uid) {
-        if (nextFlight.isFavorite || nextFlight.isTracked) {
-          void saveTrackedFlightCloud(account.uid, nextFlight);
+        if (nextFlight.isWatchlisted) {
+          void saveWatchlistItemCloud(account.uid, nextFlight);
         } else {
-          void deleteTrackedFlightCloud(account.uid, nextFlight.id);
+          void deleteWatchlistItemCloud(account.uid, nextFlight.id);
         }
       }
       notify(
-        willTrack
-          ? `Tracking ${flight.flightNumber} with live status alerts.`
-          : `Stopped tracking ${flight.flightNumber}.`,
-        willTrack ? "success" : "info",
+        willWatch
+          ? `Added ${flight.flightNumber} to your watchlist. Live status changes will create alerts.`
+          : `Removed ${flight.flightNumber} from your watchlist.`,
+        willWatch ? "success" : "info",
       );
     },
     [account.uid, notify],
@@ -656,8 +635,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           normalizeFlightNumber(item.flightNumber) ===
           normalizeFlightNumber(flightNumber),
       );
-      if (flight && account.uid) {
-        void saveTrackedFlightCloud(account.uid, { ...flight, customNotes: notes });
+      if (flight && account.uid && flight.isWatchlisted) {
+        void saveWatchlistItemCloud(account.uid, {
+          ...flight,
+          customNotes: notes,
+        });
       }
     },
     [account.uid],
@@ -765,7 +747,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const data = (await response.json()) as { aeroDataBoxConfigured?: boolean };
         setAeroConfigured(Boolean(data.aeroDataBoxConfigured));
       }
-      await refreshTrackedFlights();
+      await refreshWatchlistFlights();
       updateAccountSync();
       notify("Live flight data refreshed.", "success");
     } catch {
@@ -773,7 +755,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setSyncing(false);
     }
-  }, [notify, refreshTrackedFlights, updateAccountSync]);
+  }, [notify, refreshWatchlistFlights, updateAccountSync]);
 
   const enableBrowserNotifications = useCallback(async () => {
     if (typeof Notification === "undefined") {
@@ -791,12 +773,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, [notify]);
 
-  const favorites = useMemo(
-    () => flights.filter((flight) => flight.isFavorite),
-    [flights],
-  );
-  const tracked = useMemo(
-    () => flights.filter((flight) => flight.isTracked),
+  const watchlist = useMemo(
+    () => flights.filter((flight) => flight.isWatchlisted),
     [flights],
   );
   const unreadAlertCount = useMemo(
@@ -810,11 +788,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     resolvedTheme,
     setThemeMode,
     flights,
-    favorites,
-    tracked,
+    watchlist,
     upsertFlights,
-    toggleFavorite,
-    toggleTrack,
+    toggleWatchlist,
     updateNotes,
     alerts,
     unreadAlertCount,
@@ -832,7 +808,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     offlineMode,
     toggleOffline,
     refreshData,
-    refreshTrackedFlights,
+    refreshWatchlistFlights,
     syncing,
     dataSourceMode,
     setQuotaFallback,

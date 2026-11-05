@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.FlightRepository
 import com.example.data.local.RecentSearchEntity
 import com.example.data.local.ScheduledNotificationEntity
-import com.example.data.local.TrackedFlightEntity
 import com.example.data.preferences.ThemeMode
 import com.example.data.preferences.ThemePreferences
 import com.example.data.remote.DataSourceMode
@@ -79,9 +78,6 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val recentSearches: StateFlow<List<RecentSearchEntity>> = repository.recentSearches
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val trackedFlights: StateFlow<List<TrackedFlightEntity>> = repository.trackedFlights
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val unreadAlertCount: StateFlow<Int> = alerts.map { list ->
         list.count { !it.isRead }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -122,12 +118,12 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             val matchesStatus = filters.status == null || flight.status == filters.status
-            val matchesTracked = !filters.onlyTracked || flight.isTracked
-            matchesMode && matchesStatus && matchesTracked
+            val matchesWatchlist = !filters.onlyTracked || flight.isFavorite
+            matchesMode && matchesStatus && matchesWatchlist
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val favoriteFlights: StateFlow<List<Flight>> = flights.map { all ->
+    val watchlistFlights: StateFlow<List<Flight>> = flights.map { all ->
         all.filter { it.isFavorite }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

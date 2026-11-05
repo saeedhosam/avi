@@ -212,7 +212,7 @@ export function NotificationsDialog({
 
         <p className="rounded-xl border border-dashed border-line px-3 py-2 text-[10px] leading-relaxed text-subtle">
           Alerts are emitted by comparing successive live AeroDataBox snapshots of
-          tracked or saved flights. The app never fabricates alerts or schedules
+          watchlisted flights. The app never fabricates alerts or schedules
           test pushes.
         </p>
       </div>

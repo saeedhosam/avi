@@ -13,7 +13,6 @@ import {
   Network,
   Plane,
   PlaneTakeoff,
-  Radar,
   RefreshCw,
   Search,
   Settings2,
@@ -28,7 +27,6 @@ import { Button, IconButton, Modal } from "./ui";
 
 const NAV_ITEMS = [
   { href: "/search", label: "Search", icon: Search, tag: "Flight lookup" },
-  { href: "/radar", label: "Live Radar", icon: Radar, tag: "Airborne traffic" },
   { href: "/routes", label: "Routes", icon: Network, tag: "Global connections" },
   { href: "/airports", label: "Airports", icon: PlaneTakeoff, tag: "Boards & METAR" },
   { href: "/terminals", label: "Terminals", icon: Layers, tag: "Gate navigation" },
@@ -37,17 +35,16 @@ const NAV_ITEMS = [
 
 const PAGE_TITLES: Record<string, { title: string; eyebrow: string }> = {
   "/search": { title: "Flight Search", eyebrow: "Live telemetry console" },
-  "/radar": { title: "Live Radar", eyebrow: "Tactical airborne picture" },
   "/routes": { title: "Route Network", eyebrow: "Global direct connections" },
   "/airports": { title: "Airport Boards", eyebrow: "Departures, arrivals & METAR" },
   "/terminals": { title: "Terminal Maps", eyebrow: "Gate-level wayfinding" },
-  "/watchlist": { title: "Watchlist", eyebrow: "Tracked & favorite flights" },
+  "/watchlist": { title: "Watchlist", eyebrow: "Saved flights & live alerts" },
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
-    favorites,
+    watchlist,
     unreadAlertCount,
     themeMode,
     setThemeMode,
@@ -88,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Avi
             </p>
             <p className="mt-1 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] text-accent">
-              Live radar & flight telemetry
+              Live flight tracking & terminal maps
             </p>
           </div>
         </div>
@@ -126,9 +123,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-1">
                     <span className="text-[13px] font-semibold">{item.label}</span>
-                    {item.href === "/watchlist" && favorites.length > 0 && (
+                    {item.href === "/watchlist" && watchlist.length > 0 && (
                       <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--bg)]">
-                        {favorites.length}
+                        {watchlist.length}
                       </span>
                     )}
                   </span>
@@ -282,7 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Icon className="size-4" />
               {item.label.split(" ")[0]}
-              {item.href === "/watchlist" && favorites.length > 0 && (
+              {item.href === "/watchlist" && watchlist.length > 0 && (
                 <span className="absolute right-[22%] top-1.5 size-1.5 rounded-full bg-accent" />
               )}
             </Link>

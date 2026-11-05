@@ -19,7 +19,12 @@ import type {
 
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
-export const MAP_STYLE_URL = "/map/style.json";
+export type MapTheme = "light" | "dark";
+
+export const MAP_STYLE_URLS: Record<MapTheme, string> = {
+  light: "/map/style.json",
+  dark: "/map/style-dark.json",
+};
 
 export const MAP_COLORS = {
   ocean: "#CBE7F9",
@@ -35,10 +40,11 @@ export const MAP_COLORS = {
 export function createBaseMap(
   container: HTMLElement,
   options: { center?: [number, number]; zoom?: number; minZoom?: number; maxZoom?: number } = {},
+  theme: MapTheme = "light",
 ): MapLibreMap {
   const map = new MapLibreMapClass({
     container,
-    style: MAP_STYLE_URL,
+    style: MAP_STYLE_URLS[theme],
     center: options.center ?? [10, 24],
     zoom: options.zoom ?? 2,
     minZoom: options.minZoom ?? 1,
@@ -77,6 +83,23 @@ export function setGeoJson(
 
 export function ensureLayer(map: MapLibreMap, layer: LayerSpecification) {
   if (!map.getLayer(layer.id)) map.addLayer(layer);
+}
+
+/**
+ * Hide base-map place names while a hub or route is selected so the IATA and
+ * route labels remain readable. Custom avi-* layers are never touched.
+ */
+export function setBaseSymbolLayersVisible(map: MapLibreMap, visible: boolean) {
+  const layers = map.getStyle().layers ?? [];
+  for (const layer of layers) {
+    if (layer.type !== "symbol" || layer.id.startsWith("avi-")) continue;
+    if (!map.getLayer(layer.id)) continue;
+    map.setLayoutProperty(
+      layer.id,
+      "visibility",
+      visible ? "visible" : "none",
+    );
+  }
 }
 
 export function ensureAircraftImage(map: MapLibreMap) {

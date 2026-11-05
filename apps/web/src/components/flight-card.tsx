@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkCheck,
-  Heart,
   Luggage,
   MapPin,
   Plane,
@@ -17,15 +16,15 @@ import { StatusBadge } from "./ui";
 
 export function FlightCard({
   flight,
-  showTrack = true,
+  showWatchlist = true,
   className,
 }: {
   flight: Flight;
-  showTrack?: boolean;
+  showWatchlist?: boolean;
   className?: string;
 }) {
   const router = useRouter();
-  const { toggleFavorite, toggleTrack, addRecent } = useApp();
+  const { toggleWatchlist, addRecent } = useApp();
   const progress =
     flight.status === "LANDED"
       ? 1
@@ -76,46 +75,34 @@ export function FlightCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {showTrack && (
+          {showWatchlist && (
             <button
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                toggleTrack(flight);
+                toggleWatchlist(flight);
               }}
+              aria-pressed={flight.isWatchlisted}
+              aria-label={
+                flight.isWatchlisted
+                  ? "Remove from watchlist"
+                  : "Add to watchlist"
+              }
               className={cn(
                 "inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-colors",
-                flight.isTracked
+                flight.isWatchlisted
                   ? "border-accent/50 bg-accent-soft text-accent"
                   : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
               )}
             >
-              {flight.isTracked ? (
+              {flight.isWatchlisted ? (
                 <BookmarkCheck className="size-3" />
               ) : (
                 <Bookmark className="size-3" />
               )}
-              {flight.isTracked ? "Tracked" : "Track"}
+              {flight.isWatchlisted ? "Watchlisted" : "Watchlist"}
             </button>
           )}
-          <button
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              toggleFavorite(flight.flightNumber);
-            }}
-            aria-label={flight.isFavorite ? "Remove from watchlist" : "Add to watchlist"}
-            className="flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-3"
-          >
-            <Heart
-              className={cn(
-                "size-4",
-                flight.isFavorite
-                  ? "fill-[#FF4081] text-[#FF4081]"
-                  : "text-muted",
-              )}
-            />
-          </button>
         </div>
       </div>
 

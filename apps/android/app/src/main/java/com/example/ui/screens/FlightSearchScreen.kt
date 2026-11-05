@@ -64,7 +64,7 @@ fun FlightSearchScreen(
     val flights by viewModel.filteredFlights.collectAsState()
     val allFlights by viewModel.flights.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
-    val trackedFlights by viewModel.trackedFlights.collectAsState()
+    val watchlistFlights by viewModel.watchlistFlights.collectAsState()
     val unreadAlerts by viewModel.unreadAlertCount.collectAsState()
     val userAccount by viewModel.userAccount.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
@@ -366,7 +366,7 @@ fun FlightSearchScreen(
                     }
                 }
             } else {
-                // Mode 2: Interactive Route Lookup Card (Origin ➔ Destination)
+                // Mode 2: Interactive Route Lookup Card (Origin âž” Destination)
                 item {
                     Card(
                         modifier = Modifier
@@ -645,7 +645,7 @@ fun FlightSearchScreen(
                 }
             }
 
-            // Filter Chips Row (Including Local Room Database Tracked Filter!)
+            // Filter chips, including the unified watchlist filter
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -676,7 +676,7 @@ fun FlightSearchScreen(
                         )
                     }
 
-                    // Room Database Tracked Flights Chip
+                    // Watchlist chip
                     item {
                         FilterChip(
                             selected = onlyTrackedFilter,
@@ -689,7 +689,7 @@ fun FlightSearchScreen(
                                     tint = if (onlyTrackedFilter) DeepSpace else RadarCyan
                                 )
                             },
-                            label = { Text("Tracked in Room (${trackedFlights.size})") },
+                            label = { Text("Watchlist (${watchlistFlights.size})") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = RadarCyan,
                                 selectedLabelColor = DeepSpace,
@@ -732,7 +732,7 @@ fun FlightSearchScreen(
                 }
             }
 
-            // Room Database Active Tracking Banner if onlyTracked is enabled
+            // Watchlist banner when the watchlist filter is enabled
             if (onlyTrackedFilter) {
                 item {
                     Surface(
@@ -754,7 +754,7 @@ fun FlightSearchScreen(
                             )
                             Column {
                                 Text(
-                                    text = "LOCAL ROOM DATABASE · ${trackedFlights.size} FLIGHTS TRACKED",
+                                    text = "WATCHLIST · ${watchlistFlights.size} FLIGHTS",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
                                     color = RadarCyan
@@ -779,7 +779,7 @@ fun FlightSearchScreen(
                 ) {
                     Text(
                         text = if (searchMode == SearchMode.ROUTE) {
-                            "ROUTE RESULTS: $routeOrigin ➔ $routeDestination (${flights.size})"
+                            "ROUTE RESULTS: $routeOrigin âž” $routeDestination (${flights.size})"
                         } else {
                             "FLIGHT RESULTS (${flights.size})"
                         },
@@ -814,7 +814,7 @@ fun FlightSearchScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = if (onlyTrackedFilter) "No Tracked Flights in Room" else "No Flights Found",
+                            text = if (onlyTrackedFilter) "No Watchlisted Flights" else "No Flights Found",
                             color = TextWhite,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -824,7 +824,7 @@ fun FlightSearchScreen(
                             text = if (onlyTrackedFilter) {
                                 "Search for any flight above and tap 'Track' to save it to your local Room database for offline monitoring."
                             } else if (searchMode == SearchMode.ROUTE) {
-                                "No direct flights found for route $routeOrigin ➔ $routeDestination. Try picking other hubs like JFK ➔ LHR or SFO ➔ HND."
+                                "No direct flights found for route $routeOrigin âž” $routeDestination. Try picking other hubs like JFK âž” LHR or SFO âž” HND."
                             } else {
                                 "Try searching by flight number (e.g. 'AA 100') or airline name ('Delta', 'British Airways')."
                             },
@@ -843,18 +843,7 @@ fun FlightSearchScreen(
                             viewModel.recordRecentSearch(flight)
                             onFlightSelected(flight)
                         },
-                        onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) },
-                        onToggleTrack = {
-                            viewModel.toggleTrackFlight(flight)
-                            coroutineScope.launch {
-                                val message = if (flight.isTracked) {
-                                    "Removed ${flight.flightNumber} from local Room tracking"
-                                } else {
-                                    "Saved ${flight.flightNumber} to local Room database for tracking!"
-                                }
-                                snackbarHostState.showSnackbar(message)
-                            }
-                        }
+                        onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) }
                     )
                 }
             }
@@ -1060,7 +1049,7 @@ fun RecentSearchCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "· ${item.airline}",
+                        text = "Â· ${item.airline}",
                         color = TextMuted,
                         fontSize = 10.sp,
                         maxLines = 1
@@ -1084,3 +1073,4 @@ fun RecentSearchCard(
         }
     }
 }
+

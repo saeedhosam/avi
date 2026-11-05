@@ -102,8 +102,7 @@ export interface Flight {
   aircraft: AircraftInfo;
   telemetry: FlightTelemetry;
   timeline: FlightTimelineEvent[];
-  isFavorite: boolean;
-  isTracked: boolean;
+  isWatchlisted: boolean;
   customNotes: string;
 }
 

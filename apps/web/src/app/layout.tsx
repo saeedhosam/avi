@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   applicationName: "Avi",
   keywords: [
     "flight tracker",
-    "live radar",
+    "live flight map",
     "airport board",
     "flight connections",
     "terminal map",

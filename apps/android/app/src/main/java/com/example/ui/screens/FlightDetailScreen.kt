@@ -136,27 +136,15 @@ fun FlightDetailScreen(
                         )
                     }
 
-                    // Room Tracking button
-                    IconButton(
-                        onClick = { viewModel.toggleTrackFlight(flight) },
-                        modifier = Modifier.testTag("flight_detail_track_btn")
-                    ) {
-                        Icon(
-                            imageVector = if (flight.isTracked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = if (flight.isTracked) "Tracking in Room" else "Save to Room",
-                            tint = if (flight.isTracked) RadarCyan else TextWhite
-                        )
-                    }
-
-                    // Favorite button
+                    // Unified watchlist button
                     IconButton(
                         onClick = { viewModel.toggleFavorite(flight.flightNumber) },
-                        modifier = Modifier.testTag("flight_detail_favorite_btn")
+                        modifier = Modifier.testTag("flight_detail_watchlist_btn")
                     ) {
                         Icon(
-                            imageVector = if (flight.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (flight.isFavorite) Color(0xFFFF4081) else TextWhite
+                            imageVector = if (flight.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = if (flight.isFavorite) "Remove from watchlist" else "Add to watchlist",
+                            tint = if (flight.isFavorite) RadarCyan else TextWhite
                         )
                     }
 
@@ -436,7 +424,7 @@ fun FlightDetailScreen(
                 }
             }
 
-            // Local Room Database Tracking Card
+            // Unified watchlist card
             item {
                 Surface(
                     modifier = Modifier
@@ -444,12 +432,12 @@ fun FlightDetailScreen(
                         .clip(RoundedCornerShape(14.dp))
                         .border(
                             1.dp,
-                            if (flight.isTracked) RadarCyan.copy(alpha = 0.6f) else InstrumentBorder,
+                            if (flight.isFavorite) RadarCyan.copy(alpha = 0.6f) else InstrumentBorder,
                             RoundedCornerShape(14.dp)
                         )
-                        .clickable { viewModel.toggleTrackFlight(flight) }
-                        .testTag("flight_detail_tracking_card"),
-                    color = if (flight.isTracked) RadarCyan.copy(alpha = 0.12f) else InstrumentSurface
+                        .clickable { viewModel.toggleFavorite(flight.flightNumber) }
+                        .testTag("flight_detail_watchlist_card"),
+                    color = if (flight.isFavorite) RadarCyan.copy(alpha = 0.12f) else InstrumentSurface
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -465,26 +453,26 @@ fun FlightDetailScreen(
                                 modifier = Modifier
                                     .size(34.dp)
                                     .clip(CircleShape)
-                                    .background(if (flight.isTracked) RadarCyan.copy(alpha = 0.2f) else CockpitDark)
-                                    .border(1.dp, if (flight.isTracked) RadarCyan else InstrumentBorder, CircleShape),
+                                    .background(if (flight.isFavorite) RadarCyan.copy(alpha = 0.2f) else CockpitDark)
+                                    .border(1.dp, if (flight.isFavorite) RadarCyan else InstrumentBorder, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (flight.isTracked) Icons.Default.Storage else Icons.Default.BookmarkBorder,
+                                    imageVector = if (flight.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     contentDescription = null,
-                                    tint = if (flight.isTracked) RadarCyan else TextMuted,
+                                    tint = if (flight.isFavorite) RadarCyan else TextMuted,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
                             Column {
                                 Text(
-                                    text = if (flight.isTracked) "Saved to Local Room DB" else "Track in Local Room DB",
-                                    color = if (flight.isTracked) RadarCyan else TextWhite,
+                                    text = if (flight.isFavorite) "Saved to Watchlist" else "Add to Watchlist",
+                                    color = if (flight.isFavorite) RadarCyan else TextWhite,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = if (flight.isTracked) "Offline-cached with SQLite push tracking" else "Persist to device Room database for offline monitoring",
+                                    text = if (flight.isFavorite) "Offline-cached with live status alerts" else "Save this flight for offline monitoring and alerts",
                                     color = TextMuted,
                                     fontSize = 11.sp
                                 )
@@ -492,15 +480,15 @@ fun FlightDetailScreen(
                         }
 
                         Switch(
-                            checked = flight.isTracked,
-                            onCheckedChange = { viewModel.toggleTrackFlight(flight) },
+                            checked = flight.isFavorite,
+                            onCheckedChange = { viewModel.toggleFavorite(flight.flightNumber) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = DeepSpace,
                                 checkedTrackColor = RadarCyan,
                                 uncheckedThumbColor = TextMuted,
                                 uncheckedTrackColor = InstrumentBorder
                             ),
-                            modifier = Modifier.testTag("flight_detail_track_switch")
+                            modifier = Modifier.testTag("flight_detail_watchlist_switch")
                         )
                     }
                 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Fullscreen, LocateFixed, Minimize2, Radar as RadarIcon } from "lucide-react";
+import { Fullscreen, LocateFixed, MapPinned, Minimize2 } from "lucide-react";
 import type { Flight } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { FlightMap } from "./flight-map";
 
-export function RadarMap({
+export function FlightMapPreview({
   flight,
   className,
   isExpanded = false,
@@ -24,7 +24,7 @@ export function RadarMap({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border border-line bg-[#CBE7F9]",
+        "relative overflow-hidden rounded-xl border border-line bg-surface",
         className,
       )}
     >
@@ -54,15 +54,19 @@ export function RadarMap({
               aria-label={isExpanded ? "Collapse map" : "Expand map"}
               title={isExpanded ? "Collapse map" : "Expand map"}
             >
-              {isExpanded ? <Minimize2 className="size-3.5" /> : <Fullscreen className="size-3.5" />}
+              {isExpanded ? (
+                <Minimize2 className="size-3.5" />
+              ) : (
+                <Fullscreen className="size-3.5" />
+              )}
             </button>
           )}
         </div>
       )}
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-md border border-line/60 bg-surface/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted shadow-sm backdrop-blur">
-        <RadarIcon className="size-3 text-accent" />
-        Live OSM radar
+        <MapPinned className="size-3 text-accent" />
+        Live flight map
       </div>
     </div>
   );

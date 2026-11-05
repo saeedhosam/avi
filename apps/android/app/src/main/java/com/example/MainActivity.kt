@@ -85,8 +85,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class NavigationScreen(val label: String, val icon: ImageVector, val tag: String) {
-    SEARCH("Search", Icons.Default.Search, "nav_search"),
-    RADAR("Radar", Icons.Default.Radar, "nav_radar"),
+    SEARCH("Search", Icons.Default.Search, "nav_search"),
     CONNECTIONS("Routes", Icons.Default.Hub, "nav_connections"),
     BOARDS("Airports", Icons.Default.FlightTakeoff, "nav_boards"),
     TERMINALS("Terminals", Icons.Default.Layers, "nav_terminals"),
@@ -115,7 +114,7 @@ fun SkyTrackApp(
     val scheduledAlerts by viewModel.scheduledNotifications.collectAsState()
     val unreadAlerts by viewModel.unreadAlertCount.collectAsState()
     val userAccount by viewModel.userAccount.collectAsState()
-    val favorites by viewModel.favoriteFlights.collectAsState()
+    val favorites by viewModel.watchlistFlights.collectAsState()
     val allFlights by viewModel.flights.collectAsState()
 
     // Request POST_NOTIFICATIONS permission for Android 13+ (API 33+)
@@ -272,13 +271,6 @@ fun SkyTrackApp(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                    NavigationScreen.RADAR -> {
-                        LiveRadarScreen(
-                            viewModel = viewModel,
-                            onFlightSelected = { selectedDetailFlight = it },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
                     NavigationScreen.CONNECTIONS -> {
                         ConnectionsScreen(
                             connectionsViewModel = connectionsViewModel,
@@ -363,3 +355,5 @@ fun SkyTrackApp(
         )
     }
 }
+
+

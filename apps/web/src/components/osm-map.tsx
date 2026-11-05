@@ -11,9 +11,11 @@ import {
   ensureLayer,
   lineFeature,
   pointFeature,
+  setBaseSymbolLayersVisible,
   setGeoJson,
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
+import { useApp } from "@/lib/store";
 import { FlightMap } from "./flight-map";
 
 export function OsmRouteMap({
@@ -31,7 +33,8 @@ export function OsmRouteMap({
   onSelectAirport: (iata: string) => void;
   className?: string;
 }) {
-  const { containerRef, map } = useMapLibre({
+  const { resolvedTheme } = useApp();
+  const { containerRef, map } = useMapLibre(resolvedTheme, {
     center: [10, 22],
     zoom: 2,
     minZoom: 1.4,
@@ -39,6 +42,10 @@ export function OsmRouteMap({
   });
   const lastFitRef = useRef("");
   const clickHandlerRef = useRef<((event: MapLayerMouseEvent) => void) | null>(null);
+
+  useEffect(() => {
+    lastFitRef.current = "";
+  }, [map]);
 
   useEffect(() => {
     if (!map) return;
@@ -135,6 +142,8 @@ export function OsmRouteMap({
         "text-halo-width": 2,
       },
     });
+
+    setBaseSymbolLayersVisible(map, !origin && !selected && !selectedRoute);
 
     if (clickHandlerRef.current) {
       map.off("click", "avi-route-airport-circles", clickHandlerRef.current);

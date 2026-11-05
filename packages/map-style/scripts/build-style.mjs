@@ -6,7 +6,7 @@ const source = JSON.parse(
   readFileSync(resolve(root, "positron.source.json"), "utf8"),
 );
 
-const palette = {
+const lightPalette = {
   background: "#F2F3F5",
   water: "#CBE7F9",
   waterway: "#A5D8F3",
@@ -16,51 +16,148 @@ const palette = {
   building: "#E8ECF1",
   label: "#334155",
   labelHalo: "#FFFFFF",
+  road: "#FFFFFF",
+  roadCasing: "#D5D5D5",
+  rail: "#DDDDDD",
 };
 
-const overrides = {
-  background: { "background-color": palette.background },
-  park: { "fill-color": palette.park },
-  water: { "fill-color": palette.water },
-  waterway: { "line-color": palette.waterway },
-  landuse_residential: { "fill-color": palette.residential },
-  building: { "fill-color": palette.building, "fill-outline-color": palette.boundary },
-  boundary_2: { "line-color": palette.boundary },
-  boundary_3: { "line-color": palette.boundary },
-  boundary_disputed: { "line-color": palette.boundary },
-  airport: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_other: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_village: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_town: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_state: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_city: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_city_capital: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_country_1: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_country_2: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
-  label_country_3: { "text-color": palette.label, "text-halo-color": palette.labelHalo },
+const darkPalette = {
+  background: "#0B1A2A",
+  water: "#07131F",
+  waterway: "#123A55",
+  boundary: "#1E3A55",
+  park: "#0E2233",
+  residential: "#10283B",
+  building: "#13283E",
+  label: "#8AA0B8",
+  labelHalo: "#071018",
+  road: "#1B334C",
+  roadCasing: "#12283A",
+  rail: "#1E3A55",
 };
 
-for (const layer of source.layers) {
-  const override = overrides[layer.id];
-  if (override) {
-    layer.paint = { ...(layer.paint ?? {}), ...override };
+function buildVariant(name, palette, extra = {}) {
+  const style = structuredClone(source);
+  style.name = name;
+
+  const overrides = {
+    background: { "background-color": palette.background },
+    park: { "fill-color": palette.park },
+    water: { "fill-color": palette.water },
+    waterway: { "line-color": palette.waterway },
+    landuse_residential: { "fill-color": palette.residential },
+    landcover_wood: { "fill-color": palette.park },
+    landcover_ice_shelf: { "fill-color": palette.building },
+    landcover_glacier: { "fill-color": palette.building },
+    building: {
+      "fill-color": palette.building,
+      "fill-outline-color": palette.boundary,
+    },
+    boundary_2: { "line-color": palette.boundary },
+    boundary_3: { "line-color": palette.boundary },
+    boundary_disputed: { "line-color": palette.boundary },
+    airport: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_other: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_village: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_town: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_state: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_city: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_city_capital: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_country_1: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_country_2: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    label_country_3: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    waterway_line_label: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    water_name_point_label: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    water_name_line_label: {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    highway_path: { "line-color": palette.road },
+    highway_minor: { "line-color": palette.road },
+    highway_major_casing: { "line-color": palette.roadCasing },
+    highway_major_inner: { "line-color": palette.road },
+    highway_motorway_casing: { "line-color": palette.roadCasing },
+    highway_motorway_inner: { "line-color": palette.road },
+    highway_motorway_bridge_casing: { "line-color": palette.roadCasing },
+    highway_motorway_bridge_inner: { "line-color": palette.road },
+    tunnel_motorway_casing: { "line-color": palette.roadCasing },
+    tunnel_motorway_inner: { "line-color": palette.road },
+    railway: { "line-color": palette.rail },
+    railway_service: { "line-color": palette.rail },
+    railway_transit: { "line-color": palette.rail },
+    road_pier: { "line-color": palette.background },
+    road_area_pier: { "fill-color": palette.background },
+    ...extra,
+  };
+
+  for (const layer of style.layers) {
+    const override = overrides[layer.id];
+    if (override) {
+      layer.paint = { ...(layer.paint ?? {}), ...override };
+    }
   }
+
+  style.metadata = {
+    ...(style.metadata ?? {}),
+    "avi:palette": palette,
+  };
+
+  if (style.sources?.openmaptiles) {
+    style.sources.openmaptiles.attribution =
+      "© OpenMapTiles © OpenStreetMap contributors";
+  }
+  if (style.sources?.ne2_shaded) {
+    style.sources.ne2_shaded.attribution =
+      "Natural Earth © OpenStreetMap contributors";
+  }
+
+  return style;
 }
 
-source.name = "Avi Positron";
-source.metadata = {
-  ...(source.metadata ?? {}),
-  "avi:palette": palette,
-};
+const light = buildVariant("Avi Positron Light", lightPalette);
+const dark = buildVariant("Avi Positron Dark", darkPalette, {
+  "aeroway-area": { "fill-color": "#1E3A55" },
+});
 
-if (source.sources?.openmaptiles) {
-  source.sources.openmaptiles.attribution =
-    "© OpenMapTiles © OpenStreetMap contributors";
-}
-if (source.sources?.ne2_shaded) {
-  source.sources.ne2_shaded.attribution =
-    "Natural Earth © OpenStreetMap contributors";
-}
-
-writeFileSync(resolve(root, "style.json"), `${JSON.stringify(source, null, 2)}\n`);
-console.log(`map style written: ${source.layers.length} layers`);
+writeFileSync(resolve(root, "style.json"), `${JSON.stringify(light, null, 2)}\n`);
+writeFileSync(
+  resolve(root, "style-dark.json"),
+  `${JSON.stringify(dark, null, 2)}\n`,
+);
+console.log(`map styles written: ${light.layers.length} layers each`);

@@ -43,7 +43,7 @@ class SupabaseUserRepository {
         Unit
     }
 
-    suspend fun saveTrackedFlight(
+    suspend fun saveWatchlistItem(
         flight: CloudTrackedFlight,
         snapshot: JsonObject? = null
     ): Result<String> = runCatching {
@@ -51,8 +51,8 @@ class SupabaseUserRepository {
         val flightId = flight.id.ifBlank {
             flight.flightNumber.replace(" ", "").uppercase()
         }
-        SupabaseClientProvider.client.from("tracked_flights").upsert(
-            TrackedFlightUpsert(
+        SupabaseClientProvider.client.from("watchlist_items").upsert(
+            WatchlistItemUpsert(
                 userId = uid,
                 flightId = flightId,
                 flightNumber = flight.flightNumber.take(20),
@@ -60,8 +60,7 @@ class SupabaseUserRepository {
                 originCode = flight.originCode.take(10),
                 destCode = flight.destCode.take(10),
                 status = flight.status.take(30),
-                customNotes = flight.customNotes.take(500),
-                isFavorite = flight.isFavorite,
+                notes = flight.customNotes.take(500),
                 snapshot = snapshot
             )
         ) {
@@ -70,9 +69,9 @@ class SupabaseUserRepository {
         flightId
     }
 
-    suspend fun deleteTrackedFlight(flightId: String): Result<Unit> = runCatching {
+    suspend fun deleteWatchlistItem(flightId: String): Result<Unit> = runCatching {
         val uid = requireUserId()
-        SupabaseClientProvider.client.from("tracked_flights").delete {
+        SupabaseClientProvider.client.from("watchlist_items").delete {
             filter {
                 eq("user_id", uid)
                 eq("flight_id", flightId)
@@ -81,13 +80,13 @@ class SupabaseUserRepository {
         Unit
     }
 
-    suspend fun fetchTrackedFlights(): Result<List<TrackedFlightRow>> = runCatching {
+    suspend fun fetchWatchlistItems(): Result<List<WatchlistItemRow>> = runCatching {
         val uid = requireUserId()
-        SupabaseClientProvider.client.from("tracked_flights")
+        SupabaseClientProvider.client.from("watchlist_items")
             .select {
                 filter { eq("user_id", uid) }
             }
-            .decodeList<TrackedFlightRow>()
+            .decodeList<WatchlistItemRow>()
     }
 
     suspend fun saveAlert(alert: CloudAlert): Result<String> = runCatching {
@@ -160,3 +159,4 @@ class SupabaseUserRepository {
         SupabaseClientProvider.auth.signOut()
     }
 }
+

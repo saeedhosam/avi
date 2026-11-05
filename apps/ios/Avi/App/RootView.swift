@@ -15,12 +15,6 @@ struct RootView: View {
             .tabItem { Label("Search", systemImage: "magnifyingglass") }
 
             NavigationStack {
-                RadarPreviewScreen()
-                    .navigationTitle("Live Radar")
-            }
-            .tabItem { Label("Radar", systemImage: "radar") }
-
-            NavigationStack {
                 PlaceholderScreen(
                     title: "Routes",
                     subtitle: "Global direct connections, hub filters, and route arcs.",
@@ -56,7 +50,7 @@ struct RootView: View {
             NavigationStack {
                 PlaceholderScreen(
                     title: "Watchlist",
-                    subtitle: "Tracked flights, favourites, notes, and cross-device alerts.",
+                    subtitle: "Saved flights, notes, and cross-device alerts.",
                     systemImage: "star",
                     accent: AviTheme.indoorLounge
                 )

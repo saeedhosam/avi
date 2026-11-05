@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Edit3,
   Expand,
-  Heart,
   Layers,
   Map as MapIcon,
   MapPin,
@@ -26,7 +25,7 @@ import { useApp } from "@/lib/store";
 import { fetchDestinationForecast } from "@/lib/weather";
 import type { DestinationArrivalForecast, Flight } from "@/lib/types";
 import { STATUS_META, cn } from "@/lib/utils";
-import { RadarMap } from "@/components/radar-map";
+import { FlightMapPreview } from "@/components/flight-map-preview";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { DestinationWeatherCard, AirportWeatherCard } from "@/components/weather-cards";
 import {
@@ -47,8 +46,7 @@ export default function FlightDetailPage() {
   const router = useRouter();
   const {
     flights,
-    toggleFavorite,
-    toggleTrack,
+    toggleWatchlist,
     updateNotes,
     upsertFlights,
     aeroConfigured,
@@ -206,15 +204,15 @@ export default function FlightDetailPage() {
           />
           <ActionButton
             icon={
-              flight.isTracked ? (
+              flight.isWatchlisted ? (
                 <BookmarkCheck className="size-3.5" />
               ) : (
                 <Bookmark className="size-3.5" />
               )
             }
-            label={flight.isTracked ? "Tracked" : "Track"}
-            active={flight.isTracked}
-            onClick={() => toggleTrack(flight)}
+            label={flight.isWatchlisted ? "Watchlisted" : "Watchlist"}
+            active={flight.isWatchlisted}
+            onClick={() => toggleWatchlist(flight)}
           />
           <ActionButton
             icon={<Radio className={cn("size-3.5", syncing && "animate-pulse")} />}
@@ -226,20 +224,7 @@ export default function FlightDetailPage() {
               <MapIcon className="size-3.5" /> Live map
             </Button>
           </Link>
-          <button
-            onClick={() => toggleFavorite(flight.flightNumber)}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2 transition-colors hover:border-[#FF4081]/50"
-            aria-label="Toggle favorite"
-          >
-            <Heart
-              className={cn(
-                "size-3.5",
-                flight.isFavorite
-                  ? "fill-[#FF4081] text-[#FF4081]"
-                  : "text-muted",
-              )}
-            />
-          </button>
+
         </div>
       </div>
 
@@ -392,7 +377,7 @@ export default function FlightDetailPage() {
               mapExpanded ? "h-[420px]" : "h-[300px]",
             )}
           >
-            <RadarMap
+            <FlightMapPreview
               flight={flight}
               className="h-full"
               isExpanded={mapExpanded}
@@ -421,28 +406,30 @@ export default function FlightDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-ink">
-                  {flight.isTracked ? "Saved to local tracking" : "Track this flight"}
+                  {flight.isWatchlisted
+                    ? "Saved to your watchlist"
+                    : "Add this flight to your watchlist"}
                 </p>
                 <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
-                  {flight.isTracked
-                    ? "Offline-cached with push alerts for gate, delay, boarding, and baggage."
+                  {flight.isWatchlisted
+                    ? "Offline-cached with alerts for gate, delay, boarding, and baggage."
                     : "Persist to the local cache for offline monitoring and alerts."}
                 </p>
               </div>
               <button
-                onClick={() => toggleTrack(flight)}
+                onClick={() => toggleWatchlist(flight)}
                 className={cn(
                   "relative h-6 w-11 shrink-0 rounded-full border transition-colors",
-                  flight.isTracked
+                  flight.isWatchlisted
                     ? "border-accent bg-accent/30"
                     : "border-line bg-surface-3",
                 )}
-                aria-label="Toggle tracking"
+                aria-label="Toggle watchlist"
               >
                 <span
                   className={cn(
                     "absolute top-0.5 size-4.5 rounded-full transition-all",
-                    flight.isTracked ? "left-[22px] bg-accent" : "left-0.5 bg-muted",
+                    flight.isWatchlisted ? "left-[22px] bg-accent" : "left-0.5 bg-muted",
                   )}
                 />
               </button>

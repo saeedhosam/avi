@@ -25,7 +25,7 @@ data class ProfileUpsert(
 )
 
 @Serializable
-data class TrackedFlightRow(
+data class WatchlistItemRow(
     @SerialName("user_id") val userId: String,
     @SerialName("flight_id") val flightId: String,
     @SerialName("flight_number") val flightNumber: String,
@@ -33,13 +33,12 @@ data class TrackedFlightRow(
     @SerialName("origin_code") val originCode: String = "",
     @SerialName("dest_code") val destCode: String = "",
     @SerialName("status") val status: String = "",
-    @SerialName("custom_notes") val customNotes: String = "",
-    @SerialName("is_favorite") val isFavorite: Boolean = false,
+    @SerialName("notes") val notes: String = "",
     @SerialName("snapshot") val snapshot: JsonObject? = null
 )
 
 @Serializable
-data class TrackedFlightUpsert(
+data class WatchlistItemUpsert(
     @SerialName("user_id") val userId: String,
     @SerialName("flight_id") val flightId: String,
     @SerialName("flight_number") val flightNumber: String,
@@ -47,8 +46,7 @@ data class TrackedFlightUpsert(
     @SerialName("origin_code") val originCode: String,
     @SerialName("dest_code") val destCode: String,
     @SerialName("status") val status: String,
-    @SerialName("custom_notes") val customNotes: String = "",
-    @SerialName("is_favorite") val isFavorite: Boolean = false,
+    @SerialName("notes") val notes: String = "",
     @SerialName("snapshot") val snapshot: JsonObject? = null
 )
 
@@ -163,3 +161,4 @@ data class CloudFlightSnapshot(
     val isTracked: Boolean = true,
     val customNotes: String = ""
 )
+

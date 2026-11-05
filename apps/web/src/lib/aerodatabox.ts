@@ -404,8 +404,7 @@ export function mapAeroFlight(
     baggageCarousel: carousel(arr?.baggageBelt),
     aircraft,
     telemetry: buildTelemetry(origin, destination, status, dto),
-    isFavorite: false,
-    isTracked: false,
+    isWatchlisted: false,
     customNotes: "",
   };
 

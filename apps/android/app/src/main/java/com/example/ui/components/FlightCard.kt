@@ -31,7 +31,6 @@ fun FlightCard(
     flight: Flight,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onToggleTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -98,40 +97,6 @@ fun FlightCard(
                 ) {
                     StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
 
-                    if (onToggleTrack != null) {
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(
-                                    1.dp,
-                                    if (flight.isTracked) RadarCyan else InstrumentBorder,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable { onToggleTrack() }
-                                .testTag("track_btn_${flight.id}"),
-                            color = if (flight.isTracked) RadarCyan.copy(alpha = 0.2f) else InstrumentSurface
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (flight.isTracked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = if (flight.isTracked) "Tracking in Room" else "Save to Room",
-                                    tint = if (flight.isTracked) RadarCyan else TextMuted,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = if (flight.isTracked) "Tracked" else "Track",
-                                    fontSize = 11.sp,
-                                    color = if (flight.isTracked) RadarCyan else TextMuted,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
                     IconButton(
                         onClick = onToggleFavorite,
                         modifier = Modifier
@@ -139,9 +104,9 @@ fun FlightCard(
                             .testTag("favorite_btn_${flight.id}")
                     ) {
                         Icon(
-                            imageVector = if (flight.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (flight.isFavorite) "Remove from favorites" else "Add to favorites",
-                            tint = if (flight.isFavorite) Color(0xFFFF4081) else TextMuted
+                            imageVector = if (flight.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = if (flight.isFavorite) "Remove from watchlist" else "Add to watchlist",
+                            tint = if (flight.isFavorite) RadarCyan else TextMuted
                         )
                     }
                 }
@@ -305,7 +270,7 @@ fun FlightCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Destination Arrival Weather Planning Banner for Tracked Flights
-            if (flight.isTracked || flight.isFavorite) {
+            if (flight.isFavorite) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -32,7 +32,7 @@ fun FavoritesScreen(
     onFlightSelected: (Flight) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val favorites by viewModel.favoriteFlights.collectAsState()
+    val favorites by viewModel.watchlistFlights.collectAsState()
     var flightToShare by remember { mutableStateOf<Flight?>(null) }
 
     Scaffold(
@@ -43,7 +43,7 @@ fun FavoritesScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Saved Flight Watchlist",
+                            text = "Watchlist",
                             color = TextWhite,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
@@ -51,7 +51,7 @@ fun FavoritesScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${favorites.size} Active Watchlists · Offline Cached",
+                            text = "${favorites.size} Active Watchlists Â· Offline Cached",
                             color = RadarCyan,
                             fontSize = 11.sp,
                             maxLines = 1,
@@ -73,8 +73,8 @@ fun FavoritesScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
-                        contentDescription = "No Favorites",
+                        imageVector = Icons.Default.BookmarkBorder,
+                        contentDescription = "No watchlisted flights",
                         tint = TextSubtle,
                         modifier = Modifier.size(64.dp)
                     )
@@ -123,7 +123,7 @@ fun FavoritesScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
-                                text = "Live Alerts Active · Gate, Delay & Boarding Push Enabled",
+                                text = "Live Alerts Active Â· Gate, Delay & Boarding Push Enabled",
                                 color = TextWhite,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -140,8 +140,7 @@ fun FavoritesScreen(
                         FlightCard(
                             flight = flight,
                             onClick = { onFlightSelected(flight) },
-                            onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) },
-                            onToggleTrack = { viewModel.toggleTrackFlight(flight) }
+                            onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) }
                         )
 
                         // Scrollable single-line quick trigger simulation bar under each favorite card
@@ -210,3 +209,4 @@ fun FavoritesScreen(
         )
     }
 }
+

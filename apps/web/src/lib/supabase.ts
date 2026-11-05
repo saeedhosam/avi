@@ -117,14 +117,14 @@ export async function saveUserProfile(account: UserAccount, uid: string) {
   }
 }
 
-export async function saveTrackedFlightCloud(
+export async function saveWatchlistItemCloud(
   uid: string,
   flight: Flight,
 ) {
   const supabase = getSupabase();
   if (!supabase) return;
   try {
-    await supabase.from("tracked_flights").upsert(
+    await supabase.from("watchlist_items").upsert(
       {
         user_id: uid,
         flight_id: flight.id,
@@ -133,29 +133,28 @@ export async function saveTrackedFlightCloud(
         origin_code: flight.origin.code,
         dest_code: flight.destination.code,
         status: flight.status,
-        custom_notes: (flight.customNotes ?? "").slice(0, 500),
-        is_favorite: flight.isFavorite,
+        notes: (flight.customNotes ?? "").slice(0, 500),
         snapshot: flight as unknown as Json,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,flight_id" },
     );
   } catch (error) {
-    console.warn("Supabase tracked flight sync failed", error);
+    console.warn("Supabase watchlist sync failed", error);
   }
 }
 
-export async function deleteTrackedFlightCloud(uid: string, flightId: string) {
+export async function deleteWatchlistItemCloud(uid: string, flightId: string) {
   const supabase = getSupabase();
   if (!supabase) return;
   try {
     await supabase
-      .from("tracked_flights")
+      .from("watchlist_items")
       .delete()
       .eq("user_id", uid)
       .eq("flight_id", flightId);
   } catch (error) {
-    console.warn("Supabase tracked flight delete failed", error);
+    console.warn("Supabase watchlist delete failed", error);
   }
 }
 
@@ -227,7 +226,7 @@ export async function fetchCloudWatchlist(uid: string) {
   if (!supabase) return [];
   try {
     const { data, error } = await supabase
-      .from("tracked_flights")
+      .from("watchlist_items")
       .select("*")
       .eq("user_id", uid);
     if (error) throw error;
@@ -238,8 +237,8 @@ export async function fetchCloudWatchlist(uid: string) {
       originCode: record.origin_code,
       destCode: record.dest_code,
       status: record.status,
-      customNotes: record.custom_notes,
-      isFavorite: record.is_favorite,
+      customNotes: record.notes,
+      isWatchlisted: true,
       snapshot: record.snapshot,
     }));
   } catch (error) {
@@ -265,7 +264,7 @@ export function subscribeToUserData(
       {
         event: "*",
         schema: "public",
-        table: "tracked_flights",
+        table: "watchlist_items",
         filter: `user_id=eq.${uid}`,
       },
       () => handlers.onTrackedFlights(),

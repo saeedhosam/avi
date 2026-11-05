@@ -2,20 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { createBaseMap } from "./maplibre";
+import { createBaseMap, type MapTheme } from "./maplibre";
 
-export function useMapLibre(options: {
-  center?: [number, number];
-  zoom?: number;
-  minZoom?: number;
-  maxZoom?: number;
-} = {}) {
+export function useMapLibre(
+  theme: MapTheme = "light",
+  options: {
+    center?: [number, number];
+    zoom?: number;
+    minZoom?: number;
+    maxZoom?: number;
+  } = {},
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const instance = createBaseMap(containerRef.current, options);
+    const instance = createBaseMap(containerRef.current, options, theme);
     let disposed = false;
 
     const handleLoad = () => {
@@ -35,9 +38,9 @@ export function useMapLibre(options: {
       instance.remove();
       setMap(null);
     };
-    // The map is intentionally created once; callers update sources imperatively.
+    // Recreate on theme change; callers update sources imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [theme]);
 
   return { containerRef, map };
 }

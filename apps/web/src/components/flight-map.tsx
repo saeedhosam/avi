@@ -21,6 +21,7 @@ import {
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/lib/store";
 
 export function FlightMap({
   flight,
@@ -33,13 +34,18 @@ export function FlightMap({
   showAttribution?: boolean;
   recenterSignal?: number;
 }) {
-  const { containerRef, map } = useMapLibre({
+  const { resolvedTheme } = useApp();
+  const { containerRef, map } = useMapLibre(resolvedTheme, {
     center: [10, 24],
     zoom: 2.4,
     minZoom: 1.4,
     maxZoom: 9,
   });
   const lastFitRef = useRef<string>("");
+
+  useEffect(() => {
+    lastFitRef.current = "";
+  }, [map]);
 
   useEffect(() => {
     if (!map) return;
@@ -238,7 +244,7 @@ export function FlightMap({
     <div className={cn("relative h-full w-full overflow-hidden", className)}>
       <div ref={containerRef} className="h-full w-full" />
       {showAttribution && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-slate-300/70 bg-white/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600 shadow-sm backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-line/70 bg-surface/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted shadow-sm backdrop-blur">
           OSM · Positron
         </div>
       )}
