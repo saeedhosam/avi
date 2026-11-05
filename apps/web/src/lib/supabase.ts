@@ -196,6 +196,32 @@ export async function markAlertReadCloud(uid: string, alertId: string) {
   }
 }
 
+export async function fetchCloudAlerts(uid: string): Promise<FlightAlert[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("flight_alerts")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return (data ?? []).map((record) => ({
+      id: record.id,
+      flightNumber: record.flight_number,
+      type: record.alert_type as FlightAlert["type"],
+      title: record.title,
+      message: record.message,
+      timestamp: record.created_at,
+      isRead: record.is_read,
+    }));
+  } catch (error) {
+    console.warn("Supabase alerts fetch failed", error);
+    return [];
+  }
+}
+
 export async function fetchCloudWatchlist(uid: string) {
   const supabase = getSupabase();
   if (!supabase) return [];
@@ -220,6 +246,45 @@ export async function fetchCloudWatchlist(uid: string) {
     console.warn("Supabase watchlist fetch failed", error);
     return [];
   }
+}
+
+export function subscribeToUserData(
+  uid: string,
+  handlers: {
+    onTrackedFlights: () => void;
+    onAlerts: () => void;
+  },
+) {
+  const supabase = getSupabase();
+  if (!supabase) return () => {};
+
+  const channel = supabase
+    .channel(`avi-user-${uid}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "tracked_flights",
+        filter: `user_id=eq.${uid}`,
+      },
+      () => handlers.onTrackedFlights(),
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "flight_alerts",
+        filter: `user_id=eq.${uid}`,
+      },
+      () => handlers.onAlerts(),
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }
 
 // Web Push is implemented in the next phase; keep the current UI contract stable.

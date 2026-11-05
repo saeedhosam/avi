@@ -331,7 +331,7 @@ fun OAuthLoginDialog(
                     }
                 }
 
-                // Google Sign-In & Firestore Persistence Section
+                // Google Sign-In & Supabase sync section
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = InstrumentSurface,
@@ -371,7 +371,7 @@ fun OAuthLoginDialog(
                         }
                         Text(
                             text = if (account.isSignedIn) {
-                                "Watchlists, flight notes, and alerts are synced to Cloud Firestore."
+                                "Watchlists, flight notes, and alerts are synced to Supabase."
                             } else {
                                 "Sign in with Google to back up watchlists and flight notes across devices."
                             },

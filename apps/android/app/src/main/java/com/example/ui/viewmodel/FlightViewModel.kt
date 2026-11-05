@@ -309,7 +309,7 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
                         flightNumber = "ACCOUNT",
                         type = AlertType.BOARDING,
                         title = "Google Sign-In Connected",
-                        message = "Welcome aboard, $userName. Your tracked flights and alerts are now backed by Firebase Firestore.",
+                        message = "Welcome aboard, $userName. Your tracked flights and alerts are now backed by Supabase.",
                         timestamp = "Just now",
                         isRead = false
                     ),
@@ -331,7 +331,7 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
                     flightNumber = "ACCOUNT",
                     type = AlertType.BOARDING,
                     title = "OAuth Login Prompt",
-                    message = "Please tap 'Sign in with Google' to authenticate with Firebase Auth & Firestore.",
+                    message = "Please tap 'Sign in with Google' to authenticate with Supabase.",
                     timestamp = "Just now",
                     isRead = false
                 ),
@@ -341,7 +341,9 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun signOut() {
-        com.example.util.GoogleAuthManager.signOut()
+        viewModelScope.launch {
+            com.example.util.GoogleAuthManager.signOut()
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {

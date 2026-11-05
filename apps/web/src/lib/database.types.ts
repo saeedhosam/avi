@@ -140,33 +140,6 @@ export type Database = {
         }
         Relationships: []
       }
-      legacy_imports: {
-        Row: {
-          alerts: Json
-          claimed_at: string | null
-          created_at: string
-          email: string
-          profile: Json
-          tracked_flights: Json
-        }
-        Insert: {
-          alerts?: Json
-          claimed_at?: string | null
-          created_at?: string
-          email: string
-          profile?: Json
-          tracked_flights?: Json
-        }
-        Update: {
-          alerts?: Json
-          claimed_at?: string | null
-          created_at?: string
-          email?: string
-          profile?: Json
-          tracked_flights?: Json
-        }
-        Relationships: []
-      }
       osm_ingest_runs: {
         Row: {
           error: string | null
@@ -334,7 +307,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_legacy_data: { Args: never; Returns: undefined }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SkyTrack</string>
+    <string name="app_name">Avi</string>
     <string name="nav_connections">Routes</string>
     <string name="connections_title">Flight Connections</string>
     <string name="connections_direct_routes_badge">DIRECT ROUTES</string>

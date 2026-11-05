@@ -1,11 +1,12 @@
-package com.example.data
+﻿package com.example.data
 
 import android.content.Context
 import android.util.Log
-import com.example.data.firestore.FirestoreAlert
-import com.example.data.firestore.FirestoreRepository
-import com.example.data.firestore.FirestoreTrackedFlight
-import com.example.data.firestore.FirestoreUserProfile
+import com.example.data.cloud.CloudAlert
+import com.example.data.cloud.CloudTrackedFlight
+import com.example.data.cloud.CloudUserProfile
+import com.example.data.cloud.toCloudSnapshot
+import com.example.data.cloud.toJsonObject
 import com.example.data.local.*
 import com.example.data.remote.ApiConfig
 import com.example.data.remote.DataSourceMode
@@ -13,17 +14,24 @@ import com.example.data.remote.aerodatabox.AeroDataBoxMapper
 import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
 import com.example.data.remote.aerodatabox.FlightStateDiffer
 import com.example.model.*
+import com.example.data.supabase.CloudFlightSnapshot
+import com.example.data.supabase.SupabaseClientProvider
+import com.example.data.supabase.SupabaseUserRepository
 import com.example.notifications.FlightNotificationManager
 import com.example.notifications.FlightNotificationScheduler
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.messaging.FirebaseMessaging
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -38,8 +46,7 @@ class FlightRepository(private val context: Context) {
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
     val scheduler = FlightNotificationScheduler(context)
     val weatherService = com.example.data.weather.DestinationWeatherService(context)
-    val firestoreRepository = FirestoreRepository.getInstance(context)
-    val auth = FirebaseAuth.getInstance()
+    val cloudRepository = SupabaseUserRepository()
 
     private val _flights = MutableStateFlow<List<Flight>>(MockFlightData.initialFlights)
     val flights: StateFlow<List<Flight>> = _flights.asStateFlow()
@@ -73,7 +80,6 @@ class FlightRepository(private val context: Context) {
 
     init {
         FlightNotificationManager.createNotificationChannel(context)
-        initFcmToken()
 
         com.example.sync.FlightSyncManager.scheduleConnectivitySync(context)
         com.example.sync.FlightSyncManager.schedulePeriodicSync(context)
@@ -87,7 +93,7 @@ class FlightRepository(private val context: Context) {
             observeRoomCachedFlights()
         }
 
-        setupFirebaseAuthObserver()
+        setupSupabaseAuthObserver()
 
         // Smooth geodesic interpolation for airborne flights between network polls
         repositoryScope.launch {
@@ -220,47 +226,63 @@ class FlightRepository(private val context: Context) {
         cacheAllFlights(updatedList)
     }
 
-    private fun setupFirebaseAuthObserver() {
-        auth.addAuthStateListener { firebaseAuth ->
-            val user = firebaseAuth.currentUser
-            if (user != null) {
-                val initial = (user.displayName?.firstOrNull() ?: user.email?.firstOrNull() ?: 'A').uppercaseChar().toString()
-                _userAccount.value = UserAccount(
-                    name = user.displayName ?: ("Capt. " + (user.email?.substringBefore("@") ?: "Aviator")),
-                    email = user.email ?: "pilot@aviation.aero",
-                    avatarInitial = initial,
-                    isSignedIn = true,
-                    isOfflineMode = _userAccount.value.isOfflineMode,
-                    lastSyncTime = "Cloud Sync Active (Firestore)"
-                )
-                repositoryScope.launch {
-                    firestoreRepository.saveUserProfile(
-                        FirestoreUserProfile(
-                            userId = user.uid,
-                            displayName = user.displayName ?: "Aviator",
-                            email = user.email ?: "",
-                            photoUrl = user.photoUrl?.toString() ?: ""
+    private fun setupSupabaseAuthObserver() {
+        if (!cloudRepository.isAvailable) {
+            setGuestAccount()
+            return
+        }
+
+        repositoryScope.launch {
+            SupabaseClientProvider.auth.sessionStatus.collect { status ->
+                when (status) {
+                    is SessionStatus.Authenticated -> {
+                        val user = status.session.user
+                        val metadataName = (user.userMetadata?.get("full_name") as? JsonPrimitive)?.content
+                            ?: (user.userMetadata?.get("name") as? JsonPrimitive)?.content
+                        val name = metadataName ?: ("Capt. " + (user.email?.substringBefore("@") ?: "Aviator"))
+                        _userAccount.value = UserAccount(
+                            name = name,
+                            email = user.email ?: "pilot@aviation.aero",
+                            avatarInitial = (name.firstOrNull() ?: 'A').uppercaseChar().toString(),
+                            isSignedIn = true,
+                            isOfflineMode = _userAccount.value.isOfflineMode,
+                            lastSyncTime = "Cloud Sync Active (Supabase)"
                         )
-                    )
-                    syncFavoritesWithFirestore(user.uid)
+                        cloudRepository.saveUserProfile(
+                            CloudUserProfile(
+                                id = user.id,
+                                userId = user.id,
+                                displayName = name,
+                                email = user.email ?: "",
+                                photoUrl = (user.userMetadata?.get("avatar_url") as? JsonPrimitive)?.content ?: ""
+                            )
+                        )
+                        syncFavoritesToCloud(user.id)
+                        syncCloudTrackingToLocal(user.id)
+                    }
+
+                    is SessionStatus.NotAuthenticated -> setGuestAccount()
+                    else -> Unit
                 }
-            } else {
-                _userAccount.value = UserAccount(
-                    name = "Guest Aviator",
-                    email = "Sign in with Google to sync",
-                    avatarInitial = "G",
-                    isSignedIn = false,
-                    isOfflineMode = _userAccount.value.isOfflineMode,
-                    lastSyncTime = "Local Room Cache Active"
-                )
             }
         }
     }
 
-    private suspend fun syncFavoritesWithFirestore(userId: String) {
+    private fun setGuestAccount() {
+        _userAccount.value = UserAccount(
+            name = "Guest Aviator",
+            email = "Sign in with Google to sync",
+            avatarInitial = "G",
+            isSignedIn = false,
+            isOfflineMode = _userAccount.value.isOfflineMode,
+            lastSyncTime = "Local Room Cache Active"
+        )
+    }
+
+    private suspend fun syncFavoritesToCloud(userId: String) {
         _flights.value.filter { it.isFavorite || it.isTracked }.forEach { flight ->
-            firestoreRepository.saveTrackedFlight(
-                FirestoreTrackedFlight(
+            cloudRepository.saveTrackedFlight(
+                CloudTrackedFlight(
                     id = flight.id,
                     userId = userId,
                     flightNumber = flight.flightNumber,
@@ -270,6 +292,55 @@ class FlightRepository(private val context: Context) {
                     status = flight.status.name,
                     customNotes = flight.customNotes,
                     isFavorite = flight.isFavorite
+                ),
+                snapshot = flight.toCloudSnapshot().toJsonObject()
+            )
+        }
+    }
+
+    private suspend fun syncCloudTrackingToLocal(userId: String) {
+        val remoteRows = cloudRepository.fetchTrackedFlights().getOrNull().orEmpty()
+        val remoteFlights = remoteRows.mapNotNull { row ->
+            row.snapshot?.let { snapshot ->
+                runCatching {
+                    Json.decodeFromJsonElement<CloudFlightSnapshot>(snapshot).toFlight()
+                }.getOrNull()
+            }?.copy(
+                isFavorite = row.isFavorite,
+                isTracked = true,
+                customNotes = row.customNotes
+            )
+        }
+        if (remoteFlights.isNotEmpty()) {
+            val merged = _flights.value.toMutableList()
+            remoteFlights.forEach { remote ->
+                val index = merged.indexOfFirst {
+                    it.id == remote.id || it.flightNumber.equals(remote.flightNumber, ignoreCase = true)
+                }
+                if (index >= 0) {
+                    merged[index] = merged[index].copy(
+                        isFavorite = remote.isFavorite || merged[index].isFavorite,
+                        isTracked = true,
+                        customNotes = remote.customNotes.ifBlank { merged[index].customNotes }
+                    )
+                } else {
+                    merged.add(remote)
+                }
+            }
+            _flights.value = merged
+            cacheAllFlights(remoteFlights)
+        }
+
+        cloudRepository.fetchAlerts().getOrNull().orEmpty().forEach { alert ->
+            flightDao.insertAlert(
+                FlightAlertEntity(
+                    id = alert.id,
+                    flightNumber = alert.flightNumber,
+                    type = alert.alertType,
+                    title = alert.title,
+                    message = alert.message,
+                    timestamp = alert.timestamp.ifBlank { "Recently" },
+                    isRead = alert.isRead
                 )
             )
         }
@@ -483,12 +554,12 @@ class FlightRepository(private val context: Context) {
                         customNotes = customNotes
                     )
                 )
-                val user = auth.currentUser
-                if (user != null) {
-                    firestoreRepository.saveTrackedFlight(
-                        FirestoreTrackedFlight(
+                val userId = cloudRepository.currentUserId()
+                if (userId != null) {
+                    cloudRepository.saveTrackedFlight(
+                        CloudTrackedFlight(
                             id = flight.id,
-                            userId = user.uid,
+                            userId = userId ?: "",
                             flightNumber = flight.flightNumber,
                             airline = flight.airline,
                             originCode = flight.origin.code,
@@ -514,15 +585,15 @@ class FlightRepository(private val context: Context) {
             } else {
                 unsubscribeFromFlightPush(flightNumber)
                 flightDao.removeFavorite(flightNumber)
-                val user = auth.currentUser
-                if (user != null) {
+                val userId = cloudRepository.currentUserId()
+                if (userId != null) {
                     if (!flight.isTracked) {
-                        firestoreRepository.deleteTrackedFlight(flight.id)
+                        cloudRepository.deleteTrackedFlight(flight.id)
                     } else {
-                        firestoreRepository.saveTrackedFlight(
-                            FirestoreTrackedFlight(
+                        cloudRepository.saveTrackedFlight(
+                            CloudTrackedFlight(
                                 id = flight.id,
-                                userId = user.uid,
+                                userId = userId ?: "",
                                 flightNumber = flight.flightNumber,
                                 airline = flight.airline,
                                 originCode = flight.origin.code,
@@ -551,13 +622,13 @@ class FlightRepository(private val context: Context) {
                     customNotes = notes
                 )
             )
-            val user = auth.currentUser
+            val userId = cloudRepository.currentUserId()
             val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
             if (user != null && flight != null) {
-                firestoreRepository.saveTrackedFlight(
-                    FirestoreTrackedFlight(
+                cloudRepository.saveTrackedFlight(
+                    CloudTrackedFlight(
                         id = flight.id,
-                        userId = user.uid,
+                        userId = userId ?: "",
                         flightNumber = flight.flightNumber,
                         airline = flight.airline,
                         originCode = flight.origin.code,
@@ -593,18 +664,18 @@ class FlightRepository(private val context: Context) {
                     departureTimeScheduled = flight.departureTimeScheduled,
                     arrivalTimeScheduled = flight.arrivalTimeScheduled,
                     status = flight.status.name,
-                    terminalGate = "T${flight.terminalDeparture} · ${flight.gateDeparture}",
+                    terminalGate = "T${flight.terminalDeparture} Â· ${flight.gateDeparture}",
                     trackedSinceMillis = System.currentTimeMillis(),
                     notes = customNotes,
                     isAutoAlertEnabled = true
                 )
                 flightDao.insertTrackedFlight(entity)
-                val user = auth.currentUser
-                if (user != null) {
-                    firestoreRepository.saveTrackedFlight(
-                        FirestoreTrackedFlight(
+                val userId = cloudRepository.currentUserId()
+                if (userId != null) {
+                    cloudRepository.saveTrackedFlight(
+                        CloudTrackedFlight(
                             id = flight.id,
-                            userId = user.uid,
+                            userId = userId ?: "",
                             flightNumber = flight.flightNumber,
                             airline = flight.airline,
                             originCode = flight.origin.code,
@@ -621,7 +692,7 @@ class FlightRepository(private val context: Context) {
                         flightNumber = flight.flightNumber,
                         type = AlertType.BOARDING,
                         title = "Saved to Room Tracking: ${flight.flightNumber}",
-                        message = "Flight ${flight.flightNumber} (${flight.origin.code} ➔ ${flight.destination.code}) saved to local Room database for tracking. FCM push alerts active.",
+                        message = "Flight ${flight.flightNumber} (${flight.origin.code} âž” ${flight.destination.code}) saved to local Room database for tracking. FCM push alerts active.",
                         timestamp = "Just now",
                         isRead = false
                     ),
@@ -630,15 +701,15 @@ class FlightRepository(private val context: Context) {
             } else {
                 unsubscribeFromFlightPush(flight.flightNumber)
                 flightDao.deleteTrackedFlight(flight.flightNumber)
-                val user = auth.currentUser
-                if (user != null) {
+                val userId = cloudRepository.currentUserId()
+                if (userId != null) {
                     if (!flight.isFavorite) {
-                        firestoreRepository.deleteTrackedFlight(flight.id)
+                        cloudRepository.deleteTrackedFlight(flight.id)
                     } else {
-                        firestoreRepository.saveTrackedFlight(
-                            FirestoreTrackedFlight(
+                        cloudRepository.saveTrackedFlight(
+                            CloudTrackedFlight(
                                 id = flight.id,
-                                userId = user.uid,
+                                userId = userId ?: "",
                                 flightNumber = flight.flightNumber,
                                 airline = flight.airline,
                                 originCode = flight.origin.code,
@@ -718,12 +789,12 @@ class FlightRepository(private val context: Context) {
                     isRead = alert.isRead
                 )
             )
-            val user = auth.currentUser
-            if (user != null) {
-                firestoreRepository.saveAlert(
-                    FirestoreAlert(
+            val userId = cloudRepository.currentUserId()
+            if (userId != null) {
+                cloudRepository.saveAlert(
+                    CloudAlert(
                         id = alert.id,
-                        userId = user.uid,
+                        userId = userId ?: "",
                         flightNumber = alert.flightNumber,
                         alertType = alert.type.name,
                         title = alert.title,
@@ -753,9 +824,9 @@ class FlightRepository(private val context: Context) {
         }
         repositoryScope.launch {
             flightDao.markAlertRead(alertId)
-            val user = auth.currentUser
-            if (user != null) {
-                firestoreRepository.markAlertRead(alertId)
+            val userId = cloudRepository.currentUserId()
+            if (userId != null) {
+                cloudRepository.markAlertRead(alertId)
             }
         }
     }
@@ -801,7 +872,7 @@ class FlightRepository(private val context: Context) {
                             status = FlightStatus.DELAYED,
                             delayMinutes = extraMinutes,
                             delayReason = "ATC Flow Restriction & Thunderstorms",
-                            statusNote = "Delayed $extraMinutes mins · ATC flow management"
+                            statusNote = "Delayed $extraMinutes mins Â· ATC flow management"
                         )
                     } else it
                 }
@@ -811,7 +882,7 @@ class FlightRepository(private val context: Context) {
                         status = "DELAYED",
                         delayMinutes = extraMinutes,
                         delayReason = "ATC Flow Restriction & Thunderstorms",
-                        statusNote = "Delayed $extraMinutes mins · ATC flow management"
+                        statusNote = "Delayed $extraMinutes mins Â· ATC flow management"
                     )
                 }
                 addAlert(
@@ -832,7 +903,7 @@ class FlightRepository(private val context: Context) {
                     if (it.flightNumber == flightNumber) {
                         it.copy(
                             status = FlightStatus.BOARDING,
-                            statusNote = "Boarding Group 1 & 2 · Gate ${it.gateDeparture}"
+                            statusNote = "Boarding Group 1 & 2 Â· Gate ${it.gateDeparture}"
                         )
                     } else it
                 }
@@ -840,7 +911,7 @@ class FlightRepository(private val context: Context) {
                     flightDao.updateFlightStatus(
                         flightNumber = flightNumber,
                         status = "BOARDING",
-                        statusNote = "Boarding Group 1 & 2 · Gate ${flight.gateDeparture}"
+                        statusNote = "Boarding Group 1 & 2 Â· Gate ${flight.gateDeparture}"
                     )
                 }
                 addAlert(
@@ -879,7 +950,7 @@ class FlightRepository(private val context: Context) {
                     if (it.flightNumber == flightNumber) {
                         it.copy(
                             status = FlightStatus.CANCELLED,
-                            statusNote = "Cancelled · Technical Inspection Required",
+                            statusNote = "Cancelled Â· Technical Inspection Required",
                             delayReason = "Aircraft Maintenance"
                         )
                     } else it
@@ -888,7 +959,7 @@ class FlightRepository(private val context: Context) {
                     flightDao.updateFlightStatus(
                         flightNumber = flightNumber,
                         status = "CANCELLED",
-                        statusNote = "Cancelled · Technical Inspection Required"
+                        statusNote = "Cancelled Â· Technical Inspection Required"
                     )
                 }
                 addAlert(
@@ -925,52 +996,15 @@ class FlightRepository(private val context: Context) {
         scheduler.deleteSchedule(scheduleId)
     }
 
-    private fun initFcmToken() {
-        try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val token = task.result
-                    val prefs = context.getSharedPreferences("skytrack_prefs", Context.MODE_PRIVATE)
-                    prefs.edit().putString("fcm_token", token).apply()
-                    Log.d("SkyTrackFCM", "Firebase Messaging Token registered: $token")
-                }
-            }
-        } catch (e: Exception) {
-            Log.d("SkyTrackFCM", "FCM token registration deferred: ${e.message}")
-        }
-    }
+    // Push delivery is wired in the notification phase; keep the existing UI contract.
+    fun subscribeToFlightPush(flightNumber: String) = Unit
 
-    fun subscribeToFlightPush(flightNumber: String) {
-        val topic = "flight_" + flightNumber.replace(" ", "").lowercase(Locale.ROOT)
-        try {
-            FirebaseMessaging.getInstance().subscribeToTopic(topic).addOnCompleteListener {
-                Log.d("SkyTrackFCM", "Subscribed to FCM topic: $topic")
-            }
-        } catch (e: Exception) {
-            Log.d("SkyTrackFCM", "FCM topic subscription simulated for: $topic")
-        }
-    }
+    fun unsubscribeFromFlightPush(flightNumber: String) = Unit
 
-    fun unsubscribeFromFlightPush(flightNumber: String) {
-        val topic = "flight_" + flightNumber.replace(" ", "").lowercase(Locale.ROOT)
-        try {
-            FirebaseMessaging.getInstance().unsubscribeFromTopic(topic).addOnCompleteListener {
-                Log.d("SkyTrackFCM", "Unsubscribed from FCM topic: $topic")
-            }
-        } catch (e: Exception) {
-            Log.d("SkyTrackFCM", "FCM topic unsubscription simulated for: $topic")
-        }
-    }
-
-    fun getFcmToken(): String {
-        val prefs = context.getSharedPreferences("skytrack_prefs", Context.MODE_PRIVATE)
-        var token = prefs.getString("fcm_token", null)
-        if (token == null) {
-            token = "fcm_skytrack_device_${UUID.randomUUID().toString().take(12)}"
-            prefs.edit().putString("fcm_token", token).apply()
-        }
-        return token
-    }
+    fun getFcmToken(): String =
+        context.getSharedPreferences("skytrack_prefs", Context.MODE_PRIVATE)
+            .getString("fcm_token", "")
+            .orEmpty()
 
     fun updateAccount(account: UserAccount) {
         _userAccount.value = account
@@ -1052,3 +1086,4 @@ class FlightRepository(private val context: Context) {
         com.example.sync.FlightSyncManager.enqueueImmediateSync(context)
     }
 }
+

@@ -35,15 +35,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Firebase Cloud Messaging Push Service -->
-        <service
-            android:name=".notifications.SkyTrackMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-
         <!-- Local Notification Alarm Receiver for Room Scheduled Alerts -->
         <receiver
             android:name=".notifications.FlightAlertAlarmReceiver"

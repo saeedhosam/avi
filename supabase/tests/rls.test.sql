@@ -1,6 +1,6 @@
 begin;
 
-select plan(6);
+select plan(5);
 
 -- RLS must be enabled on every user-owned table.
 select is(
@@ -31,12 +31,6 @@ select is(
   (select relrowsecurity from pg_class where oid = 'public.push_subscriptions'::regclass),
   true,
   'push_subscriptions has RLS enabled'
-);
-
-select is(
-  (select relrowsecurity from pg_class where oid = 'public.legacy_imports'::regclass),
-  true,
-  'legacy_imports has RLS enabled'
 );
 
 select * from finish();

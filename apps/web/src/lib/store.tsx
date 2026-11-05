@@ -21,6 +21,7 @@ import type { DataSourceMode } from "./data-source";
 import { normalizeFlightNumber, uid } from "./utils";
 import {
   deleteTrackedFlightCloud,
+  fetchCloudAlerts,
   fetchCloudWatchlist,
   markAlertReadCloud,
   observeSupabaseAuth,
@@ -30,6 +31,7 @@ import {
   saveUserProfile,
   signInWithGoogleSupabase,
   signOutSupabase,
+  subscribeToUserData,
   supabaseEnabled,
 } from "./supabase";
 
@@ -392,6 +394,72 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [addAlert],
   );
 
+  const mergeCloudWatchlist = useCallback(
+    async (uid: string) => {
+      const records = await fetchCloudWatchlist(uid);
+      if (!records.length) return;
+      const cloudByNumber = new Map(
+        records.map((record) => [String(record.flightNumber), record]),
+      );
+      const missing = [...cloudByNumber.keys()].filter(
+        (number) =>
+          !flightsRef.current.some(
+            (flight) =>
+              normalizeFlightNumber(flight.flightNumber) ===
+              normalizeFlightNumber(number),
+          ),
+      );
+      const fetched: Flight[] = [];
+      for (const number of missing.slice(0, 8)) {
+        try {
+          const response = await fetch(
+            `/api/flights/search?flight=${encodeURIComponent(number.replace(/\s+/g, ""))}`,
+            { cache: "no-store" },
+          );
+          const data = (await response.json()) as { flights?: Flight[] };
+          fetched.push(...(data.flights ?? []));
+        } catch {
+          // A missing cloud flight is retried on the next sync.
+        }
+      }
+      const merged = fetched.map((flight) => {
+        const record = cloudByNumber.get(flight.flightNumber);
+        return {
+          ...flight,
+          isFavorite: Boolean(record?.isFavorite),
+          isTracked: true,
+          customNotes: String(record?.customNotes ?? ""),
+        };
+      });
+      if (merged.length) upsertFlights(merged);
+      upsertFlights(
+        flightsRef.current.map((flight) => {
+          const record = cloudByNumber.get(flight.flightNumber);
+          if (!record) return flight;
+          return {
+            ...flight,
+            isFavorite: Boolean(record.isFavorite) || flight.isFavorite,
+            isTracked: true,
+            customNotes: String(record.customNotes ?? flight.customNotes),
+          };
+        }),
+      );
+    },
+    [upsertFlights],
+  );
+
+  const mergeCloudAlerts = useCallback(async (uid: string) => {
+    const remote = await fetchCloudAlerts(uid);
+    if (!remote.length) return;
+    setAlerts((current) => {
+      const byId = new Map(current.map((alert) => [alert.id, alert]));
+      for (const alert of remote) byId.set(alert.id, alert);
+      return [...byId.values()].sort((a, b) =>
+        b.timestamp.localeCompare(a.timestamp),
+      );
+    });
+  }, []);
+
   const updateAccountSync = useCallback(() => {
     setAccount((current) => ({
       ...current,
@@ -455,61 +523,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (next && uidValue) {
         setAccount((current) => ({ ...next, isOfflineMode: current.isOfflineMode }));
         void saveUserProfile(next, uidValue);
-        void fetchCloudWatchlist(uidValue).then(async (records) => {
-          if (!records.length) return;
-          const cloudByNumber = new Map(
-            records.map((record) => [String(record.flightNumber), record]),
-          );
-          const missing = [...cloudByNumber.keys()].filter(
-            (number) =>
-              !flightsRef.current.some(
-                (flight) =>
-                  normalizeFlightNumber(flight.flightNumber) ===
-                  normalizeFlightNumber(number),
-              ),
-          );
-          const fetched: Flight[] = [];
-          for (const number of missing.slice(0, 8)) {
-            try {
-              const response = await fetch(
-                `/api/flights/search?flight=${encodeURIComponent(number.replace(/\s+/g, ""))}`,
-                { cache: "no-store" },
-              );
-              const data = (await response.json()) as { flights?: Flight[] };
-              fetched.push(...(data.flights ?? []));
-            } catch {
-              // A missing cloud flight is retried on the next refresh.
-            }
-          }
-          const merged = fetched.map((flight) => {
-            const record = cloudByNumber.get(flight.flightNumber);
-            return {
-              ...flight,
-              isFavorite: Boolean(record?.isFavorite),
-              isTracked: true,
-              customNotes: String(record?.customNotes ?? ""),
-            };
-          });
-          if (merged.length) upsertFlights(merged);
-          upsertFlights(
-            flightsRef.current.map((flight) => {
-              const record = cloudByNumber.get(flight.flightNumber);
-              if (!record) return flight;
-              return {
-                ...flight,
-                isFavorite: Boolean(record.isFavorite) || flight.isFavorite,
-                isTracked: true,
-                customNotes: String(record.customNotes ?? flight.customNotes),
-              };
-            }),
-          );
-        });
+        void mergeCloudWatchlist(uidValue);
+        void mergeCloudAlerts(uidValue);
       } else {
         setAccount((current) => ({ ...GUEST_ACCOUNT, isOfflineMode: current.isOfflineMode }));
       }
     });
     return () => unsubscribe?.();
-  }, [upsertFlights]);
+  }, [mergeCloudAlerts, mergeCloudWatchlist]);
+
+  useEffect(() => {
+    const uid = account.uid;
+    if (!supabaseEnabled || !uid) return;
+    return subscribeToUserData(uid, {
+      onTrackedFlights: () => void mergeCloudWatchlist(uid),
+      onAlerts: () => void mergeCloudAlerts(uid),
+    });
+  }, [account.uid, mergeCloudAlerts, mergeCloudWatchlist]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;
