@@ -48,9 +48,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
       - name: Install Android 37 platform
-        run: sdkmanager "platforms;android-37"
+        run: |
+          SDKMANAGER="$(find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-37"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
