@@ -13,10 +13,12 @@ supabase db push
 
 Applied migrations:
 
-1. `initial_schema` — profiles, tracked flights, alerts, push tokens, provider/map caches, legacy import table, triggers
-2. `rls` — RLS policies and explicit grants
-3. `legacy_import` — email-claim RPC for the Firestore cutover
-4. `realtime` — Realtime publication for tracked flights and alerts
+1. `initial_schema` - profiles, tracked flights, alerts, push tokens, provider/map caches, triggers
+2. `rls` - RLS policies and explicit grants
+3. `legacy_import` - historical Firestore staging path (removed in `drop_legacy_import`)
+4. `realtime` - Realtime publication for tracked flights and alerts
+5. `drop_legacy_import` - no legacy data is being migrated
+6. `client_write_policies` - owner insert policies for profiles and alerts
 
 ## Client boundary
 
@@ -40,11 +42,10 @@ Server-owned (RLS enabled, no client policies):
 - `provider_cache`
 - `airport_maps` (public read, service-role write)
 - `osm_ingest_runs`
-- `legacy_imports`
 
 ## Smoke test
 
-A temporary auth user was created through the admin API, signed in with the publishable key, and successfully read its trigger-created profile and inserted/read a tracked flight. The user was deleted afterwards. This verifies the auth trigger and RLS grant path.
+A temporary auth user was created through the admin API, signed in with the publishable key, upserted its own profile, and inserted/read a tracked flight and alert. The user was deleted afterwards. This verifies the auth trigger and the RLS/grant path used by web and Android.
 
 ## Google OAuth
 

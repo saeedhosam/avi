@@ -43,6 +43,15 @@ Updated: 2026-11-05
 - MapLibre worker served from `/maplibre/maplibre-gl-worker.mjs`.
 - Routes and aircraft symbols render; flight arcs, traveled path, IATA badges, and aircraft heading verified in headless Chrome.
 - Firebase Auth/Firestore removed from web; Supabase browser client wired for auth, profile, tracked flights, and alerts.
+- Supabase Realtime subscriptions merge tracked flights and alerts across sessions/devices.
+
+### Android
+
+- Supabase-kt auth, Postgrest, and Realtime wired.
+- Firebase Auth, Firestore, App Check, Google Services plugin, and FCM service removed.
+- Credential Manager Google ID token exchanged through Supabase `IDToken`.
+- Room remains the offline cache; cloud tracked flights with snapshots and alerts are merged on sign-in.
+- Android debug build passes in CI against compileSdk 36 with Supabase 3.1.4 / Ktor 3.1.3.
 
 ### API
 
@@ -63,7 +72,7 @@ Updated: 2026-11-05
 
 | Item | Needed for |
 | --- | --- |
-| Google OAuth client ID + secret | Supabase Google sign-in on web/Android/iOS |
+| Google OAuth client ID + secret | Supabase Google sign-in on web/Android/iOS (still not configured) |
 | Android SHA-1/SHA-256 fingerprints | Google sign-in on Android |
 | Rotated AeroDataBox RapidAPI key | Live flights, boards, routes |
 | Real domain + DNS | Production HTTPS, shared links, OAuth redirects |
@@ -73,7 +82,7 @@ Updated: 2026-11-05
 
 ## Next implementation phases
 
-1. **Android Supabase migration** — remove Firebase Auth/Firestore/App Check, add Supabase-kt + Ktor, keep Room offline cache.
+1. **Google OAuth dev setup** — add the Web/Android OAuth clients and verify web + Android sign-in.
 2. **Android MapLibre migration** — remove Play Services Maps/maps-compose, add MapLibre Compose, reuse shared style/GeoJSON, delete Canvas radar/route renderers.
 3. **Backend provider parity** — move flight mapping/boards/routes/weather from Next API routes into `services/api`; point web and Android at the shared API.
 4. **Indoor + AMDB** — Overpass ingestion job, curated floorplan georeferencing, routing graph, `/v1/airports/{iata}/map/*` endpoints, web/Android indoor UI.
@@ -83,7 +92,8 @@ Updated: 2026-11-05
 ## Known limitations
 
 - The web still uses its Next.js API routes for airport/weather data; the shared `avi-api` currently covers flight search and status.
-- Android still uses Firebase and Google Maps until its migration phase lands.
+- Android still uses Google Maps until its MapLibre phase lands.
+- Google OAuth provider is not configured yet; web/Android sign-in cannot complete until the client ID/secret and Android SHA are added.
 - Indoor/AMDB data and routing are not implemented yet.
 - No production domain is connected; `sslip.io` is staging only.
 - Live flights and airport boards report `NOT_CONFIGURED` until a valid AeroDataBox key is set on the server.
