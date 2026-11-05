@@ -1,4 +1,4 @@
-﻿import java.time.Duration
+import java.time.Duration
 
 plugins {
   alias(libs.plugins.android.application)
