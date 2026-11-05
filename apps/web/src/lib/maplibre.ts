@@ -6,6 +6,7 @@ import {
   NavigationControl,
   ScaleControl,
   Map as MapLibreMapClass,
+  setWorkerUrl,
 } from "maplibre-gl";
 import type {
   Feature,
@@ -15,6 +16,8 @@ import type {
   Point,
   Position,
 } from "geojson";
+
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 export const MAP_STYLE_URL = "/map/style.json";
 

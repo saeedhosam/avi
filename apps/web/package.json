@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "predev": "node scripts/copy-maplibre-assets.mjs",
+    "prebuild": "node scripts/copy-maplibre-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
