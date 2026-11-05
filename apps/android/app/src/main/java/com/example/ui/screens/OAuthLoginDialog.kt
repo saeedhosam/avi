@@ -393,7 +393,7 @@ fun OAuthLoginDialog(
                 if (account.isSignedIn) {
                     OutlinedButton(
                         onClick = {
-                            GoogleAuthManager.signOut()
+                            coroutineScope.launch { GoogleAuthManager.signOut() }
                             onSignOut()
                         },
                         modifier = Modifier

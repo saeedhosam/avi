@@ -6,6 +6,7 @@ import com.example.data.cloud.CloudAlert
 import com.example.data.cloud.CloudTrackedFlight
 import com.example.data.cloud.CloudUserProfile
 import com.example.data.cloud.toCloudSnapshot
+import com.example.data.cloud.toFlight
 import com.example.data.cloud.toJsonObject
 import com.example.data.local.*
 import com.example.data.remote.ApiConfig
@@ -236,7 +237,7 @@ class FlightRepository(private val context: Context) {
             SupabaseClientProvider.auth.sessionStatus.collect { status ->
                 when (status) {
                     is SessionStatus.Authenticated -> {
-                        val user = status.session.user
+                        val user = status.session.user ?: return@collect
                         val metadataName = (user.userMetadata?.get("full_name") as? JsonPrimitive)?.content
                             ?: (user.userMetadata?.get("name") as? JsonPrimitive)?.content
                         val name = metadataName ?: ("Capt. " + (user.email?.substringBefore("@") ?: "Aviator"))
@@ -624,7 +625,7 @@ class FlightRepository(private val context: Context) {
             )
             val userId = cloudRepository.currentUserId()
             val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
-            if (user != null && flight != null) {
+            if (userId != null && flight != null) {
                 cloudRepository.saveTrackedFlight(
                     CloudTrackedFlight(
                         id = flight.id,
