@@ -79,6 +79,41 @@ export function ensureLayer(map: MapLibreMap, layer: LayerSpecification) {
   if (!map.getLayer(layer.id)) map.addLayer(layer);
 }
 
+export function ensureAircraftImage(map: MapLibreMap) {
+  if (map.hasImage("avi-aircraft")) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.clearRect(0, 0, 64, 64);
+  context.translate(32, 32);
+  context.beginPath();
+  context.moveTo(0, -27);
+  context.lineTo(6, -7);
+  context.lineTo(28, 4);
+  context.lineTo(28, 11);
+  context.lineTo(6, 6);
+  context.lineTo(6, 21);
+  context.lineTo(14, 27);
+  context.lineTo(14, 31);
+  context.lineTo(0, 27);
+  context.lineTo(-14, 31);
+  context.lineTo(-14, 27);
+  context.lineTo(-6, 21);
+  context.lineTo(-6, 6);
+  context.lineTo(-28, 11);
+  context.lineTo(-28, 4);
+  context.lineTo(-6, -7);
+  context.closePath();
+  context.fillStyle = MAP_COLORS.radarCyan;
+  context.strokeStyle = MAP_COLORS.ink;
+  context.lineWidth = 2;
+  context.fill();
+  context.stroke();
+  map.addImage("avi-aircraft", context.getImageData(0, 0, 64, 64));
+}
+
 export function pointFeature(
   id: string,
   coordinates: Position,

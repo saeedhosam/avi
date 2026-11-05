@@ -13,6 +13,7 @@ import {
 import {
   MAP_COLORS,
   collection,
+  ensureAircraftImage,
   ensureLayer,
   lineFeature,
   pointFeature,
@@ -190,23 +191,18 @@ export function FlightMap({
         "circle-opacity": 0.24,
       },
     });
+    ensureAircraftImage(map);
     ensureLayer(map, {
       id: "avi-aircraft-icon",
       type: "symbol",
       source: "avi-aircraft",
       layout: {
-        "text-field": "✈",
-        "text-font": ["Noto Sans Bold"],
-        "text-size": 18,
-        "text-rotate": ["get", "heading"],
-        "text-rotation-alignment": "map",
-        "text-allow-overlap": true,
-        "text-ignore-placement": true,
-      },
-      paint: {
-        "text-color": MAP_COLORS.radarCyan,
-        "text-halo-color": MAP_COLORS.ink,
-        "text-halo-width": 1.5,
+        "icon-image": "avi-aircraft",
+        "icon-size": 0.52,
+        "icon-rotate": ["get", "heading"],
+        "icon-rotation-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
       },
     });
 
