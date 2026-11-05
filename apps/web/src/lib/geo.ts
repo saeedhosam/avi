@@ -94,7 +94,8 @@ export function destinationAlong(
 }
 
 export function headingDestination(start: LngLat, heading: number, distanceNm: number): LngLat {
-  const distance = distanceNm / 60;
+  // Earth radius in nautical miles; trigonometric functions below use radians.
+  const distance = distanceNm / 3440.065;
   const [lon, lat] = start.map(toRadians) as LngLat;
   const bearing = toRadians(heading);
   const lat2 = Math.asin(
