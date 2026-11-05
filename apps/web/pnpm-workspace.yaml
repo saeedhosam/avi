@@ -1,0 +1,5 @@
+onlyBuiltDependencies:
+  - "@firebase/util"
+  - protobufjs
+minimumReleaseAgeExclude:
+  - lucide-react@1.68.0

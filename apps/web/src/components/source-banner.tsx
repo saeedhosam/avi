@@ -1,0 +1,161 @@
+"use client";
+
+import { useState } from "react";
+import {
+  RadioTower,
+  Cloud,
+  Info,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
+import { useApp } from "@/lib/store";
+import { DATA_SOURCE_META } from "@/lib/data-source";
+import { cn } from "@/lib/utils";
+import { Button, Modal } from "./ui";
+
+export function SourceBanner({ className }: { className?: string }) {
+  const { dataSourceMode, syncing, refreshData, aeroConfigured, offlineMode } =
+    useApp();
+  const [open, setOpen] = useState(false);
+  const meta = DATA_SOURCE_META[dataSourceMode];
+
+  return (
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={cn(
+          "flex w-full cursor-pointer items-center gap-2 rounded-xl border bg-surface-2/80 px-3 py-2 text-left transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          className,
+        )}
+        style={{ borderColor: `${meta.color}66` }}
+      >
+        {syncing ? (
+          <RefreshCw className="size-3 animate-spin text-accent" />
+        ) : (
+          <span
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: meta.color }}
+          />
+        )}
+        <span
+          className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.1em]"
+          style={{ color: meta.color }}
+        >
+          {syncing ? "SYNCING LIVE TELEMETRY…" : meta.badge}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[10px] text-muted">
+          · {meta.summary}
+        </span>
+        <Info className="size-3 shrink-0 text-subtle" />
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void refreshData();
+          }}
+          className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-3"
+          aria-label="Refresh telemetry"
+        >
+          <RefreshCw className={cn("size-3", syncing && "animate-spin")} />
+        </button>
+      </div>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Telemetry & API diagnostics"
+        subtitle={meta.title}
+        icon={<RadioTower className="size-4" />}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+            <Button size="sm" onClick={refreshData} disabled={syncing}>
+              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
+              Refresh
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs leading-relaxed text-muted">{meta.subtitle}</p>
+          <div className="space-y-2">
+            <DiagnosticRow
+              title="AeroDataBox RapidAPI"
+              detail="Flights, FIDS boards, delays, daily route stats"
+              active={aeroConfigured && !offlineMode}
+              value={aeroConfigured ? "KEY CONFIGURED" : "CACHE FALLBACK"}
+            />
+            <DiagnosticRow
+              title="Open-Meteo aviation weather"
+              detail="Live METAR, forecasts, VFR/IFR rules"
+              active={!offlineMode}
+              value="LIVE · ZERO-KEY"
+            />
+            <DiagnosticRow
+              title="Local cache + background sync"
+              detail="Flights, watchlist, notes, alerts, routes"
+              active
+              value="ACTIVE (SSOT)"
+            />
+          </div>
+          {offlineMode ? (
+            <p className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
+              <WifiOff className="mt-0.5 size-3.5 shrink-0 text-accent" />
+              Offline mode is enabled. Live API calls are paused and the local
+              cache is serving all screens.
+            </p>
+          ) : !aeroConfigured ? (
+            <p className="flex items-start gap-2 rounded-lg border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
+              <Cloud className="mt-0.5 size-3.5 shrink-0 text-delayed" />
+              Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
+              to <code className="font-mono text-accent">.env.local</code> for live
+              RapidAPI flight and FIDS data. Weather is already live via Open-Meteo.
+            </p>
+          ) : null}
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function DiagnosticRow({
+  title,
+  detail,
+  active,
+  value,
+}: {
+  title: string;
+  detail: string;
+  active: boolean;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-surface-2 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-semibold text-ink">{title}</p>
+        <p className="mt-0.5 truncate text-[9px] text-subtle">{detail}</p>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 rounded-md border px-1.5 py-1 text-[8px] font-extrabold tracking-wide",
+          active
+            ? "border-landed/35 bg-landed/10 text-landed"
+            : "border-delayed/35 bg-delayed/10 text-delayed",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
