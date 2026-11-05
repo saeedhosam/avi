@@ -162,7 +162,7 @@ export default function WatchlistPage() {
             </div>
             <p className="mt-2 rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5 text-[9px] leading-relaxed text-muted">
               Favorites and tracked flights are cached locally and mirrored to
-              Firestore for signed-in users. Alerts update every flight state
+              Supabase for signed-in users. Alerts update every flight state
               change.
             </p>
           </Panel>

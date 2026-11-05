@@ -206,7 +206,7 @@ export function AccountDialog({
                     <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
                       {offlineMode
                         ? "Serving the local browser cache. Reconnect to refresh live telemetry."
-                        : "Watchlists, notes, alerts, and profile are persisted locally and mirrored to Firestore."}
+                        : "Watchlists, notes, alerts, and profile are persisted locally and mirrored to Supabase."}
                     </p>
                   </div>
                 </div>

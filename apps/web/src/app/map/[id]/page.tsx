@@ -16,8 +16,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { cn, geodesicDistanceKm, kmToNm } from "@/lib/utils";
-import { GoogleFlightMap } from "@/components/google-flight-map";
-import { OsmFlightMap } from "@/components/osm-map";
+import { FlightMap } from "@/components/flight-map";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
 
 export default function FlightMapPage() {
@@ -34,11 +33,6 @@ export default function FlightMapPage() {
     );
   }, [flights, params.id]);
 
-  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const [provider, setProvider] = useState<"google" | "osm">(
-    googleMapsKey ? "google" : "osm",
-  );
-  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap");
   const [showHud, setShowHud] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -106,44 +100,6 @@ export default function FlightMapPage() {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">
-            {googleMapsKey && (
-              <button
-                onClick={() => setProvider("google")}
-                className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-[9px] font-bold transition-colors",
-                  provider === "google" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
-                )}
-              >
-                Google
-              </button>
-            )}
-            <button
-              onClick={() => setProvider("osm")}
-              className={cn(
-                "flex items-center gap-1 rounded-md px-2 py-1 text-[9px] font-bold transition-colors",
-                provider === "osm" ? "bg-accent text-[color:var(--bg)]" : "text-muted",
-              )}
-            >
-              OSM
-            </button>
-          </div>
-          {provider === "google" && (
-            <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">
-              {(["roadmap", "satellite"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setMapType(type)}
-                  className={cn(
-                    "rounded-md px-2 py-1 text-[9px] font-bold capitalize transition-colors",
-                    mapType === type ? "bg-accent text-[color:var(--bg)]" : "text-muted",
-                  )}
-                >
-                  {type === "roadmap" ? "Road" : "Satellite"}
-                </button>
-              ))}
-            </div>
-          )}
           <button
             onClick={() => setShowHud((value) => !value)}
             className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface-2 px-2.5 text-[9px] font-bold text-muted transition-colors hover:text-accent"
@@ -166,15 +122,7 @@ export default function FlightMapPage() {
       </div>
 
       <div className="relative h-[calc(100vh-160px)] min-h-[520px]">
-        {provider === "google" && googleMapsKey ? (
-          <GoogleFlightMap
-            flight={flight}
-            mapTypeId={mapType}
-            className="h-full"
-          />
-        ) : (
-          <OsmFlightMap flight={flight} className="h-full" />
-        )}
+        <FlightMap flight={flight} className="h-full" />
 
         {/* Floating flight info */}
         <div className="pointer-events-none absolute left-3 top-3 w-[260px] max-w-[calc(100%-80px)]">
@@ -308,7 +256,7 @@ export default function FlightMapPage() {
 
         <div className="pointer-events-none absolute bottom-20 left-3 flex items-center gap-1.5 rounded-md border border-line/70 bg-surface/85 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-subtle backdrop-blur">
           <Layers className="size-2.5 text-accent" />{" "}
-          {provider === "google" ? "Google Maps" : "OpenStreetMap"} · drag to pan · scroll to zoom
+          MapLibre · OpenStreetMap Positron · drag to pan · scroll to zoom
         </div>
       </div>
     </div>

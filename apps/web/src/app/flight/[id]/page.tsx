@@ -522,7 +522,7 @@ export default function FlightDetailPage() {
             </p>
             <p className="mt-1 text-[9px] leading-relaxed text-subtle">
               Flight state is stored in the local browser cache and mirrored to
-              Firestore for signed-in users.
+              Supabase for signed-in users.
             </p>
           </div>
         </aside>
@@ -708,7 +708,7 @@ function NotesModal({
       open={open}
       onClose={onClose}
       title={`Flight note · ${flight.flightNumber}`}
-      subtitle="Personal notes stay local and sync to Firestore when signed in."
+      subtitle="Personal notes stay local and sync to Supabase when signed in."
       icon={<NotebookPen className="size-4" />}
       size="sm"
       footer={
@@ -731,7 +731,7 @@ function NotesModal({
       />
       <p className="mt-1.5 text-[10px] text-subtle">
         Notes are private to your profile and capped at 500 characters by
-        Firestore rules.
+        Supabase RLS policies.
       </p>
     </Modal>
   );

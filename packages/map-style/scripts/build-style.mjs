@@ -53,5 +53,14 @@ source.metadata = {
   "avi:palette": palette,
 };
 
+if (source.sources?.openmaptiles) {
+  source.sources.openmaptiles.attribution =
+    "© OpenMapTiles © OpenStreetMap contributors";
+}
+if (source.sources?.ne2_shaded) {
+  source.sources.ne2_shaded.attribution =
+    "Natural Earth © OpenStreetMap contributors";
+}
+
 writeFileSync(resolve(root, "style.json"), `${JSON.stringify(source, null, 2)}\n`);
 console.log(`map style written: ${source.layers.length} layers`);

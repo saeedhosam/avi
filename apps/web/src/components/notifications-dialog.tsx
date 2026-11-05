@@ -87,7 +87,7 @@ export function NotificationsDialog({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <KeyRound className="size-4 text-accent" />
-              <span className="label-caps text-ink">FCM device registration</span>
+              <span className="label-caps text-ink">Push registration</span>
             </div>
             <div className="flex items-center gap-2">
               <span

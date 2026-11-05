@@ -12,8 +12,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
     "clsx": "^2.1.1",
-    "leaflet": "^1.9.4",
     "lucide-react": "^1.68.0",
+    "maplibre-gl": "^6.16.0",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -21,16 +21,15 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
-    "@types/google.maps": "^3.66.9",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@types/leaflet": "^1.9.22"
+    "typescript": "^5"
   },
-  "description": "Desktop web edition of SkyTrack \u2014 live radar, flight tracking, route network, airport boards, terminal maps, alerts, and offline watchlist.",
+  "description": "Avi web — live radar, flight tracking, route network, airport boards, terminal maps, alerts, and offline watchlist.",
   "packageManager": "pnpm@11.7.0"
 }
