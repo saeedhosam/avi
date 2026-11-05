@@ -193,7 +193,7 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun deleteTrackedFlight(flightNumber: String) {
-        repository.deleteTrackedFlight(flightNumber)
+        repository.deleteWatchlistItem(flightNumber)
     }
 
     fun selectAirport(code: String) {

@@ -701,7 +701,7 @@ class FlightRepository(private val context: Context) {
                 )
             } else {
                 unsubscribeFromFlightPush(flight.flightNumber)
-                flightDao.deleteWatchlistItem(flight.flightNumber)
+                flightDao.deleteTrackedFlight(flight.flightNumber)
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
                     if (!flight.isFavorite) {
@@ -734,7 +734,7 @@ class FlightRepository(private val context: Context) {
         }
         repositoryScope.launch {
             unsubscribeFromFlightPush(flightNumber)
-            flightDao.deleteWatchlistItem(flightNumber)
+            flightDao.deleteTrackedFlight(flightNumber)
         }
     }
 
