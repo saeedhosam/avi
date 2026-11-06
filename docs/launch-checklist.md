@@ -24,8 +24,11 @@ Everything split between "code" and "your side" for going live at
    - optional `APP_ORIGIN` → `https://avi.codestep.org`
    - optional `APP_API_ORIGIN` → `https://api.codestep.org`
 4. **Lemon Squeezy account** — signup must confirm Egypt seller support and a
-   payout method (PayPal or bank). Then create the store, two subscription
-   products (Plus, Pro; monthly + annual variants), and add these secrets:
+   payout method (PayPal or bank). **⚠️ Status 2026-11-06**: store creation 500s
+   at `app.lemonsqueezy.com/create-store` for the Egypt seller; investigating.
+   If LS/Egypt is unsupported, phase 0 = `docs/ops/plan-assignment.md` (manual
+   plans + direct payment); long-term options: LS via a foreign entity later,
+   or Paymob for local card subscriptions. Then add these secrets:
    - `BILLING_PROVIDER=lemon_squeezy`
    - `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`
    - `LEMONSQUEEZY_VARIANT_PLUS`, `LEMONSQUEEZY_VARIANT_PRO`
