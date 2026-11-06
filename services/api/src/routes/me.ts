@@ -7,7 +7,7 @@ import { PLAN_LIMITS, type PlanTier } from "../engine/plans.js";
 interface MeOptions {
   supabaseServer: SupabaseServer;
   usage: UsageTracker;
-  billingProvider: "manual" | "lemon_squeezy";
+  billingProvider: "manual" | "lemon_squeezy" | "polar";
 }
 
 const validPlan = (plan: string): PlanTier =>
@@ -24,7 +24,7 @@ const meResponse = z.object({
     unitsBudget: z.number(),
   }),
   billing: z.object({
-    provider: z.enum(["manual", "lemon_squeezy"]),
+    provider: z.enum(["manual", "lemon_squeezy", "polar"]),
     upgradeEnabled: z.boolean(),
   }),
 });

@@ -162,3 +162,134 @@ export async function createLemonSqueezyCheckout(
   };
   return payload.data?.attributes?.url ?? null;
 }
+
+// ── Polar.sh (Merchant of Record, confirmed Egypt payout route) ────────────
+
+const POLAR_API = "https://api.polar.sh/v1";
+
+/** Creates a hosted Polar checkout for the target tier. */
+export async function createPolarCheckout(
+  config: AppConfig,
+  uid: string,
+  webOrigin: string,
+  target: "PLUS" | "PRO",
+): Promise<string | null> {
+  const productId =
+    target === "PRO" ? config.POLAR_PRICE_PRO : config.POLAR_PRICE_PLUS;
+  if (
+    config.BILLING_PROVIDER !== "polar" ||
+    !config.POLAR_API_KEY ||
+    !productId
+  ) {
+    return null;
+  }
+  // The first id of a comma-separated list is the default (monthly); annual
+  // variants still unlock the tier via webhook regardless of entry point.
+  const products = productId.split(",").map((id) => id.trim()).filter(Boolean);
+  if (!products.length) return null;
+  const response = await fetch(`${POLAR_API}/checkouts`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.POLAR_API_KEY}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      products,
+      metadata: { user_id: uid },
+      success_url: `${webOrigin.replace(/\/+$/, "")}/?upgraded=1`,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { url?: string };
+  return payload.url ?? null;
+}
+
+/**
+ * Polar webhooks sign the raw body with HMAC-SHA256 (hex, base64 by default
+ * per the `Polar-Webhook-Signature` header).
+ */
+export function verifyPolarSignature(
+  secret: string,
+  rawBody: string,
+  signatureHeader: string | undefined,
+): boolean {
+  if (!secret || !signatureHeader || typeof rawBody !== "string") return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(signatureHeader.trim(), "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export interface PolarWebhookEvent {
+  type?: string;
+  data?: {
+    id?: string | number;
+    customer_id?: string;
+    external_customer_id?: string | null;
+    product_id?: string;
+    price_id?: string;
+    metadata?: { user_id?: string } | null;
+    status?: string;
+    customer_email?: string;
+  };
+}
+
+/**
+ * Maps a Polar webhook payload to a profile patch — the tier comes from
+ * product/price id membership in the comma-separated tier lists.
+ */
+export function planPatchFromPolarWebhook(
+  payload: PolarWebhookEvent,
+  config: AppConfig,
+): BillingStatusPatch | null {
+  const type = (payload.type ?? "").toLowerCase();
+  const data = payload.data ?? {};
+  const productId = data.product_id ?? "";
+  const priceId = data.price_id ?? "";
+
+  const matchesTier = (ids: string | undefined): "PLUS" | "PRO" | null => {
+    if (!ids) return null;
+    const list = ids.split(",").map((id) => id.trim()).filter(Boolean);
+    if (list.includes(productId) || (priceId && list.includes(priceId))) {
+      return productId && list.includes(productId)
+        ? ids === config.POLAR_PRICE_PRO
+          ? "PRO"
+          : "PLUS"
+        : ids === config.POLAR_PRICE_PRO
+          ? "PRO"
+          : "PLUS";
+    }
+    return null;
+  };
+  const variantToPlan = (tier: "PLUS" | "PRO" | null): BillingPlanTier =>
+    tier ?? "FREE";
+
+  // Terminal lifecycle states downgrade regardless of product id.
+  if (type === "subscription.canceled" || type === "subscription.revoked") {
+    return {
+      plan: "FREE",
+      billingCustomerId: data.customer_id ?? null,
+    };
+  }
+
+  // Active subscriptions and orders set the tier if their product matches.
+  if (
+    type === "subscription.created" ||
+    type === "subscription.updated" ||
+    type === "subscription.active" ||
+    type === "order.created"
+  ) {
+    const tier =
+      matchesTier(config.POLAR_PRICE_PRO) ?? matchesTier(config.POLAR_PRICE_PLUS);
+    if (!tier) return null;
+    return {
+      plan: variantToPlan(tier) as BillingPlanTier,
+      billingCustomerId: data.customer_id ?? null,
+    };
+  }
+
+  return null;
+}

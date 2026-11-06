@@ -23,21 +23,20 @@ Everything split between "code" and "your side" for going live at
    - `AVI_API_BASE_URL` → `https://api.codestep.org`
    - optional `APP_ORIGIN` → `https://avi.codestep.org`
    - optional `APP_API_ORIGIN` → `https://api.codestep.org`
-4. **Lemon Squeezy account** — signup must confirm Egypt seller support and a
-   payout method (PayPal or bank). **⚠️ Status 2026-11-06**: store creation 500s
-   at `app.lemonsqueezy.com/create-store` for the Egypt seller; investigating.
-   If LS/Egypt is unsupported, phase 0 = `docs/ops/plan-assignment.md` (manual
-   plans + direct payment); long-term options: LS via a foreign entity later,
-   or Paymob for local card subscriptions. Then add these secrets:
-   - `BILLING_PROVIDER=lemon_squeezy`
-   - `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`
-   - `LEMONSQUEEZY_VARIANT_PLUS`, `LEMONSQUEEZY_VARIANT_PRO`
-     (comma-separated lists if a plan has Monthly **and** Yearly variants:
-     `41,44`)
-   - `LEMONSQUEEZY_WEBHOOK_SECRET`
-   - In the store set the webhook to
-     `https://api.codestep.org/v1/webhooks/lemon-squeezy` and connect the
-     secret. Untested payment events land in gateway logs.
+4. **Billing: Polar.sh** — the MoR choice for Egyptian sellers (Egypt is in
+   Polar's official supported-payout list; LS store creation was 500-ing for
+   this seller). Your side: sign up at polar.sh, connect the **Finance →
+   Account** payout (Country Egypt → Stripe Connect Express KYC with Egyptian
+   bank; submit for review — up to 14 days), create the two subscription
+   products (Plus $4.99/mo, Pro $9.99/mo, optionally yearly prices), set the
+   webhook to `https://api.codestep.org/v1/webhooks/polar` (copy its secret;
+   events: order.created, subscription.created/updated/active/canceled/revoked),
+   and create an API key. Then add these secrets:
+   - `BILLING_PROVIDER=polar`
+   - `POLAR_API_KEY`, `POLAR_WEBHOOK_SECRET`
+   - `POLAR_PRICE_PLUS`, `POLAR_PRICE_PRO`
+     (comma-separated if a plan has Monthly **and** Yearly prices)
+   Then trigger Deploy.
 5. **Uptime monitoring** on
    `https://api.codestep.org/healthz` and `https://avi.codestep.org/` (e.g.
    Better Uptime / UptimeRobot) with an email alert target.

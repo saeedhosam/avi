@@ -51,7 +51,7 @@ export interface AccountUsage {
   planLimits: { concurrentTracked: number };
   watchlistCount: number;
   units: { unitsUsed: number; unitsBudget: number };
-  billing: { provider: "manual" | "lemon_squeezy"; upgradeEnabled: boolean };
+  billing: { provider: "manual" | "lemon_squeezy" | "polar"; upgradeEnabled: boolean };
 }
 
 export interface Toast {

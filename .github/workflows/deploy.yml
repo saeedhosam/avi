@@ -119,11 +119,10 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER || 'manual' }}
-          LEMONSQUEEZY_API_KEY: ${{ secrets.LEMONSQUEEZY_API_KEY }}
-          LEMONSQUEEZY_STORE_ID: ${{ secrets.LEMONSQUEEZY_STORE_ID }}
-          LEMONSQUEEZY_VARIANT_PLUS: ${{ secrets.LEMONSQUEEZY_VARIANT_PLUS }}
-          LEMONSQUEEZY_VARIANT_PRO: ${{ secrets.LEMONSQUEEZY_VARIANT_PRO }}
-          LEMONSQUEEZY_WEBHOOK_SECRET: ${{ secrets.LEMONSQUEEZY_WEBHOOK_SECRET }}
+          POLAR_API_KEY: ${{ secrets.POLAR_API_KEY }}
+          POLAR_PRICE_PLUS: ${{ secrets.POLAR_PRICE_PLUS }}
+          POLAR_PRICE_PRO: ${{ secrets.POLAR_PRICE_PRO }}
+          POLAR_WEBHOOK_SECRET: ${{ secrets.POLAR_WEBHOOK_SECRET }}
           APP_ORIGIN: ${{ secrets.APP_ORIGIN || 'https://avi.codestep.org' }}
           APP_API_ORIGIN: ${{ secrets.APP_API_ORIGIN || 'https://api.codestep.org' }}
         run: |
@@ -143,13 +142,12 @@ jobs:
           VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
           VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
           VAPID_SUBJECT=$VAPID_SUBJECT
-          # Billing (Lemon Squeezy; unset = manual plan assignment).
+          # Billing (Polar.sh MoR; unset = manual plan assignment).
           BILLING_PROVIDER=$BILLING_PROVIDER
-          LEMONSQUEEZY_API_KEY=$LEMONSQUEEZY_API_KEY
-          LEMONSQUEEZY_STORE_ID=$LEMONSQUEEZY_STORE_ID
-          LEMONSQUEEZY_VARIANT_PLUS=$LEMONSQUEEZY_VARIANT_PLUS
-          LEMONSQUEEZY_VARIANT_PRO=$LEMONSQUEEZY_VARIANT_PRO
-          LEMONSQUEEZY_WEBHOOK_SECRET=$LEMONSQUEEZY_WEBHOOK_SECRET
+          POLAR_API_KEY=$POLAR_API_KEY
+          POLAR_PRICE_PLUS=$POLAR_PRICE_PLUS
+          POLAR_PRICE_PRO=$POLAR_PRICE_PRO
+          POLAR_WEBHOOK_SECRET=$POLAR_WEBHOOK_SECRET
           EOF
 
           ssh -i ~/.ssh/avi_deploy "$HETZNER_USER@$HETZNER_HOST" 'umask 077; cat > /opt/avi/.env.web.production' <<EOF

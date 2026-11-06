@@ -44,14 +44,18 @@ const ConfigSchema = z.object({
   AERODATABOX_UNITS_PER_FLIGHT: z.coerce.number().int().min(1).default(2),
   UNIT_BUDGET_PER_MONTH: z.coerce.number().int().min(0).default(32_000),
   // ── Billing (Track M) ─────────────────────────────────────────────
-  // "manual" = plans set by SQL; "lemon_squeezy" = webhooks assign plans and
-  // the checkout API sells them. Stripe slots into the same surface later.
-  BILLING_PROVIDER: z.enum(["manual", "lemon_squeezy"]).default("manual"),
+  // "manual" = plans set by SQL; "lemon_squeezy"/"polar" = MoR webhooks assign
+  // plans and the vendor's checkout API sells them.
+  BILLING_PROVIDER: z.enum(["manual", "lemon_squeezy", "polar"]).default("manual"),
   LEMONSQUEEZY_API_KEY: z.string().optional(),
   LEMONSQUEEZY_STORE_ID: z.string().optional(),
   LEMONSQUEEZY_VARIANT_PLUS: z.string().optional(),
   LEMONSQUEEZY_VARIANT_PRO: z.string().optional(),
   LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
+  POLAR_API_KEY: z.string().optional(),
+  POLAR_PRICE_PLUS: z.string().optional(),
+  POLAR_PRICE_PRO: z.string().optional(),
+  POLAR_WEBHOOK_SECRET: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema> & {
