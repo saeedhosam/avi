@@ -29,6 +29,8 @@ Everything split between "code" and "your side" for going live at
    - `BILLING_PROVIDER=lemon_squeezy`
    - `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`
    - `LEMONSQUEEZY_VARIANT_PLUS`, `LEMONSQUEEZY_VARIANT_PRO`
+     (comma-separated lists if a plan has Monthly **and** Yearly variants:
+     `41,44`)
    - `LEMONSQUEEZY_WEBHOOK_SECRET`
    - In the store set the webhook to
      `https://api.codestep.org/v1/webhooks/lemon-squeezy` and connect the

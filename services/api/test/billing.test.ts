@@ -52,6 +52,19 @@ describe("plan mapping from webhook payloads", () => {
     expect(patch?.billingCustomerId).toBe("777");
   });
 
+  it("maps any variant inside a comma-separated tier list", () => {
+    const config = loadConfig({
+      NODE_ENV: "test",
+      LEMONSQUEEZY_VARIANT_PLUS: "41,44",
+      LEMONSQUEEZY_VARIANT_PRO: "42,77",
+    });
+    const yearly = {
+      meta: { event_name: "subscription_created", custom_data: { user_id: "u1" } },
+      data: { id: 101, attributes: { status: "active", variant_id: 44, customer_id: 777 } },
+    };
+    expect(planPatchFromWebhook(yearly, config)?.plan).toBe("PLUS");
+  });
+
   it("cancels to FREE on terminal subscription statuses", () => {
     const cancelled = {
       meta: { event_name: "subscription_updated", custom_data: { user_id: "u1" } },

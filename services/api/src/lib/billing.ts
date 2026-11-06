@@ -103,8 +103,12 @@ function variantToPlan(
     attributes?.first_subscription_item?.variant_id ?? attributes?.variant_id ?? "",
   );
   if (!variant || variant === "null") return null;
-  if (config.LEMONSQUEEZY_VARIANT_PRO && variant === config.LEMONSQUEEZY_VARIANT_PRO) return "PRO";
-  if (config.LEMONSQUEEZY_VARIANT_PLUS && variant === config.LEMONSQUEEZY_VARIANT_PLUS) return "PLUS";
+  // Variants are comma-separated lists so a plan can span billing intervals
+  // (e.g., "41,44" = Plus monthly + Plus yearly).
+  const tierVariant = (ids: string | undefined): boolean =>
+    Boolean(ids && ids.split(",").map((id) => id.trim()).includes(variant));
+  if (tierVariant(config.LEMONSQUEEZY_VARIANT_PRO)) return "PRO";
+  if (tierVariant(config.LEMONSQUEEZY_VARIANT_PLUS)) return "PLUS";
   return null;
 }
 
