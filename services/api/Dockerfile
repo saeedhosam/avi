@@ -10,6 +10,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/catalog/package.json packages/catalog/package.json
+COPY packages/catalog/airports.json packages/catalog/airports.json
+COPY packages/catalog/terminal-layouts.json packages/catalog/terminal-layouts.json
+COPY packages/catalog/world_countries.json packages/catalog/world_countries.json
 COPY packages/map-style/package.json packages/map-style/package.json
 COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
@@ -18,7 +21,14 @@ RUN pnpm install --frozen-lockfile --filter @avi/api...
 
 COPY services/api services/api
 RUN pnpm --filter @avi/api build
+
 RUN pnpm --filter @avi/api deploy --prod --legacy /prod/api
+
+# `pnpm deploy` may materialize workspace deps as symlinks into the repo tree;
+# make @avi/catalog a real directory inside the produced bundle so the runtime
+# stage (which copies only /prod/api) resolves @avi/catalog/airports.json.
+RUN rm -rf /prod/api/node_modules/@avi/catalog \
+  && cp -r /repo/packages/catalog /prod/api/node_modules/@avi/catalog
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
