@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { SupabaseServer } from "../lib/supabase-server.js";
 import type { UsageTracker } from "../lib/usage.js";
+import { billingUpgradeEnabled } from "../lib/billing.js";
 import { PLAN_LIMITS, type PlanTier } from "../engine/plans.js";
 
 interface MeOptions {
@@ -84,7 +85,7 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
         units: { unitsUsed: usage.unitsUsed, unitsBudget: usage.unitsBudget },
         billing: {
           provider: options.billingProvider,
-          upgradeEnabled: options.billingProvider === "lemon_squeezy",
+          upgradeEnabled: billingUpgradeEnabled(options.billingProvider),
         },
       };
     },

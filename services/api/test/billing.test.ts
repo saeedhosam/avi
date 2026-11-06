@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  billingUpgradeEnabled,
   planPatchFromWebhook,
   verifyLemonSqueezySignature,
 } from "../src/lib/billing.js";
@@ -27,6 +28,19 @@ const billingConfig = loadConfig({
   NODE_ENV: "test",
   LEMONSQUEEZY_VARIANT_PLUS: "41",
   LEMONSQUEEZY_VARIANT_PRO: "42",
+});
+
+describe("upgrade-visibility flag (regression — polar previously reported false)", () => {
+  it("is true for every self-serve provider", () => {
+    expect(billingUpgradeEnabled("lemon_squeezy")).toBe(true);
+    expect(billingUpgradeEnabled("polar")).toBe(true);
+  });
+
+  it("is false for manual and unknown providers", () => {
+    expect(billingUpgradeEnabled("manual")).toBe(false);
+    expect(billingUpgradeEnabled(undefined)).toBe(false);
+    expect(billingUpgradeEnabled("nonsense")).toBe(false);
+  });
 });
 
 describe("Lemon Squeezy webhook signature", () => {

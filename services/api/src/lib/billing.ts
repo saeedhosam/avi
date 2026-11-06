@@ -8,6 +8,14 @@ import type { AppConfig } from "../config.js";
 
 export type BillingPlanTier = "FREE" | "PLUS" | "PRO";
 
+export type BillingProvider = "manual" | "lemon_squeezy" | "polar";
+
+/** Self-serve checkout is live for every provider except manual assignment. */
+export function billingUpgradeEnabled(provider: string | null | undefined): boolean {
+  const value = (provider ?? "manual").trim().toLowerCase();
+  return value === "lemon_squeezy" || value === "polar";
+}
+
 export interface BillingStatusPatch {
   plan: BillingPlanTier;
   billingCustomerId: string | null;
