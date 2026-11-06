@@ -51,13 +51,6 @@ object ApiConfig {
         "REPLACE_WITH_YOUR_KEY"
     )
 
-    private val PLACEHOLDER_MAP_KEYS = setOf(
-        "",
-        "null",
-        "DEFAULT_MAPS_KEY",
-        "YOUR_MAPS_KEY"
-    )
-
     /**
      * Returns the configured AeroDataBox API key from BuildConfig.
      */
@@ -101,18 +94,6 @@ object ApiConfig {
     fun hasValidAeroDataBoxKey(keyOverride: String? = null): Boolean {
         val key = (keyOverride ?: aeroDataBoxApiKey).trim()
         return key.length >= 16 && key !in PLACEHOLDER_KEYS && !key.startsWith("DEFAULT_")
-    }
-
-    /**
-     * Checks whether a real Google Maps API key is configured.
-     */
-    fun hasValidMapsApiKey(): Boolean {
-        return try {
-            val key = BuildConfig.MAPS_API_KEY.trim()
-            key.length >= 16 && key !in PLACEHOLDER_MAP_KEYS && !key.startsWith("DEFAULT_")
-        } catch (_: Throwable) {
-            false
-        }
     }
 
     /**

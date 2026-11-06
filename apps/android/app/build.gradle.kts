@@ -1,3 +1,4 @@
+import java.io.File
 import java.time.Duration
 
 plugins {
@@ -10,7 +11,7 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk { version = release(37) }
 
   defaultConfig {
     applicationId = "com.aistudio.skytrack.wkvzp"
@@ -19,7 +20,6 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    manifestPlaceholders["MAPS_API_KEY"] = ""
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
@@ -66,6 +66,9 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  sourceSets.getByName("main").assets {
+    directories.add(layout.buildDirectory.dir("generated/aviMapStyles").get().asFile.path)
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -74,7 +77,7 @@ android {
 
 kotlin {
   compilerOptions {
-    freeCompilerArgs.add("-Xannotation-default-target=param-property")
+    // Free of the pre-2.4 "-Xannotation-default-target" opt-in now that AGP ships Kotlin 2.4.
   }
 }
 
@@ -83,6 +86,22 @@ kotlin {
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
+}
+
+// Ship the shared Positron map styles from packages/map-style as Android assets,
+// so web and Android render from the same single source of truth.
+// NOTE: derived via parentFile instead of ".." — path builds with ".." are
+// misresolved by the local environment's mount layer (rootProject layout .dir("..")
+// produced apps/packages instead of repo/packages).
+val aviRootDir = rootProject.projectDir.parentFile.parentFile
+val aviMapStyleDir = File(aviRootDir, "packages/map-style")
+val generatedMapAssets = layout.buildDirectory.dir("generated/aviMapStyles")
+val copyAviMapStyles = tasks.register("copyAviMapStyles", Copy::class) {
+  from(aviMapStyleDir) {
+    include("style.json", "style-dark.json")
+    into("map")
+  }
+  into(generatedMapAssets)
 }
 
 // Some unused dependencies are commented out below instead of being removed.
@@ -121,7 +140,7 @@ dependencies {
   implementation(libs.ktor.client.content.negotiation)
   implementation(libs.ktor.serialization.kotlinx.json)
   implementation(libs.kotlinx.serialization.json)
-  implementation(libs.kotlinx.coroutines.play.services)
+  implementation(libs.maplibre.compose)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
@@ -130,10 +149,7 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
   implementation(libs.retrofit)
-  implementation(libs.play.services.maps)
-  implementation(libs.maps.compose)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -151,6 +167,8 @@ dependencies {
   "kspRelease"(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)
 }
+
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(copyAviMapStyles) }
 
 tasks.matching { it.name.startsWith("ksp") }.configureEach {
   if (name.contains("UnitTest") || name.contains("AndroidTest")) {

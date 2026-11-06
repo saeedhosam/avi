@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <!-- Same silhouette as the web aircraft icon: nose pointing up (-Y), cyan fill, ink outline. -->
+    <path
+        android:fillColor="#00E5FF"
+        android:strokeColor="#071018"
+        android:strokeWidth="2"
+        android:strokeLineJoin="round"
+        android:pathData="M32,5 L38,25 L60,36 L60,43 L38,38 L38,53 L46,59 L46,63 L32,59 L18,63 L18,59 L26,53 L26,38 L4,43 L4,36 L26,25 Z" />
+</vector>

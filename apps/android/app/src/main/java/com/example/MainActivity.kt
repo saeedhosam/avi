@@ -85,7 +85,8 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class NavigationScreen(val label: String, val icon: ImageVector, val tag: String) {
-    SEARCH("Search", Icons.Default.Search, "nav_search"),
+    SEARCH("Search", Icons.Default.Search, "nav_search"),
+
     CONNECTIONS("Routes", Icons.Default.Hub, "nav_connections"),
     BOARDS("Airports", Icons.Default.FlightTakeoff, "nav_boards"),
     TERMINALS("Terminals", Icons.Default.Layers, "nav_terminals"),
@@ -103,7 +104,7 @@ fun SkyTrackApp(
 ) {
     var currentScreen by remember { mutableStateOf(NavigationScreen.SEARCH) }
     var selectedDetailFlight by remember { mutableStateOf<Flight?>(null) }
-    var googleMapFlight by remember { mutableStateOf<Flight?>(null) }
+    var mapFlight by remember { mutableStateOf<Flight?>(null) }
     var terminalAirportCode by remember { mutableStateOf<String?>(null) }
     var terminalGate by remember { mutableStateOf<String?>(null) }
     var showTerminalOverlay by remember { mutableStateOf(false) }
@@ -140,14 +141,14 @@ fun SkyTrackApp(
         }
     }
 
-    // Handle back button when overlay, Google Maps, flight detail, or secondary tab is open
+    // Handle back button when overlay, flight map, flight detail, or secondary tab is open
     BackHandler(
-        enabled = showTerminalOverlay || googleMapFlight != null || selectedDetailFlight != null || currentScreen != NavigationScreen.SEARCH
+        enabled = showTerminalOverlay || mapFlight != null || selectedDetailFlight != null || currentScreen != NavigationScreen.SEARCH
     ) {
         if (showTerminalOverlay) {
             showTerminalOverlay = false
-        } else if (googleMapFlight != null) {
-            googleMapFlight = null
+        } else if (mapFlight != null) {
+            mapFlight = null
         } else if (selectedDetailFlight != null) {
             selectedDetailFlight = null
         } else {
@@ -159,7 +160,7 @@ fun SkyTrackApp(
         modifier = Modifier.fillMaxSize().testTag("skytrack_main_scaffold"),
         containerColor = DeepSpace,
         bottomBar = {
-            if (!showTerminalOverlay && selectedDetailFlight == null && googleMapFlight == null) {
+            if (!showTerminalOverlay && selectedDetailFlight == null && mapFlight == null) {
                 NavigationBar(
                     containerColor = CockpitDark,
                     tonalElevation = 6.dp,
@@ -178,7 +179,7 @@ fun SkyTrackApp(
                             selected = isSelected,
                             onClick = {
                                 selectedDetailFlight = null
-                                googleMapFlight = null
+                                mapFlight = null
                                 showTerminalOverlay = false
                                 currentScreen = screen
                             },
@@ -235,11 +236,11 @@ fun SkyTrackApp(
                     onBack = { showTerminalOverlay = false },
                     modifier = Modifier.fillMaxSize()
                 )
-            } else if (googleMapFlight != null) {
-                val liveGoogleMapFlight = allFlights.find { it.id == googleMapFlight!!.id } ?: googleMapFlight!!
-                GoogleFlightMapScreen(
-                    flight = liveGoogleMapFlight,
-                    onBack = { googleMapFlight = null },
+            } else if (mapFlight != null) {
+                val liveMapFlight = allFlights.find { it.id == mapFlight!!.id } ?: mapFlight!!
+                FlightMapScreen(
+                    flight = liveMapFlight,
+                    onBack = { mapFlight = null },
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (selectedDetailFlight != null) {
@@ -249,7 +250,7 @@ fun SkyTrackApp(
                     flight = liveFlight,
                     viewModel = viewModel,
                     onBack = { selectedDetailFlight = null },
-                    onOpenGoogleMap = { googleMapFlight = liveFlight },
+                    onOpenFlightMap = { mapFlight = liveFlight },
                     onOpenTerminalMap = { airportCode, gate ->
                         terminalAirportCode = airportCode
                         terminalGate = gate

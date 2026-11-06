@@ -7,7 +7,7 @@ Avi is a flight-tracking and terminal-wayfinding platform with a shared provider
 | Path | Purpose | Status |
 | --- | --- | --- |
 | `apps/web` | Next.js 16 web client | Running; Supabase auth/data migration in progress |
-| `apps/android` | Kotlin + Compose Android client | Supabase auth/data migrated; MapLibre migration pending |
+| `apps/android` | Kotlin + Compose Android client | MapLibre migration complete; Google Maps removed |
 | `apps/ios` | SwiftUI placeholder client | Scaffolded |
 | `services/api` | Fastify provider gateway | Running; live flight search + status |
 | `supabase` | Postgres schema, RLS, migrations, tests | Applied to the `avi` project |

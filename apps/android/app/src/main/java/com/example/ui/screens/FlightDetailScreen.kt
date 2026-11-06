@@ -36,7 +36,7 @@ fun FlightDetailScreen(
     flight: Flight,
     viewModel: FlightViewModel,
     onBack: () -> Unit,
-    onOpenGoogleMap: () -> Unit,
+    onOpenFlightMap: () -> Unit,
     onOpenTerminalMap: (airportCode: String, gate: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -100,14 +100,14 @@ fun FlightDetailScreen(
                         )
                     }
 
-                    // Google Maps Button
+                    // Flight Map Button
                     IconButton(
-                        onClick = onOpenGoogleMap,
-                        modifier = Modifier.testTag("open_google_map_top_btn")
+                        onClick = onOpenFlightMap,
+                        modifier = Modifier.testTag("open_flight_map_top_btn")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Map,
-                            contentDescription = "Open Google Maps",
+                            contentDescription = "Open Flight Map",
                             tint = RadarCyan
                         )
                     }
@@ -517,8 +517,8 @@ fun FlightDetailScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(1.dp, RadarCyan.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                    .clickable(onClick = onOpenGoogleMap)
-                                    .testTag("launch_google_maps_pill"),
+                                    .clickable(onClick = onOpenFlightMap)
+                                    .testTag("launch_flight_map_pill"),
                                 color = InstrumentSurface
                             ) {
                                 Row(
@@ -533,7 +533,7 @@ fun FlightDetailScreen(
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = "Google Maps",
+                                        text = "Flight Map",
                                         color = RadarCyan,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
