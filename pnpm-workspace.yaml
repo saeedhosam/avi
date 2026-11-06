@@ -15,3 +15,5 @@ minimumReleaseAgeExclude:
   - '@supabase/realtime-js@2.119.0'
   - '@supabase/storage-js@2.119.0'
   - '@supabase/supabase-js@2.119.0'
+  - '@fastify/cors@11.4.1'
+  - lucide-react@1.69.0
