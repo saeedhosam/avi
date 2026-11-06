@@ -2,7 +2,7 @@ name: avi
 
 services:
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2.11.9-alpine
     container_name: avi-caddy
     restart: unless-stopped
     ports:
@@ -99,7 +99,7 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:8-alpine
+    image: redis:8.8-alpine
     container_name: avi-redis
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]

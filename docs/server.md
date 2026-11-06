@@ -29,10 +29,10 @@ SSH password authentication is disabled; root login is key-only.
 
 | Service | Image | Exposure |
 | --- | --- | --- |
-| `avi-caddy` | `caddy:2.10-alpine` | public 80/443 |
+| `avi-caddy` | `caddy:2.11.9-alpine` | public 80/443 |
 | `avi-web` | `avi-web:local` | internal 3000 |
 | `avi-api` | `avi-api:local` | internal 8080 |
-| `avi-redis` | `redis:8-alpine` | internal 6379 |
+| `avi-redis` | `redis:8.8-alpine` | internal 6379 |
 
 Only Caddy publishes ports. UFW allows 22/80/443.
 

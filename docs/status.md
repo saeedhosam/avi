@@ -57,7 +57,9 @@ Updated: 2026-11-05
 - Room remains the offline cache; cloud watchlist items with snapshots and alerts are merged on sign-in.
 - Live Radar screen/tab removed; the flight detail map is kept.
 - User-facing watchlist is unified to one action/list; Supabase calls use `watchlist_items` and `notes`.
-- Android debug build passes in CI against compileSdk 36 with Supabase 3.1.4 / Ktor 3.1.3.
+- Google Maps removed from Android: the flight map is now MapLibre Compose (`org.maplibre.compose:maplibre-compose:0.20.0`, OpenGL runtime) using the same Positron light/dark styles as web, copied from `packages/map-style` into assets at build time (`copyAviMapStyles` task). Theme-following, great-circle arcs, traveled path, heading vector, IATA halo labels, and camera fit mirror the web flight map. `play-services-maps`, `maps-compose`, and `MAPS_API_KEY` are gone.
+- Toolchain refreshed 2026-11-06: AGP 9.5.1 / Gradle 9.8.2 / built-in Kotlin 2.4.21, compileSdk 37, Compose BOM 2026.09.00, KSP 2.3.13, Room 2.8.5, Supabase BOM 3.9.0, Ktor 3.6.1, OkHttp 5.5.1, Retrofit 3.0.0.
+- Android debug build and unit tests pass locally; CI builds with the same Gradle version.
 
 ### API
 
@@ -91,19 +93,19 @@ Updated: 2026-11-05
 ## Next implementation phases
 
 1. **Google OAuth dev setup** — add the Web/Android OAuth clients and verify web + Android sign-in.
-2. **Android MapLibre migration** — remove Play Services Maps/maps-compose, add MapLibre Compose, reuse shared light/dark styles and selected-hub label hiding.
-3. **Android internal watchlist cleanup** — collapse the remaining `isFavorite`/`isTracked` duality and Room tracked/favorite tables into one cached watchlist.
-4. **Backend provider parity** — move flight mapping/boards/routes/weather from Next API routes into `services/api`; point web and Android at the shared API.
-5. **Indoor + AMDB** — Overpass ingestion job, curated floorplan georeferencing, routing graph, `/v1/airports/{iata}/map/*` endpoints, web/Android indoor UI.
-6. **Push** — Web Push VAPID, FCM HTTP v1, APNs, alert engine.
-7. **iOS implementation** beyond the placeholder.
+2. **Android internal watchlist cleanup** — collapse the remaining `isFavorite`/`isTracked` duality and Room tracked/favorite tables into one cached watchlist.
+3. **Backend provider parity** — move flight mapping/boards/routes/weather from Next API routes into `services/api`; point web and Android at the shared API.
+4. **Indoor + AMDB** — Overpass ingestion job, curated floorplan georeferencing, routing graph, `/v1/airports/{iata}/map/*` endpoints, web/Android indoor UI.
+5. **Push** — Web Push VAPID, FCM HTTP v1, APNs, alert engine.
+6. **iOS implementation** beyond the placeholder.
 
 ## Known limitations
 
 - The web still uses its Next.js API routes for airport/weather data; the shared `avi-api` currently covers flight search and status.
-- Android still uses Google Maps until its MapLibre phase lands.
 - Android still carries internal `isFavorite`/`isTracked` flags and separate Room tracked/favorite tables behind the unified UI.
 - Web Google OAuth works; Android Google sign-in remains deferred until the Android OAuth client, SHA fingerprints, and `GOOGLE_WEB_CLIENT_ID` are added.
 - Indoor/AMDB data and routing are not implemented yet.
 - No production domain is connected; `sslip.io` is staging only.
 - The direct Starter plan has a 40,000 unit/month cap with no paid overage, so watchlist refresh frequency and route browsing must stay within budget.
+- Map styles are bundled into the Android APK from `packages/map-style` at build time; keep that package as the single source of truth. The web route-map contract (hide base labels when a hub/route is selected) is not yet mirrored on Android.
+- TypeScript stays on 5.9.x; the npm `latest` is TS 7 (the Go rewrite) — ecosystem (Next typegen, ESLint configs) is not aligned on it yet.
