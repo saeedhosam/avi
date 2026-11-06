@@ -127,8 +127,8 @@ export default function WatchlistPage() {
               </div>
             </div>
             <p className="mt-3 text-[10px] leading-relaxed text-muted">
-              Watchlisted flights are cached locally, mirrored to Supabase, and
-              checked for real status changes while live data is available.
+              Saved flights are stored on this device and synced to
+              your account, with live status checks whenever data is available.
             </p>
           </Panel>
 

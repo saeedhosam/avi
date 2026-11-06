@@ -281,7 +281,7 @@ export default function RoutesPage() {
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
-            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+            "Live flight data is unavailable right now.",
           );
         }
         if (data.error) throw new Error(data.error);
@@ -290,7 +290,7 @@ export default function RoutesPage() {
         const next = toConnections(originNode, data.routes ?? []);
         setConnections(next);
         if (!next.length) {
-          setError("AeroDataBox returned no daily direct routes for this airport.");
+          setError("No live direct routes found for this airport today.");
         }
       } catch (loadError) {
         setConnections([]);
@@ -793,7 +793,7 @@ export default function RoutesPage() {
                 ) : (
                   <div>
                     <p className="mb-1.5 text-[9px] leading-relaxed text-muted">
-                      Pick an origin hub to load live direct routes from AeroDataBox.
+                      Pick an origin hub to load live direct routes.
                     </p>
                     <div className="grid grid-cols-3 gap-1">
                       {QUICK_HUBS.map((code) => (
@@ -837,7 +837,7 @@ export default function RoutesPage() {
         open={hubSheetOpen}
         onClose={() => setHubSheetOpen(false)}
         title="Select origin airport hub"
-        subtitle="Enter an IATA code or city to load live direct routes from AeroDataBox."
+        subtitle="Enter an IATA code or city to load live direct routes."
         icon={<Search className="size-4" />}
         size="md"
       >

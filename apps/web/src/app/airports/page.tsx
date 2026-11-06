@@ -159,7 +159,7 @@ export default function AirportsPage() {
       if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
       if (data.mode === "NOT_CONFIGURED") {
         throw new Error(
-          "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+          "Live flight data is unavailable right now. Weather is unaffected.",
         );
       }
       if (data.error) throw new Error(data.error);
@@ -218,7 +218,7 @@ export default function AirportsPage() {
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
-            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+            "Live flight data is unavailable right now. Weather is unaffected.",
           );
         }
         setSearchAirports(data.airports ?? []);
@@ -291,7 +291,7 @@ export default function AirportsPage() {
           <h2 className="mt-1 flex items-center gap-2 text-xl font-black tracking-tight text-ink">
             {tab === "BOARD" ? "Live airport flight boards" : "Live airport explorer"}
             <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-accent">
-              {tab === "BOARD" ? airportCode : "AERODATABOX + METEO"}
+              {tab === "BOARD" ? airportCode : "LIVE + WEATHER"}
             </span>
           </h2>
           <p className="mt-1 text-[11px] text-muted">
@@ -334,11 +334,9 @@ export default function AirportsPage() {
 
       {!aeroConfigured && !offlineMode && (
         <div className="mb-3 rounded-xl border border-delayed/40 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-          <strong className="text-delayed">AeroDataBox is not configured.</strong>{" "}
-          Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code> and{" "}
-          <code className="font-mono text-accent">AERODATABOX_API_HOST</code> to{" "}
-          <code className="font-mono text-accent">.env</code>, then restart the dev
-          server. Weather remains live from Open-Meteo; no demo flights are shown.
+          <strong className="text-delayed">Live flight data is unavailable.</strong>{" "}
+          Airport weather stays live for the current session and saved boards,
+          routes, and data from your last sync are shown here. Weather stays live; no simulated flights ever appear.
         </div>
       )}
 
@@ -461,7 +459,7 @@ export default function AirportsPage() {
                   <EmptyState
                     icon={<PlaneTakeoff className="size-6" />}
                     title={`No live ${direction.toLowerCase()} found`}
-                    description={`AeroDataBox returned no ${direction.toLowerCase()} for ${airportCode}${airline !== "All" ? ` operated by ${airline}` : ""}.`}
+                    description={`No live ${direction.toLowerCase()} found for ${airportCode}${airline !== "All" ? ` operated by ${airline}` : ""}.`}
                   />
                 ) : (
                   <div className="divide-y divide-line/50">
@@ -479,7 +477,7 @@ export default function AirportsPage() {
 
               <div className="flex items-center justify-between rounded-xl border border-line/60 bg-surface px-3 py-2 text-[9px] text-subtle">
                 <span>
-                  {lastSync} · AeroDataBox {boardMode || "live FIDS"}
+                  {lastSync} · {boardMode || "live boards"}
                 </span>
                 <span className={cn("flex items-center gap-1", boardError ? "text-delayed" : "text-landed")}>
                   <span
@@ -666,8 +664,8 @@ export default function AirportsPage() {
                 title={searchLoading ? "Searching live airports…" : "No airports found"}
                 description={
                   searchLoading
-                    ? "Querying AeroDataBox for matching airports."
-                    : "Try a different IATA code, city, or country. Live airport search requires AeroDataBox."
+                    ? "Searching live airport data."
+                    : "Try a different IATA code, city, or country."
                 }
               />
             </Panel>
@@ -935,9 +933,8 @@ function AirportDetailModal({
           </div>
 
           <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[9px] leading-relaxed text-subtle">
-            Weather is fetched live from Open-Meteo. Flight boards, routes, gates,
-            and statuses are fetched live from AeroDataBox. Nothing on this screen
-            is simulated.
+            Weather is live and flight boards, routes, gates, and statuses come
+            from the live feed — nothing on this screen is simulated.
           </p>
         </div>
       )}

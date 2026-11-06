@@ -27,16 +27,34 @@ import { Button, IconButton, Modal } from "./ui";
 
 const NAV_ITEMS = [
   { href: "/search", label: "Search", icon: Search, tag: "Flight lookup" },
-  { href: "/routes", label: "Routes", icon: Network, tag: "Global connections" },
-  { href: "/airports", label: "Airports", icon: PlaneTakeoff, tag: "Boards & METAR" },
-  { href: "/terminals", label: "Terminals", icon: Layers, tag: "Gate navigation" },
+  {
+    href: "/routes",
+    label: "Routes",
+    icon: Network,
+    tag: "Global connections",
+  },
+  {
+    href: "/airports",
+    label: "Airports",
+    icon: PlaneTakeoff,
+    tag: "Boards & METAR",
+  },
+  {
+    href: "/terminals",
+    label: "Terminals",
+    icon: Layers,
+    tag: "Gate navigation",
+  },
   { href: "/watchlist", label: "Watchlist", icon: Heart, tag: "Saved flights" },
 ];
 
 const PAGE_TITLES: Record<string, { title: string; eyebrow: string }> = {
   "/search": { title: "Flight Search", eyebrow: "Live telemetry console" },
   "/routes": { title: "Route Network", eyebrow: "Global direct connections" },
-  "/airports": { title: "Airport Boards", eyebrow: "Departures, arrivals & METAR" },
+  "/airports": {
+    title: "Airport Boards",
+    eyebrow: "Departures, arrivals & METAR",
+  },
   "/terminals": { title: "Terminal Maps", eyebrow: "Gate-level wayfinding" },
   "/watchlist": { title: "Watchlist", eyebrow: "Saved flights & live alerts" },
 };
@@ -63,7 +81,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const pageKey =
     Object.keys(PAGE_TITLES).find(
-      (key) => pathname === key || (key !== "/search" && pathname.startsWith(key)),
+      (key) =>
+        pathname === key || (key !== "/search" && pathname.startsWith(key)),
     ) ?? "/search";
   const meta = pathname.startsWith("/flight/")
     ? { title: "Flight Dossier", eyebrow: "Live flight detail" }
@@ -85,7 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Avi
             </p>
             <p className="mt-1 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] text-accent">
-              Live flight tracking & terminal maps
+              Your sky companion
             </p>
           </div>
         </div>
@@ -122,7 +141,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-1">
-                    <span className="text-[13px] font-semibold">{item.label}</span>
+                    <span className="text-[13px] font-semibold">
+                      {item.label}
+                    </span>
                     {item.href === "/watchlist" && watchlist.length > 0 && (
                       <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--bg)]">
                         {watchlist.length}
@@ -259,7 +280,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-72px)] pb-20 lg:pb-0">{children}</main>
+        <main className="min-h-[calc(100vh-72px)] pb-20 lg:pb-0">
+          {children}
+        </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line/70 bg-surface/95 backdrop-blur-xl lg:hidden">
@@ -301,45 +324,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         icon={<Info className="size-4" />}
         size="sm"
         footer={
-          <Button size="sm" variant="ghost" onClick={() => setSourceOpen(false)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSourceOpen(false)}
+          >
             Close
           </Button>
         }
       >
         <div className="space-y-3">
-          <p className="text-xs leading-relaxed text-muted">{source.subtitle}</p>
+          <p className="text-xs leading-relaxed text-muted">
+            {source.subtitle}
+          </p>
           <div className="space-y-2">
             <DiagnosticRow
-              title="AeroDataBox Direct API"
-              detail="Live flight lookup, FIDS boards, daily route stats"
+              title="Live flight data"
+              detail="Live flight lookup, airport boards, daily route stats"
               active={aeroConfigured && !offlineMode}
-              value={aeroConfigured ? "KEY CONFIGURED" : "CACHE FALLBACK"}
+              value={aeroConfigured ? "CONNECTED" : "SAVED DATA"}
             />
             <DiagnosticRow
-              title="Open-Meteo aviation weather"
-              detail="Zero-key METAR, destination arrival forecasts, VFR/IFR rules"
+              title="Destination weather"
+              detail="METAR, arrival forecasts, VFR/IFR rules"
               active={!offlineMode}
-              value="LIVE · ZERO-KEY"
+              value="CONNECTED"
             />
             <DiagnosticRow
               title="Local cache & background sync"
               detail="Flights, watchlist, notes, alerts, route cache"
               active
-              value="ACTIVE (SSOT)"
+              value="ACTIVE"
             />
             <DiagnosticRow
-              title="Supabase"
-              detail="Auth · Postgres · Realtime · push"
+              title="Account sync"
+              detail="Sign-in · profile · watchlist · alerts"
               active={aeroConfigured || Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)}
-              value={aeroConfigured ? "CONFIGURED" : "OPTIONAL"}
+              value={aeroConfigured ? "CONNECTED" : "OPTIONAL"}
             />
           </div>
           {!aeroConfigured && (
             <p className="rounded-lg border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-              Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
-              to <code className="font-mono text-accent">.env.local</code> to stream
-              live global flight numbers and airport FIDS boards. Until then,
-              Avi uses the authentic local cache and live Open-Meteo weather.
+              Live flight lookups aren’t connected in this build, so saved
+              flights and weather are used until it is. Everything else —
+              watchlist, saves, notes, alerts — works normally.
             </p>
           )}
         </div>

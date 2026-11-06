@@ -78,7 +78,14 @@ export function DestinationWeatherCard({
           <p className="text-[11px] font-semibold">
             Fetching destination arrival weather…
           </p>
-          <p className="text-[9px] text-subtle">Open-Meteo · live forecast</p>
+          <a
+            href="https://open-meteo.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[9px] text-subtle underline-offset-2 hover:underline"
+          >
+            Weather data by Open-Meteo
+          </a>
         </div>
       </div>
     );

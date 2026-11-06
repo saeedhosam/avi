@@ -113,14 +113,14 @@ export default function SearchPage() {
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
-            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+            "Live flight data is unavailable right now.",
           );
         }
         if (data.error) throw new Error(data.error);
         const incoming = data.flights ?? [];
         setResults(incoming);
         if (incoming.length) upsertFlights(incoming);
-        else setError("AeroDataBox returned no live flights for this number.");
+        else setError("No live flights found for this number.");
       } catch (searchError) {
         if (!controller.signal.aborted) {
           setError(
@@ -173,7 +173,7 @@ export default function SearchPage() {
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
-            "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart.",
+            "Live flight data is unavailable right now.",
           );
         }
         if (data.error) throw new Error(data.error);
@@ -295,7 +295,7 @@ export default function SearchPage() {
                   <TextInput
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Flight # or airlineâ€¦"
+                    placeholder="e.g. AA 123"
                     className="pl-9 pr-8"
                   />
                   {query && (
@@ -309,7 +309,7 @@ export default function SearchPage() {
                   )}
                 </div>
                 <p className="text-[9px] leading-relaxed text-subtle">
-                  Requires a live AeroDataBox result. Try a flight number such as{" "}
+                  Needs a live flight match. Try a number such as{" "}
                   <span className="font-mono text-accent">MS985</span>,{" "}
                   <span className="font-mono text-accent">BA286</span>, or{" "}
                   <span className="font-mono text-accent">EK202</span>.
@@ -437,7 +437,7 @@ export default function SearchPage() {
             </div>
             {recents.length === 0 ? (
               <p className="py-2 text-[10px] leading-relaxed text-subtle">
-                Live flights you open are cached here for one-tap recall.
+                Flights you open are saved here for one-tap recall.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -458,7 +458,7 @@ export default function SearchPage() {
                         />
                       </p>
                       <p className="mt-0.5 truncate text-[9px] text-subtle">
-                        {recent.originCode} â†’ {recent.destCode} Â· {recent.airline}
+                        {recent.originCode} → {recent.destCode} · {recent.airline}
                       </p>
                     </button>
                     <button
@@ -480,11 +480,11 @@ export default function SearchPage() {
             <div>
               <p className="label-caps text-accent">
                 {mode === "ROUTE"
-                  ? `Live departures Â· ${routeOrigin || "â€”"}${routeDestination ? ` â†’ ${routeDestination}` : " â†’ any"}`
+                  ? `Live departures · ${routeOrigin || "—"}${routeDestination ? ` → ${routeDestination}` : " → any"}`
                   : "Live flight lookup"}
               </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
-                {mode === "ROUTE" ? "Live route departures" : "AeroDataBox flight lookup"}
+                {mode === "ROUTE" ? "Live route departures" : "Live flight lookup"}
                 <span className="ml-2 text-sm font-semibold text-muted">
                   ({displayFlights.length})
                 </span>
@@ -504,28 +504,26 @@ export default function SearchPage() {
                   )}
                 />
                 <span className="text-[10px] font-semibold text-muted">
-                  {loading ? "Querying live dataâ€¦" : error ? "Live lookup unavailable" : "Live data"}
+                  {loading ? "Querying live data…" : error ? "Live lookup unavailable" : "Live data"}
                 </span>
               </div>
               <Button size="sm" variant="outline" onClick={refreshData} disabled={syncing}>
-                {syncing ? "Refreshingâ€¦" : "Refresh"}
+                {syncing ? "Refreshing…" : "Refresh"}
               </Button>
             </div>
           </div>
 
           {!aeroConfigured && !offlineMode && (
             <div className="rounded-xl border border-delayed/40 bg-delayed/10 px-3 py-2.5 text-[10px] leading-relaxed text-muted">
-              <strong className="text-delayed">Live data is not configured.</strong>{" "}
-              Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
-              and <code className="font-mono text-accent">AERODATABOX_API_HOST</code>{" "}
-              to <code className="font-mono text-accent">.env</code>, then restart the
-              dev server. No demo flights are shown.
+              <strong className="text-delayed">Live flight data is unavailable.</strong>{" "}
+              Saved flights and airport weather keep working. Sign out and back
+              in, or check the system status panel, if this persists.
             </div>
           )}
 
           {offlineMode && (
             <div className="rounded-xl border border-accent/35 bg-accent-soft px-3 py-2.5 text-[10px] leading-relaxed text-muted">
-              Offline mode is active. Only previously cached live flights are shown.
+              You’re offline — showing previously viewed flights from your last sync.
             </div>
           )}
 
@@ -533,7 +531,7 @@ export default function SearchPage() {
             <Panel>
               <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
                 <Radio className="size-4 animate-pulse text-accent" />
-                Querying live AeroDataBox dataâ€¦
+                Fetching live flight data…
               </div>
             </Panel>
           ) : error ? (
@@ -556,7 +554,7 @@ export default function SearchPage() {
                 title="Search live flights"
                 description={
                   mode === "FLIGHT_NUMBER"
-                    ? "Enter a full flight number to query AeroDataBox. Results are never simulated."
+                    ? "Enter a full flight number for live results. No simulated data is ever shown."
                     : "Enter a 3-letter origin airport code. Live departures will be filtered by the optional destination."
                 }
               />
@@ -650,11 +648,11 @@ export default function SearchPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[10px] font-bold text-ink">
-                        {flight.flightNumber} Â· {flight.origin.code}â†’{flight.destination.code}
+                        {flight.flightNumber} · {flight.origin.code}→{flight.destination.code}
                       </span>
                       <span className="block text-[9px] text-subtle tabular">
                         {flight.telemetry.hasLiveLocation
-                          ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft Â· ${flight.telemetry.groundSpeedKnots} kt`
+                          ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft · ${flight.telemetry.groundSpeedKnots} kt`
                           : "Live position not reported"}
                       </span>
                     </span>
@@ -686,7 +684,7 @@ export default function SearchPage() {
                     </p>
                     <p className="mt-0.5 flex items-center gap-1 text-[9px] text-subtle">
                       <span className="font-mono text-accent">{alert.flightNumber}</span>
-                      Â· {alert.timestamp}
+                      · {alert.timestamp}
                     </p>
                   </div>
                 ))}
@@ -711,10 +709,10 @@ export default function SearchPage() {
                     <Clock className="size-3 text-subtle" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[10px] font-semibold text-ink">
-                        {flight.flightNumber} Â· {flight.destination.code}
+                        {flight.flightNumber} · {flight.destination.code}
                       </span>
                       <span className="block text-[9px] text-subtle">
-                        {flight.departureTimeEstimated} Â· {flight.gateDeparture}
+                        {flight.departureTimeEstimated} · {flight.gateDeparture}
                       </span>
                     </span>
                     <span
@@ -735,8 +733,7 @@ export default function SearchPage() {
             </p>
             <p className="mt-1 text-[9px] leading-relaxed text-subtle">
               Every flight, gate, delay, status, route, and airport board on this
-              screen comes from AeroDataBox. Weather comes from Open-Meteo. No demo
-              records are seeded.
+              screen comes from the live feed — no demo data, ever.
             </p>
           </div>
         </aside>

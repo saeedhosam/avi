@@ -58,7 +58,7 @@ export function createBaseMap(
   map.addControl(
     new AttributionControl({
       compact: true,
-      customAttribution: "© OpenStreetMap contributors · OpenFreeMap",
+      customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
     }),
     "bottom-right",
   );

@@ -131,7 +131,7 @@ export default function FlightDetailPage() {
             <EmptyState
               icon={<Radio className="size-6 animate-pulse" />}
               title="Loading live flight"
-              description="Querying AeroDataBox for this flight number. Only live data is shown."
+              description="Looking up this flight number live. Only live data is shown."
             />
           ) : (
             <EmptyState
@@ -141,8 +141,8 @@ export default function FlightDetailPage() {
                 offlineMode
                   ? "Offline mode is active and this flight is not cached. Reconnect to fetch it live."
                   : !aeroConfigured
-                    ? "AeroDataBox is not configured. Add AERODATABOX_API_KEY to .env and restart."
-                    : "AeroDataBox returned no live flight for this number. It may not be operating today."
+                    ? "Live flight data is unavailable right now. Weather and your saved data still work."
+                    : "No live data found for this number. It may not be operating today."
               }
               action={
                 <Link href="/search">
@@ -508,8 +508,8 @@ export default function FlightDetailPage() {
               <MapPin className="size-3 text-accent" /> Cached & cloud synced
             </p>
             <p className="mt-1 text-[9px] leading-relaxed text-subtle">
-              Flight state is stored in the local browser cache and mirrored to
-              Supabase for signed-in users.
+              Flight state is saved on this device and synced to
+              your account when you’re signed in.
             </p>
           </div>
         </aside>
@@ -695,7 +695,7 @@ function NotesModal({
       open={open}
       onClose={onClose}
       title={`Flight note · ${flight.flightNumber}`}
-      subtitle="Personal notes stay local and sync to Supabase when signed in."
+      subtitle="Personal notes stay on your device and sync to your account when signed in."
       icon={<NotebookPen className="size-4" />}
       size="sm"
       footer={
@@ -717,8 +717,8 @@ function NotesModal({
         className="w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-ink outline-none placeholder:text-subtle focus:border-accent"
       />
       <p className="mt-1.5 text-[10px] text-subtle">
-        Notes are private to your profile and capped at 500 characters by
-        Supabase RLS policies.
+        Notes stay private to you — only you and your devices can
+        see them. Up to 500 characters each.
       </p>
     </Modal>
   );

@@ -49,7 +49,7 @@ export function SourceBanner({ className }: { className?: string }) {
           className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.1em]"
           style={{ color: meta.color }}
         >
-          {syncing ? "SYNCING LIVE TELEMETRY…" : meta.badge}
+          {syncing ? "SYNCING…" : meta.badge}
         </span>
         <span className="min-w-0 flex-1 truncate text-[10px] text-muted">
           · {meta.summary}
@@ -62,7 +62,7 @@ export function SourceBanner({ className }: { className?: string }) {
             void refreshData();
           }}
           className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-3"
-          aria-label="Refresh telemetry"
+          aria-label="Refresh data"
         >
           <RefreshCw className={cn("size-3", syncing && "animate-spin")} />
         </button>
@@ -71,7 +71,7 @@ export function SourceBanner({ className }: { className?: string }) {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Telemetry & API diagnostics"
+        title="Data & sync status"
         subtitle={meta.title}
         icon={<RadioTower className="size-4" />}
         size="sm"
@@ -91,36 +91,35 @@ export function SourceBanner({ className }: { className?: string }) {
           <p className="text-xs leading-relaxed text-muted">{meta.subtitle}</p>
           <div className="space-y-2">
             <DiagnosticRow
-              title="AeroDataBox Direct API"
-              detail="Flights, FIDS boards, delays, daily route stats"
+              title="Live flight data"
+              detail="Flights, airport boards, delays, daily route stats"
               active={aeroConfigured && !offlineMode}
-              value={aeroConfigured ? "KEY CONFIGURED" : "CACHE FALLBACK"}
+              value={aeroConfigured ? "CONNECTED" : "SAVED DATA"}
             />
             <DiagnosticRow
-              title="Open-Meteo aviation weather"
+              title="Destination weather"
               detail="Live METAR, forecasts, VFR/IFR rules"
               active={!offlineMode}
-              value="LIVE · ZERO-KEY"
+              value="CONNECTED"
             />
             <DiagnosticRow
               title="Local cache + background sync"
               detail="Flights, watchlist, notes, alerts, routes"
               active
-              value="ACTIVE (SSOT)"
+              value="ACTIVE"
             />
           </div>
           {offlineMode ? (
             <p className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
               <WifiOff className="mt-0.5 size-3.5 shrink-0 text-accent" />
-              Offline mode is enabled. Live API calls are paused and the local
-              cache is serving all screens.
+              You’re offline. Live lookups are paused and
+              your saved data is being used across all screens.
             </p>
           ) : !aeroConfigured ? (
             <p className="flex items-start gap-2 rounded-lg border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
               <Cloud className="mt-0.5 size-3.5 shrink-0 text-delayed" />
-              Add <code className="font-mono text-accent">AERODATABOX_API_KEY</code>{" "}
-              to <code className="font-mono text-accent">.env.local</code> for live
-              AeroDataBox flight and FIDS data. Weather is already live via Open-Meteo.
+              Live flight lookups aren’t connected in this build.
+              Saved flights and boards are shown from your last sync. Weather is live.
             </p>
           ) : null}
         </div>

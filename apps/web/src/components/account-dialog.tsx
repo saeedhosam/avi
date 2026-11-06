@@ -139,20 +139,20 @@ export function AccountDialog({
           <div className="mt-3 grid grid-cols-3 gap-2">
             <StatusMini
               icon={<Cloud className="size-3.5" />}
-              label="Supabase"
-              value={account.isSignedIn ? "Synced" : "Not linked"}
+              label="Sync"
+              value={account.isSignedIn ? "Linked" : "Not linked"}
               active={account.isSignedIn}
             />
             <StatusMini
               icon={<Wifi className="size-3.5" />}
-              label="AeroDataBox"
-              value={aeroConfigured ? "Configured" : "Cache"}
+              label="Live data"
+              value={aeroConfigured ? "Connected" : "Saved only"}
               active={aeroConfigured}
             />
             <StatusMini
               icon={<Sparkles className="size-3.5" />}
               label="Weather"
-              value="Open-Meteo"
+              value="Live"
               active
             />
           </div>
@@ -205,8 +205,8 @@ export function AccountDialog({
                     </p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
                       {offlineMode
-                        ? "Serving the local browser cache. Reconnect to refresh live telemetry."
-                        : "Watchlists, notes, alerts, and profile are persisted locally and mirrored to Supabase."}
+                        ? "Showing your saved data. Reconnect to refresh live flights and weather."
+                        : "Watchlists, notes, alerts, and your profile are saved on this device and synced to your account."}
                     </p>
                   </div>
                 </div>
@@ -254,7 +254,7 @@ export function AccountDialog({
             <div className="rounded-xl border border-line bg-surface-2 p-3.5">
               <div className="flex items-center gap-2">
                 <UserRound className="size-4 text-accent" />
-                <p className="label-caps text-ink">Supabase authentication</p>
+                <p className="label-caps text-ink">Account sync</p>
               </div>
               <div className="mt-2 space-y-1.5 text-[11px] text-muted">
                 <p className="flex items-center justify-between gap-3">
@@ -264,24 +264,23 @@ export function AccountDialog({
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
-                  <span>Environment</span>
+                  <span>Status</span>
                   <span className="font-semibold text-ink">
-                    {supabaseReady ? "Supabase client ready" : "Supabase not initialized"}
+                    {supabaseReady ? "Sync connected" : "Offline only"}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
-                  <span>Push token</span>
-                  <span className="max-w-[200px] truncate font-mono text-[10px] text-accent">
-                    {fcmToken || "—"}
+                  <span>Alerts</span>
+                  <span className="font-semibold text-ink">
+                    {fcmToken ? "Enabled on this device" : "Not set up on this device"}
                   </span>
                 </p>
               </div>
               {!supabaseReady && (
                 <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
-                  Add your Supabase URL and publishable key to{" "}
-                  <code className="font-mono text-accent">.env.local</code> to
-                  enable Google sign-in and cloud sync. The app gracefully falls
-                  back to local storage until then.
+                  Google sign-in and cross-device sync aren’t connected in
+                  this build. Your data stays safe on this device until sync is
+                  available.
                 </p>
               )}
             </div>

@@ -194,7 +194,7 @@ export default function FlightMapPage() {
             </div>
             {!flight.telemetry.hasLiveLocation && (
               <div className="mt-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] leading-relaxed text-delayed">
-                Live aircraft position is not reported by AeroDataBox. The route is
+                A live aircraft position isn’t available for this flight. The route is
                 shown, but no aircraft marker is fabricated.
               </div>
             )}
@@ -256,7 +256,7 @@ export default function FlightMapPage() {
 
         <div className="pointer-events-none absolute bottom-20 left-3 flex items-center gap-1.5 rounded-md border border-line/70 bg-surface/85 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-subtle backdrop-blur">
           <Layers className="size-2.5 text-accent" />{" "}
-          MapLibre · OpenStreetMap Positron · drag to pan · scroll to zoom
+          © OpenStreetMap contributors · tiles by OpenFreeMap · drag to pan · scroll to zoom
         </div>
       </div>
     </div>

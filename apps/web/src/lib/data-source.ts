@@ -4,37 +4,40 @@ export type DataSourceMode =
   | "QUOTA_FALLBACK"
   | "NOT_CONFIGURED";
 
+// User-facing copy for the data status chip and panel. Keys mirror the
+// internal data pipeline states; wording is traveller-facing and must not
+// mention providers, env vars, HTTP codes, or infrastructure names.
 export const DATA_SOURCE_META = {
   LIVE_AERODATABOX: {
-    badge: "LIVE AERODATABOX + METEO",
-    summary: "Live flights, FIDS & weather",
-    title: "Live AeroDataBox & Open-Meteo connected",
+    badge: "LIVE DATA + WEATHER",
+    summary: "Live flights, airport boards & weather",
+    title: "Connected to live flight data",
     subtitle:
-      "Streaming real-time global flights, airport FIDS boards, hourly delay changes, and destination weather. Cached results remain available offline.",
+      "Live flights, airport boards, delay changes, and destination weather update as they happen. Recently viewed flights and boards stay available offline.",
     color: "#10B981",
   },
   OFFLINE_CACHE: {
-    badge: "OFFLINE · CACHED LIVE DATA",
-    summary: "Serving cached live results",
-    title: "Offline mode",
+    badge: "OFFLINE · SAVED DATA",
+    summary: "Saved flights and weather from your last sync",
+    title: "Offline — showing saved data",
     subtitle:
-      "Live API calls are paused. Previously fetched flights, routes, weather, alerts, and watchlists are served from the local cache.",
+      "You're offline. Flights you viewed, your watchlist, notes, and recent weather are shown from your last sync.",
     color: "#00E5FF",
   },
   QUOTA_FALLBACK: {
-    badge: "RATE LIMIT · CACHED LIVE DATA",
-    summary: "AeroDataBox quota reached",
-    title: "AeroDataBox rate limit reached (HTTP 429)",
+    badge: "UPDATES PAUSED · SAVED DATA",
+    summary: "Live updates paused — showing saved data",
+    title: "Live updates paused",
     subtitle:
-      "New flight lookups are paused until the AeroDataBox quota resets. Cached live results and Open-Meteo weather remain available.",
+      "The live feed is busy right now, so new flight lookups are paused. Everything you already saved is up to date as of your last sync.",
     color: "#F59E0B",
   },
   NOT_CONFIGURED: {
-    badge: "AERODATABOX NOT CONFIGURED",
-    summary: "Add your AeroDataBox API key",
-    title: "Live flight data is not configured",
+    badge: "LIVE DATA UNAVAILABLE",
+    summary: "Saved flights and weather are still available",
+    title: "Live flight data unavailable",
     subtitle:
-      "Add AERODATABOX_API_KEY to .env and restart the server to enable live flight search, airport boards, and route data.",
+      "Live flight looks are unavailable right now. Saved flights and weather keep working.",
     color: "#EF4444",
   },
 } as const;
