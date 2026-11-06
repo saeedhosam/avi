@@ -71,7 +71,7 @@ interface AppContextValue {
   markAllAlertsRead: () => void;
   recents: RecentSearch[];
   addRecent: (flight: Flight) => void;
-  deleteRecent: (flightNumber: string) => void;
+  deleteRecent: (flightNumber: string, flightDate?: string) => void;
   clearRecents: () => void;
   account: UserAccount;
   authBusy: boolean;
@@ -148,8 +148,9 @@ function normalizePersistedFlight(value: unknown): Flight {
   };
 }
 
-function flightKey(flight: Pick<Flight, "flightNumber">) {
-  return normalizeFlightNumber(flight.flightNumber).toLowerCase();
+function flightKey(flight: Pick<Flight, "flightNumber" | "flightDate">) {
+  const number = normalizeFlightNumber(flight.flightNumber).toLowerCase();
+  return flight.flightDate ? `${number}|${flight.flightDate}` : `${number}|any`;
 }
 
 function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
@@ -160,6 +161,7 @@ function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
+      flightDate: next.flightDate,
       type: "GATE_CHANGE",
       title: `Gate change · ${next.flightNumber}`,
       message: `${next.airline} ${next.flightNumber} departure gate changed from ${previous.gateDeparture} to ${next.gateDeparture} (Terminal ${next.terminalDeparture}).`,
@@ -172,6 +174,7 @@ function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
+      flightDate: next.flightDate,
       type: "CANCELLATION",
       title: `Flight cancelled · ${next.flightNumber}`,
       message: `${next.flightNumber} (${next.origin.code} → ${next.destination.code}) has been cancelled. ${next.delayReason ?? "Contact your airline for rebooking."}`,
@@ -185,6 +188,7 @@ function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
+      flightDate: next.flightDate,
       type: "DELAY",
       title: `Delay update · ${next.flightNumber}`,
       message: `${next.flightNumber} is now delayed by ${next.delayMinutes} minutes. Estimated departure ${next.departureTimeEstimated}. ${next.delayReason ?? ""}`.trim(),
@@ -197,6 +201,7 @@ function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
+      flightDate: next.flightDate,
       type: "BOARDING",
       title: `Boarding · ${next.flightNumber}`,
       message: `Boarding has started for ${next.flightNumber} at ${next.gateDeparture}, Terminal ${next.terminalDeparture}.`,
@@ -214,6 +219,7 @@ function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
+      flightDate: next.flightDate,
       type: "BAGGAGE",
       title: `Baggage update · ${next.flightNumber}`,
       message: `Baggage for ${next.flightNumber} is assigned to ${next.baggageCarousel} at ${next.destination.code}.`,
@@ -412,31 +418,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const records = await fetchCloudWatchlist(uid);
       if (!records.length) return;
       const cloudByNumber = new Map(
-        records.map((record) => [String(record.flightNumber), record]),
+        records.map((record) => [
+          `${String(record.flightNumber).toLowerCase()}|${record.flightDate ?? "any"}`,
+          record,
+        ]),
       );
       const missing = [...cloudByNumber.keys()].filter(
-        (number) =>
-          !flightsRef.current.some(
-            (flight) =>
-              normalizeFlightNumber(flight.flightNumber) ===
-              normalizeFlightNumber(number),
-          ),
+        (key) => !flightsRef.current.some((flight) => flightKey(flight) === key),
       );
       const fetched: Flight[] = [];
-      for (const number of missing.slice(0, 8)) {
+      for (const key of missing.slice(0, 8)) {
+        const record = cloudByNumber.get(key);
+        if (!record) continue;
         try {
-          const response = await fetch(
-            `/api/flights/search?flight=${encodeURIComponent(number.replace(/\s+/g, ""))}`,
-            { cache: "no-store" },
+          const url = new URL("/api/flights/search", window.location.origin);
+          url.searchParams.set(
+            "flight",
+            String(record.flightNumber).replace(/\s+/g, ""),
           );
+          if (record.flightDate) url.searchParams.set("date", record.flightDate);
+          const response = await fetch(url, { cache: "no-store" });
           const data = (await response.json()) as { flights?: Flight[] };
-          fetched.push(...(data.flights ?? []));
+          // Only flights on the saved operating date count for this entry.
+          fetched.push(
+            ...(data.flights ?? []).filter(
+              (flight) =>
+                (flight.flightDate ?? "any") === (record.flightDate ?? "any"),
+            ),
+          );
         } catch {
           // A missing cloud flight is retried on the next sync.
         }
       }
       const merged = fetched.map((flight) => {
-        const record = cloudByNumber.get(flight.flightNumber);
+        const record = cloudByNumber.get(flightKey(flight));
         return {
           ...flight,
           isWatchlisted: true,
@@ -444,9 +459,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
       });
       if (merged.length) upsertFlights(merged);
+      // Re-flag anything already in the local cache that matches a cloud row.
       upsertFlights(
         flightsRef.current.map((flight) => {
-          const record = cloudByNumber.get(flight.flightNumber);
+          const record = cloudByNumber.get(flightKey(flight));
           if (!record) return flight;
           return {
             ...flight,
@@ -492,10 +508,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const results = await Promise.all(
         targets.slice(0, 8).map(async (flight) => {
           try {
-            const response = await fetch(
-              `/api/flights/search?flight=${encodeURIComponent(flight.flightNumber.replace(/\s+/g, ""))}`,
-              { cache: "no-store" },
+            const url = new URL("/api/flights/search", window.location.origin);
+            url.searchParams.set(
+              "flight",
+              flight.flightNumber.replace(/\s+/g, ""),
             );
+            if (flight.flightDate) url.searchParams.set("date", flight.flightDate);
+            const response = await fetch(url, { cache: "no-store" });
             const data = (await response.json()) as {
               mode: string;
               flights?: Flight[];
@@ -579,16 +598,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleWatchlist = useCallback(
     (flight: Flight, notes = "") => {
+      const targetKey = flightKey(flight);
       const current = flightsRef.current.find(
-        (item) =>
-          normalizeFlightNumber(item.flightNumber) ===
-          normalizeFlightNumber(flight.flightNumber),
+        (item) => flightKey(item) === targetKey,
       );
       if (!current) return;
       const willWatch = !current.isWatchlisted;
       const updated = flightsRef.current.map((item) =>
-        normalizeFlightNumber(item.flightNumber) ===
-        normalizeFlightNumber(flight.flightNumber)
+        flightKey(item) === targetKey
           ? {
               ...item,
               isWatchlisted: willWatch,
@@ -598,11 +615,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
       flightsRef.current = updated;
       setFlights(updated);
-      const nextFlight = updated.find(
-        (item) =>
-          normalizeFlightNumber(item.flightNumber) ===
-          normalizeFlightNumber(flight.flightNumber),
-      );
+      const nextFlight = updated.find((item) => flightKey(item) === targetKey);
       if (nextFlight && account.uid) {
         if (nextFlight.isWatchlisted) {
           void saveWatchlistItemCloud(account.uid, nextFlight);
@@ -622,18 +635,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateNotes = useCallback(
     (flightNumber: string, notes: string) => {
+      const match = normalizeFlightNumber(flightNumber);
       const updated = flightsRef.current.map((flight) =>
-        normalizeFlightNumber(flight.flightNumber) ===
-        normalizeFlightNumber(flightNumber)
+        normalizeFlightNumber(flight.flightNumber) === match
           ? { ...flight, customNotes: notes }
           : flight,
       );
       flightsRef.current = updated;
       setFlights(updated);
-      const flight = updated.find(
-        (item) =>
-          normalizeFlightNumber(item.flightNumber) ===
-          normalizeFlightNumber(flightNumber),
+      const flight = updated.find((item) =>
+        normalizeFlightNumber(item.flightNumber) === match,
       );
       if (flight && account.uid && flight.isWatchlisted) {
         void saveWatchlistItemCloud(account.uid, {
@@ -667,6 +678,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRecents((prev) => {
       const next: RecentSearch = {
         flightNumber: flight.flightNumber,
+        flightDate: flight.flightDate,
         airline: flight.airline,
         originCode: flight.origin.code,
         originCity: flight.origin.city,
@@ -675,20 +687,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: flight.status,
         searchTimestamp: Date.now(),
       };
-      return [next, ...prev.filter((item) => item.flightNumber !== flight.flightNumber)].slice(0, 5);
+      return [
+        next,
+        ...prev.filter(
+          (item) =>
+            item.flightNumber !== flight.flightNumber ||
+            item.flightDate !== flight.flightDate,
+        ),
+      ].slice(0, 5);
     });
   }, []);
 
-  const deleteRecent = useCallback((flightNumber: string) => {
-    setRecents((prev) => prev.filter((item) => item.flightNumber !== flightNumber));
-  }, []);
+  const deleteRecent = useCallback(
+    (flightNumber: string, flightDate?: string) => {
+      setRecents((prev) =>
+        prev.filter(
+          (item) =>
+            item.flightNumber !== flightNumber ||
+            item.flightDate !== flightDate,
+        ),
+      );
+    },
+    [],
+  );
 
   const clearRecents = useCallback(() => setRecents([]), []);
 
   const signIn = useCallback(async () => {
     if (!supabaseEnabled) {
       notify(
-        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env and restart.",
+        "Sign-in isn\u2019t connected in this build. Your data stays safely on this device.",
         "warning",
       );
       return;
@@ -696,7 +724,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAuthBusy(true);
     try {
       await signInWithGoogleSupabase();
-      notify("Google Sign-In connected. Supabase sync active.", "success");
+      notify("Google Sign-In connected. Sync is active.", "success");
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "Google Sign-In failed or was cancelled.",
@@ -712,7 +740,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await signOutSupabase().catch(() => {});
     }
     setAccount({ ...GUEST_ACCOUNT, isOfflineMode: offlineMode });
-    notify("Signed out. Cached live data remains available offline.", "info");
+    notify("Signed out. Your saved data stays on this device.", "info");
   }, [account.uid, notify, offlineMode]);
 
   const toggleOffline = useCallback(() => {
@@ -722,13 +750,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...current,
         isOfflineMode: next,
         lastSyncTime: next
-          ? "Offline mode · serving cached live data"
+          ? "Offline · saved data"
           : "Online · live data enabled",
       }));
       notify(
         next
-          ? "Offline mode enabled. No live API calls will be made."
-          : "Online. Live API access restored.",
+          ? "Offline mode enabled — live lookups paused."
+          : "Back online — live lookups resumed.",
         next ? "warning" : "success",
       );
       return next;

@@ -78,6 +78,8 @@ export interface FlightTimelineEvent {
 
 export interface Flight {
   id: string;
+  /** Departure date in the flight's local timezone as ISO YYYY-MM-DD, when known. */
+  flightDate?: string;
   flightNumber: string;
   airline: string;
   airlineCode: string;
@@ -109,6 +111,7 @@ export interface Flight {
 export interface FlightAlert {
   id: string;
   flightNumber: string;
+  flightDate?: string;
   type: AlertType;
   title: string;
   message: string;
@@ -118,6 +121,7 @@ export interface FlightAlert {
 
 export interface RecentSearch {
   flightNumber: string;
+  flightDate?: string;
   airline: string;
   originCode: string;
   originCity: string;

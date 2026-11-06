@@ -100,6 +100,14 @@ function normalizeFlightNumber(raw: string) {
   return match ? `${match[1]} ${match[2]}` : compact;
 }
 
+/** Departure date in the departure airport's timezone (ISO YYYY-MM-DD). */
+function scheduledDepartureDate(
+  dto: AeroMovementDto | undefined,
+): string | undefined {
+  const raw = dto?.scheduledTime?.local ?? dto?.scheduledTime?.utc;
+  return raw?.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+}
+
 function resolveAirport(
   dto: AeroAirportDto | undefined,
   fallbackIata: string | undefined,
@@ -340,6 +348,8 @@ export function mapAeroFlight(
 
   const dep = dto.departure ?? (isDeparture ? dto.movement : undefined);
   const arr = dto.arrival ?? (!isDeparture ? dto.movement : undefined);
+  // The operating date scoped to the departure airport's own timezone.
+  const departureDate = scheduledDepartureDate(dep);
 
   const origin = resolveAirport(dep?.airport, isDeparture ? fallbackIata : undefined);
   const destination = resolveAirport(arr?.airport, !isDeparture ? fallbackIata : undefined);
@@ -383,6 +393,7 @@ export function mapAeroFlight(
 
   const baseFlight: Omit<Flight, "timeline"> = {
     id: compactId,
+    flightDate: departureDate,
     flightNumber,
     airline,
     airlineCode,

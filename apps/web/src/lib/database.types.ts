@@ -262,6 +262,7 @@ export type Database = {
           airline: string
           created_at: string
           dest_code: string
+          flight_date: string | null
           flight_id: string
           flight_number: string
           notes: string
@@ -275,6 +276,7 @@ export type Database = {
           airline?: string
           created_at?: string
           dest_code?: string
+          flight_date?: string | null
           flight_id: string
           flight_number: string
           notes?: string
@@ -288,6 +290,7 @@ export type Database = {
           airline?: string
           created_at?: string
           dest_code?: string
+          flight_date?: string | null
           flight_id?: string
           flight_number?: string
           notes?: string

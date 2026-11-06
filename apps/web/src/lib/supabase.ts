@@ -129,6 +129,7 @@ export async function saveWatchlistItemCloud(
         user_id: uid,
         flight_id: flight.id,
         flight_number: flight.flightNumber,
+        flight_date: flight.flightDate ?? null,
         airline: flight.airline.slice(0, 100),
         origin_code: flight.origin.code,
         dest_code: flight.destination.code,
@@ -233,6 +234,7 @@ export async function fetchCloudWatchlist(uid: string) {
     return (data ?? []).map((record) => ({
       flightId: record.flight_id,
       flightNumber: record.flight_number,
+      flightDate: record.flight_date ?? undefined,
       airline: record.airline,
       originCode: record.origin_code,
       destCode: record.dest_code,

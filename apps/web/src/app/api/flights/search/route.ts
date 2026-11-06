@@ -4,6 +4,7 @@ import {
   mapAeroFlight,
   type AeroFlightDto,
 } from "@/lib/aerodatabox";
+import type { Flight } from "@/lib/types";
 
 
 export async function GET(request: Request) {
@@ -16,10 +17,19 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   }
+  const rawDate = (searchParams.get("date") ?? "").trim();
+  if (rawDate && !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    return NextResponse.json(
+      { mode: "NOT_CONFIGURED", flights: [], error: "Invalid departure date" },
+      { status: 400 },
+    );
+  }
 
-  const { data, status, mode } = await fetchAeroJson<AeroFlightDto[]>(
-    `/flights/number/${cleaned}?withAircraftImage=false&withLocation=true`,
-  );
+  // Date-scoped lookups use the specific-date endpoint (departure date only).
+  const path = rawDate
+    ? `/flights/number/${cleaned}/${rawDate}?dateLocalRole=Departure&withAircraftImage=false&withLocation=true`
+    : `/flights/number/${cleaned}?withAircraftImage=false&withLocation=true`;
+  const { data, status, mode } = await fetchAeroJson<AeroFlightDto[]>(path);
 
   if (!data) {
     return NextResponse.json({
@@ -31,7 +41,8 @@ export async function GET(request: Request) {
 
   const flights = data
     .map((dto) => mapAeroFlight(dto))
-    .filter((flight) => Boolean(flight));
+    .filter((flight): flight is Flight => Boolean(flight))
+    .filter((flight) => !rawDate || flight.flightDate === rawDate);
 
   return NextResponse.json({ mode, flights });
 }

@@ -109,6 +109,50 @@ export function SourceBanner({ className }: { className?: string }) {
               value="ACTIVE"
             />
           </div>
+          <div className="space-y-1.5 rounded-xl border border-line/70 bg-surface px-3 py-2.5">
+            <p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-subtle">
+              Data sources
+            </p>
+            <p className="text-[9px] leading-relaxed text-subtle">
+              Flight data by{" "}
+              <a
+                href="https://www.aerodatabox.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                AeroDataBox
+              </a>
+              .{" "}
+              <a
+                href="https://open-meteo.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                Weather data by Open-Meteo
+              </a>
+              . Map data ©{" "}
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                OpenStreetMap contributors
+              </a>{" "}
+              · tiles by{" "}
+              <a
+                href="https://openfreemap.org/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                OpenFreeMap
+              </a>
+              . Not for operational navigation use.
+            </p>
+          </div>
           {offlineMode ? (
             <p className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
               <WifiOff className="mt-0.5 size-3.5 shrink-0 text-accent" />

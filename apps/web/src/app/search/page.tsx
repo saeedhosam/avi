@@ -23,7 +23,11 @@ import type { Flight, FlightStatus } from "@/lib/types";
 import {
   STATUS_META,
   cn,
+  flightDateLabel,
+  isoDateOffset,
+  isoDateToday,
   normalizeFlightNumber,
+  splitFlightQuery,
   statusLabel,
 } from "@/lib/utils";
 import { FlightCard } from "@/components/flight-card";
@@ -61,6 +65,7 @@ export default function SearchPage() {
 
   const [mode, setMode] = useState<SearchMode>("FLIGHT_NUMBER");
   const [query, setQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState(isoDateToday());
   const [statusFilter, setStatusFilter] = useState<FlightStatus | null>(null);
   const [onlyWatchlisted, setOnlyWatchlisted] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState("JFK");
@@ -86,8 +91,11 @@ export default function SearchPage() {
     setResults([]);
     setError(null);
     setResultMode("");
-    const cleaned = query.trim().replace(/\s+/g, "").replace(/-/g, "");
-    if (cleaned.length < 3) {
+    // Accept combined forms like "AA123, 13-MAR"; typed date wins over chips.
+    const parsed = splitFlightQuery(query.trim().toUpperCase());
+    const number = parsed.number.replace(/\s+/g, "").replace(/-/g, "");
+    const date = parsed.date ?? selectedDate;
+    if (number.length < 3) {
       setLoading(false);
       return;
     }
@@ -101,7 +109,7 @@ export default function SearchPage() {
       setError(null);
       try {
         const response = await fetch(
-          `/api/flights/search?flight=${encodeURIComponent(cleaned)}`,
+          `/api/flights/search?flight=${encodeURIComponent(number)}&date=${date}`,
           { signal: controller.signal, cache: "no-store" },
         );
         const data = (await response.json()) as {
@@ -137,7 +145,7 @@ export default function SearchPage() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [query, mode, offlineMode, setQuotaFallback, upsertFlights]);
+  }, [query, selectedDate, mode, offlineMode, setQuotaFallback, upsertFlights]);
 
   // Route lookup: live airport departures from AeroDataBox, filtered by destination.
   useEffect(() => {
@@ -225,20 +233,30 @@ export default function SearchPage() {
     [results, statusFilter, onlyWatchlisted],
   );
 
-  const openRecent = (flightNumber: string) => {
+  const openRecent = (
+    flightNumber: string,
+    flightDate?: string,
+  ) => {
     setMode("FLIGHT_NUMBER");
     setStatusFilter(null);
     setOnlyWatchlisted(false);
     const matched = flights.find(
       (flight) =>
         normalizeFlightNumber(flight.flightNumber) ===
-        normalizeFlightNumber(flightNumber),
+          normalizeFlightNumber(flightNumber) &&
+        flight.flightDate === flightDate,
     );
     if (matched) {
       addRecent(matched);
-      router.push(`/flight/${encodeURIComponent(matched.id)}`);
+      const query = new URLSearchParams();
+      if (matched.flightDate) query.set("date", matched.flightDate);
+      router.push(
+        `/flight/${encodeURIComponent(matched.id)}?${query.toString()}`,
+      );
     } else {
-      setQuery(flightNumber);
+      setQuery(
+        flightDate ? `${flightNumber} ${flightDateLabel(flightDate)}` : flightNumber,
+      );
     }
   };
 
@@ -295,7 +313,7 @@ export default function SearchPage() {
                   <TextInput
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="e.g. AA 123"
+                    placeholder="e.g. AA123 · 13-MAR"
                     className="pl-9 pr-8"
                   />
                   {query && (
@@ -308,11 +326,45 @@ export default function SearchPage() {
                     </button>
                   )}
                 </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-subtle">
+                    Departure date
+                  </span>
+                  <button
+                    onClick={() => setSelectedDate(isoDateToday())}
+                    className={cn(
+                      "rounded-lg border px-1.5 py-0.5 text-[10px] font-bold transition-colors",
+                      selectedDate === isoDateToday()
+                        ? "border-accent/60 bg-accent-soft text-accent"
+                        : "border-line text-muted hover:text-ink",
+                    )}
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => setSelectedDate(isoDateOffset(1))}
+                    className={cn(
+                      "rounded-lg border px-1.5 py-0.5 text-[10px] font-bold transition-colors",
+                      selectedDate === isoDateOffset(1)
+                        ? "border-accent/60 bg-accent-soft text-accent"
+                        : "border-line text-muted hover:text-ink",
+                    )}
+                  >
+                    Tomorrow
+                  </button>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) =>
+                      setSelectedDate(event.target.value || isoDateToday())
+                    }
+                    className="rounded-lg border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-ink focus:border-accent/60 focus-visible:outline-none"
+                    aria-label="Departure date"
+                  />
+                </div>
                 <p className="text-[9px] leading-relaxed text-subtle">
-                  Needs a live flight match. Try a number such as{" "}
-                  <span className="font-mono text-accent">MS985</span>,{" "}
-                  <span className="font-mono text-accent">BA286</span>, or{" "}
-                  <span className="font-mono text-accent">EK202</span>.
+                  Include the date inline too — e.g.{" "}
+                  <span className="font-mono text-accent">AA123, 13-MAR</span>.
                 </p>
               </div>
             ) : (
@@ -443,11 +495,13 @@ export default function SearchPage() {
               <div className="space-y-1.5">
                 {recents.map((recent) => (
                   <div
-                    key={recent.flightNumber}
+                    key={`${recent.flightNumber}|${recent.flightDate ?? "any"}`}
                     className="group flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2/70 p-2"
                   >
                     <button
-                      onClick={() => openRecent(recent.flightNumber)}
+                      onClick={() =>
+                        openRecent(recent.flightNumber, recent.flightDate)
+                      }
                       className="min-w-0 flex-1 text-left"
                     >
                       <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink">
@@ -458,11 +512,13 @@ export default function SearchPage() {
                         />
                       </p>
                       <p className="mt-0.5 truncate text-[9px] text-subtle">
-                        {recent.originCode} → {recent.destCode} · {recent.airline}
+                        {recent.originCode} → {recent.destCode}
+                        {recent.flightDate ? ` · ${flightDateLabel(recent.flightDate)}` : ""}
+                        {" · "}{recent.airline}
                       </p>
                     </button>
                     <button
-                      onClick={() => deleteRecent(recent.flightNumber)}
+                      onClick={() => deleteRecent(recent.flightNumber, recent.flightDate)}
                       aria-label={`Remove ${recent.flightNumber} from recent searches`}
                       className="text-subtle opacity-0 transition-opacity hover:text-cancelled group-hover:opacity-100"
                     >
@@ -640,7 +696,13 @@ export default function SearchPage() {
                 {airborne.slice(0, 4).map((flight) => (
                   <button
                     key={flight.id}
-                    onClick={() => router.push(`/flight/${encodeURIComponent(flight.id)}`)}
+                    onClick={() =>
+                      router.push(
+                        flight.flightDate
+                          ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
+                          : `/flight/${encodeURIComponent(flight.id)}`,
+                      )
+                    }
                     className="flex w-full items-center gap-2 rounded-lg border border-line/60 bg-surface-2/60 px-2 py-1.5 text-left transition-colors hover:border-accent/40"
                   >
                     <span className="flex size-6 items-center justify-center rounded-md bg-surface-3 text-[9px] font-bold text-accent">

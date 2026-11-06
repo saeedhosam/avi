@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
-import { STATUS_META, cn } from "@/lib/utils";
+import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
 import { StatusBadge } from "./ui";
 
 export function FlightCard({
@@ -40,13 +40,21 @@ export function FlightCard({
       tabIndex={0}
       onClick={() => {
         addRecent(flight);
-        router.push(`/flight/${encodeURIComponent(flight.id)}`);
+        router.push(
+          flight.flightDate
+            ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
+            : `/flight/${encodeURIComponent(flight.id)}`,
+        );
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           addRecent(flight);
-          router.push(`/flight/${encodeURIComponent(flight.id)}`);
+          router.push(
+          flight.flightDate
+            ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
+            : `/flight/${encodeURIComponent(flight.id)}`,
+        );
         }
       }}
       className={cn(
@@ -65,6 +73,11 @@ export function FlightCard({
               <p className="text-[15px] font-bold leading-none text-ink">
                 {flight.flightNumber}
               </p>
+              {flight.flightDate && (
+                <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted">
+                  {flightDateLabel(flight.flightDate)}
+                </span>
+              )}
               <StatusBadge
                 status={flight.status}
                 delayMinutes={flight.delayMinutes}

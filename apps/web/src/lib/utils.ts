@@ -138,6 +138,104 @@ export function normalizeFlightNumber(value: string) {
   return value.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
 }
 
+const MONTHS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+] as const;
+
+/** ISO YYYY-MM-DD for "today" in the viewer's timezone. */
+export function isoDateToday() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** ISO YYYY-MM-DD N days from (or before) today. */
+export function isoDateOffset(days: number) {
+  const now = new Date();
+  now.setDate(now.getDate() + days);
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** "13 MAR" style short label for an ISO date. */
+export function flightDateLabel(iso?: string | null) {
+  if (!iso) return "";
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return iso;
+  const month = MONTHS[Number(match[2]) - 1];
+  if (!month) return iso;
+  const day = String(Number(match[3]));
+  return `${day} ${month}`;
+}
+
+/**
+ * Splits a combined query like "AA123, 13-MAR" or "BA286 2026-03-13" into the
+ * flight number and an ISO departure date. Only recognised dates are pulled
+ * out of the text; anything else stays part of the number.
+ */
+export function splitFlightQuery(raw: string): {
+  number: string;
+  date: string | null;
+} {
+  const text = raw
+    .replace(/[,;/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const year = new Date().getFullYear();
+  const trailing = text.match(
+    /(?:^|\s)((\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[-/ ]?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:[./](\d{2,4}))?)$/i,
+  );
+  if (!trailing || !/^[A-Za-z]{2}\s?\d/.test(text.slice(0, trailing.index ?? 0))) {
+    return { number: text.replace(/\s+/g, ""), date: null };
+  }
+  const numberText = text.slice(0, trailing.index ?? 0).trim();
+  if (trailing[2]) {
+    // ISO form.
+    const month = Number(trailing[3]);
+    const day = Number(trailing[4]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      return { number: text.replace(/\s+/g, ""), date: null };
+    }
+    return {
+      number: numberText.replace(/\s+/g, ""),
+      date: `${trailing[2]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    };
+  }
+  const monthIndex = MONTHS.indexOf(
+    (trailing[6]?.toUpperCase() ?? "") as (typeof MONTHS)[number],
+  );
+  const day = Number(trailing[5]);
+  if (monthIndex < 0 || !day || day < 1 || day > 31) {
+    return { number: text.replace(/\s+/g, ""), date: null };
+  }
+  const typed = trailing[7];
+  let dateYear = year;
+  if (typed) {
+    const parsed = Number(typed);
+    // Two-digit years roll into the current century.
+    if (!Number.isNaN(parsed)) {
+      dateYear = typed.length <= 2 ? (parsed < 70 ? 2000 + parsed : 1900 + parsed) : parsed;
+      // A past year in a flight search probably means the current year.
+      if (dateYear < year) dateYear = year;
+    }
+  }
+  const iso = `${dateYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return { number: numberText.replace(/\s+/g, ""), date: iso };
+}
+
 export function initials(name: string) {
   return name
     .split(/\s+/)

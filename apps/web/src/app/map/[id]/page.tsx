@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Compass,
@@ -16,22 +16,29 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { cn, geodesicDistanceKm, kmToNm } from "@/lib/utils";
+import type { Flight } from "@/lib/types";
 import { FlightMap } from "@/components/flight-map";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
 
 export default function FlightMapPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { flights } = useApp();
   const flight = useMemo(() => {
     const id = decodeURIComponent(params.id ?? "");
-    return flights.find(
-      (item) =>
-        item.id.toLowerCase() === id.toLowerCase() ||
-        item.flightNumber.replace(/\s+/g, "").toLowerCase() ===
-          id.replace(/\s+/g, "").toLowerCase(),
+    const numberMatch = (item: Flight) =>
+      item.id.toLowerCase() === id.toLowerCase() ||
+      item.flightNumber.replace(/\s+/g, "").toLowerCase() ===
+        id.replace(/\s+/g, "").toLowerCase();
+    const dateParam = searchParams.get("date") ?? "";
+    const dateMatch = (item: Flight) =>
+      !dateParam || (item.flightDate ?? "") === dateParam;
+    return (
+      flights.find((item) => numberMatch(item) && dateMatch(item)) ??
+      flights.find(numberMatch)
     );
-  }, [flights, params.id]);
+  }, [flights, params.id, searchParams]);
 
   const [showHud, setShowHud] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);

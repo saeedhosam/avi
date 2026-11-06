@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Bookmark,
@@ -24,7 +24,7 @@ import {
 import { useApp } from "@/lib/store";
 import { fetchDestinationForecast } from "@/lib/weather";
 import type { DestinationArrivalForecast, Flight } from "@/lib/types";
-import { STATUS_META, cn } from "@/lib/utils";
+import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
 import { FlightMapPreview } from "@/components/flight-map-preview";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { DestinationWeatherCard, AirportWeatherCard } from "@/components/weather-cards";
@@ -43,6 +43,7 @@ import {
 
 export default function FlightDetailPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const {
     flights,
@@ -55,14 +56,19 @@ export default function FlightDetailPage() {
     syncing,
   } = useApp();
 
+  const dateParam = searchParams.get("date") ?? "";
   const flight = useMemo(() => {
     const id = decodeURIComponent(params.id ?? "");
-    return flights.find(
-      (item) =>
-        item.id.toLowerCase() === id.toLowerCase() ||
-        item.flightNumber.replace(/\s+/g, "").toLowerCase() === id.replace(/\s+/g, "").toLowerCase(),
+    const numberMatch = (item: Flight) =>
+      item.id.toLowerCase() === id.toLowerCase() ||
+      item.flightNumber.replace(/\s+/g, "").toLowerCase() === id.toLowerCase();
+    const dateMatch = (item: Flight) =>
+      !dateParam || (item.flightDate ?? "") === dateParam;
+    return (
+      flights.find((item) => numberMatch(item) && dateMatch(item)) ??
+      flights.find(numberMatch)
     );
-  }, [flights, params.id]);
+  }, [flights, params.id, dateParam]);
 
   const [forecast, setForecast] = useState<DestinationArrivalForecast | null>(null);
   const [forecastLoading, setForecastLoading] = useState(true);
@@ -86,7 +92,12 @@ export default function FlightDetailPage() {
     }
     let active = true;
     setLookupState("loading");
-    fetch(`/api/flights/search?flight=${encodeURIComponent(rawId)}`, {
+    const url = new URL(
+      `/api/flights/search?flight=${encodeURIComponent(rawId)}`,
+      window.location.origin,
+    );
+    if (dateParam) url.searchParams.set("date", dateParam);
+    fetch(url, {
       cache: "no-store",
     })
       .then((response) => response.json())
@@ -247,6 +258,7 @@ export default function FlightDetailPage() {
                 <div>
                   <p className="text-[11px] font-bold text-ink">
                     {flight.origin.city} → {flight.destination.city}
+                    {flight.flightDate ? ` · ${flightDateLabel(flight.flightDate)}` : ""}
                   </p>
                   <p className="text-[9px] text-subtle">
                     {flight.aircraft.model} · {flight.aircraft.registration}
