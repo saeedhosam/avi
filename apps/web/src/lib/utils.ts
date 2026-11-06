@@ -236,6 +236,125 @@ export function splitFlightQuery(raw: string): {
   return { number: numberText.replace(/\s+/g, ""), date: iso };
 }
 
+const DATE_YEAR_MIN = 1900;
+const DATE_YEAR_MAX = 2100;
+
+function monthFromName(token: string): number | null {
+  if (token.length < 3) return null;
+  const value = token.toLowerCase();
+  const index = MONTHS.findIndex(
+    (month) =>
+      month.toLowerCase().startsWith(value) ||
+      value.startsWith(month.toLowerCase()),
+  );
+  return index < 0 ? null : index + 1;
+}
+
+function isoFromParts(
+  year: number,
+  month: number,
+  day: number,
+): string | null {
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    year < DATE_YEAR_MIN ||
+    year > DATE_YEAR_MAX
+  ) {
+    return null;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function resolveYearToken(raw: string): number | null {
+  if (raw.length <= 2) {
+    const value = Number(raw);
+    const currentYear = new Date().getFullYear();
+    const rolled = value < 70 ? 2000 + value : 1900 + value;
+    // A past year in a flight search probably means the current year.
+    return rolled < currentYear ? currentYear : rolled;
+  }
+  const value = Number(raw);
+  return value >= DATE_YEAR_MIN && value <= DATE_YEAR_MAX ? value : null;
+}
+
+/**
+ * Parses a departure day typed freely into the search field — "17-Mar",
+ * "17 March", "17-March", "17/03", "Mar 17 2027", "2026-03-17" and close
+ * relatives. Returns ISO YYYY-MM-DD, or null when the text is not a
+ * recognisable date.
+ */
+export function parseFlexibleDate(raw: string): string | null {
+  const text = raw
+    .trim()
+    .replace(/(\d)(st|nd|rd|th)\b/gi, "$1")
+    .replace(/[,;]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!text) return null;
+  const currentYear = new Date().getFullYear();
+
+  // Day + month name with an optional year: 17-Mar, 17 March 2027.
+  let match = text.match(
+    /^(\d{1,2})[\s./-]*([A-Za-z]{3,})(?:[\s./-]+(\d{1,4}))?$/,
+  );
+  if (match) {
+    const month = monthFromName(match[2]);
+    if (!month) return null;
+    const year = match[3]
+      ? resolveYearToken(match[3])
+      : currentYear;
+    return year === null ? null : isoFromParts(year, month, Number(match[1]));
+  }
+
+  // Month name + day with an optional year: Mar 17, March 17 2027.
+  match = text.match(
+    /^([A-Za-z]{3,})[\s./-]*(\d{1,2})(?:[\s./-]+(\d{1,4}))?$/,
+  );
+  if (match) {
+    const month = monthFromName(match[1]);
+    if (!month) return null;
+    const year = match[3]
+      ? resolveYearToken(match[3])
+      : currentYear;
+    return year === null ? null : isoFromParts(year, month, Number(match[2]));
+  }
+
+  // ISO / year-first: 2026-03-17, 2026.3.17.
+  match = text.match(/^(\d{4})[./-]+(\d{1,2})[./-]+(\d{1,2})$/);
+  if (match) {
+    return isoFromParts(
+      Number(match[1]),
+      Number(match[2]),
+      Number(match[3]),
+    );
+  }
+
+  // Numeric day/month pairs with an optional year: 17/03, 17-03-2027, 3/17.
+  match = text.match(/^(\d{1,2})[./\- ]+(\d{1,2})(?:[./\- ]+(\d{1,4}))?$/);
+  if (match) {
+    const first = Number(match[1]);
+    const second = Number(match[2]);
+    const year = match[3] ? resolveYearToken(match[3]) : currentYear;
+    if (year === null) return null;
+    if (first > 12 && second <= 12) return isoFromParts(year, second, first);
+    if (first <= 12 && second > 12) return isoFromParts(year, first, second);
+    if (first <= 12 && second <= 12) return isoFromParts(year, second, first);
+    return null;
+  }
+
+  return null;
+}
+
 export function initials(name: string) {
   return name
     .split(/\s+/)
