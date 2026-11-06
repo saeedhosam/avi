@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BellRing,
-  Check,
   CheckCheck,
   Clock,
-  Copy,
   DoorOpen,
   KeyRound,
   Luggage,
@@ -15,8 +13,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { ALERT_META, cn } from "@/lib/utils";
-import { Button, EmptyState, IconButton, Modal } from "./ui";
+import { ALERT_META, cn, formatAlertTimestamp } from "@/lib/utils";
+import { Button, EmptyState, Modal } from "./ui";
 
 const alertIconMap = {
   GATE_CHANGE: DoorOpen,
@@ -36,30 +34,19 @@ export function NotificationsDialog({
   const {
     alerts,
     unreadAlertCount,
-    fcmToken,
     markAlertRead,
     markAllAlertsRead,
     enableBrowserNotifications,
+    enableWebPush,
     notificationPermission,
+    webPushSupported,
+    webPushConfigured,
+    webPushSubscribed,
     offlineMode,
   } = useApp();
 
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1800);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const copyToken = async () => {
-    try {
-      await navigator.clipboard.writeText(fcmToken);
-      setCopied(true);
-    } catch {
-      // Clipboard access is optional.
-    }
-  };
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   return (
     <Modal
@@ -102,35 +89,53 @@ export function NotificationsDialog({
             </div>
           </div>
 
-          {fcmToken ? (
-            <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-lg border border-line/70 bg-surface px-2.5 py-2 font-mono text-[10px] text-muted">
-                {fcmToken}
-              </code>
-              <IconButton label="Copy push token" onClick={copyToken}>
-                {copied ? (
-                  <Check className="size-3.5 text-landed" />
-                ) : (
-                  <Copy className="size-3.5" />
-                )}
-              </IconButton>
-            </div>
-          ) : (
-            <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
-              Web Push is not configured yet. Browser notifications still work
-              while the app is open. No fake token is generated.
+          {webPushSubscribed ? (
+            <p className="mt-2 rounded-lg border border-landed/30 bg-landed/10 px-2.5 py-2 text-[10px] font-semibold text-landed">
+              <KeyRound className="mr-1 inline size-3" /> Push enabled on this device
+              — alerts arrive even with the app closed.
             </p>
+          ) : !webPushSupported || !webPushConfigured ? (
+            <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[10px] leading-relaxed text-subtle">
+              {webPushSupported
+                ? "Web Push isn't connected in this build yet. In-app alerts still work."
+                : "This browser doesn't support Web Push. In-app alerts still work."}
+            </p>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {pushMessage && (
+                <p className="rounded-lg border border-delayed/30 bg-delayed/10 px-2.5 py-1.5 text-[10px] text-muted">
+                  {pushMessage}
+                </p>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pushBusy}
+                onClick={async () => {
+                  setPushBusy(true);
+                  setPushMessage(null);
+                  try {
+                    await enableWebPush();
+                  } finally {
+                    setPushBusy(false);
+                  }
+                }}
+              >
+                <KeyRound className="size-3.5" />
+                {pushBusy ? "Connecting…" : "Enable push on this device"}
+              </Button>
+            </div>
           )}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-[11px] text-muted">
               <Radio className="size-3.5 text-accent" />
-              Browser push:{" "}
+              In-app notifications:{" "}
               <span className="font-semibold text-ink">{notificationPermission}</span>
             </div>
-            <Button size="sm" variant="outline" onClick={enableBrowserNotifications}>
+            <Button size="sm" variant="ghost" onClick={enableBrowserNotifications}>
               <BellRing className="size-3.5" />
-              Enable desktop push
+              In-app only
             </Button>
           </div>
         </div>
@@ -200,7 +205,7 @@ export function NotificationsDialog({
                           {alert.flightNumber}
                         </span>
                         <span>·</span>
-                        <span>{alert.timestamp}</span>
+                        <span>{formatAlertTimestamp(alert.timestamp)}</span>
                       </span>
                     </span>
                   </button>

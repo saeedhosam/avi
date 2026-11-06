@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
-import { ALERT_META, cn } from "@/lib/utils";
+import { ALERT_META, cn, formatAlertTimestamp } from "@/lib/utils";
 import { FlightCard } from "@/components/flight-card";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { Button, EmptyState, Panel } from "@/components/ui";
@@ -159,7 +159,7 @@ export default function WatchlistPage() {
                       {ALERT_META[alert.type]?.label ?? alert.type}
                     </span>
                     <span className="text-[8px] text-subtle">
-                      {alert.timestamp}
+                      {formatAlertTimestamp(alert.timestamp)}
                     </span>
                   </div>
                 </div>

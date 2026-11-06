@@ -1,11 +1,13 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
+import type { WatchEngine } from "../engine/watch-engine.js";
 import { AeroDataBoxProvider } from "../providers/aerodatabox.js";
 
 interface StatusOptions {
   config: AppConfig;
   provider: AeroDataBoxProvider;
+  engine?: WatchEngine | null;
 }
 
 const statusResponse = z.object({
@@ -21,6 +23,29 @@ const statusResponse = z.object({
     style: z.literal("positron"),
     tileProvider: z.literal("openfreemap"),
   }),
+  watchEngine: z
+    .object({
+      enabled: z.boolean(),
+      lastTickAt: z.string().nullable(),
+      lastSwept: z.number(),
+      backlog: z.number(),
+      error: z.string().nullable(),
+      units: z.object({
+        unitsUsed: z.number(),
+        unitsBudget: z.number(),
+        overBudget: z.boolean(),
+      }),
+      supabaseReady: z.boolean(),
+      metered: z.number(),
+      push: z
+        .object({
+          enabled: z.boolean(),
+          lastDelivered: z.number(),
+          lastError: z.string().nullable(),
+        })
+        .nullable(),
+    })
+    .nullable(),
   timestamp: z.string(),
 });
 
@@ -55,6 +80,7 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
         style: "positron" as const,
         tileProvider: "openfreemap" as const,
       },
+      watchEngine: options.engine ? options.engine.stats() : null,
       timestamp: new Date().toISOString(),
     }),
   );

@@ -33,6 +33,12 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
       ? `\n💬 Note: "${flight.customNotes}"`
       : "";
 
+  const shareUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "";
+  const flightLink = `${shareUrl}/flight/${flight.flightNumber.replace(/\s+/g, "")}${flight.flightDate ? `?date=${flight.flightDate}` : ""}`;
+
   return [
     "✈️ Avi Flight Status Update",
     "━━━━━━━━━━━━━━━━━━━━━",
@@ -47,7 +53,7 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
     `Aircraft: ${flight.aircraft.model} (${flight.aircraft.registration})`,
   ]
     .filter(Boolean)
-    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nTrack live with Avi: https://app.2-31-110-53.sslip.io/flight/${flight.flightNumber.replace(/\s+/g, "")}`;
+    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nTrack live with Avi: ${flightLink}`;
 }
 
 export function ShareFlightDialog({

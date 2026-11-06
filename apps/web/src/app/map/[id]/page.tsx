@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -17,8 +18,16 @@ import {
 import { useApp } from "@/lib/store";
 import { cn, geodesicDistanceKm, kmToNm } from "@/lib/utils";
 import type { Flight } from "@/lib/types";
-import { FlightMap } from "@/components/flight-map";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
+
+const FlightMap = dynamic(() => import("@/components/flight-map").then((m) => m.FlightMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center rounded-xl border border-line bg-surface-2">
+      <p className="text-[11px] text-muted">Loading live map…</p>
+    </div>
+  ),
+});
 
 export default function FlightMapPage() {
   const params = useParams<{ id: string }>();

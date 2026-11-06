@@ -18,14 +18,20 @@ import type {
   UserAccount,
 } from "./types";
 import type { DataSourceMode } from "./data-source";
+import { getSupabase } from "./supabase";
 import { normalizeFlightNumber, uid } from "./utils";
+import {
+  enableWebPush as enableWebPushSubscription,
+  hasWebPushSubscription,
+  webPushConfigured as webPushConfiguredCheck,
+  webPushSupported as webPushSupportedCheck,
+} from "./push";
 import {
   deleteWatchlistItemCloud,
   fetchCloudAlerts,
   fetchCloudWatchlist,
   markAlertReadCloud,
   observeSupabaseAuth,
-  requestFcmToken,
   saveAlertCloud,
   saveUserProfile,
   saveWatchlistItemCloud,
@@ -33,12 +39,20 @@ import {
   signOutSupabase,
   subscribeToUserData,
   supabaseEnabled,
+  watchRowId,
 } from "./supabase";
 
 const STORAGE_KEY = "skytrack.desktop.live.v1";
-const FCM_TOKEN_KEY = "skytrack.fcm.token";
 
 type ToastKind = "info" | "success" | "warning" | "alert";
+
+export interface AccountUsage {
+  plan: "FREE" | "PLUS" | "PRO";
+  planLimits: { concurrentTracked: number };
+  watchlistCount: number;
+  units: { unitsUsed: number; unitsBudget: number };
+  billing: { provider: "manual" | "lemon_squeezy"; upgradeEnabled: boolean };
+}
 
 export interface Toast {
   id: string;
@@ -57,13 +71,12 @@ interface PersistedState {
 interface AppContextValue {
   hydrated: boolean;
   themeMode: ThemeMode;
-  resolvedTheme: "light" | "dark";
   setThemeMode: (mode: ThemeMode) => void;
   flights: Flight[];
   watchlist: Flight[];
-  upsertFlights: (incoming: Flight[]) => void;
+  upsertFlights: (incoming: Flight[], options?: { source?: "live" | "cloud" }) => void;
   toggleWatchlist: (flight: Flight, notes?: string) => void;
-  updateNotes: (flightNumber: string, notes: string) => void;
+  updateNotes: (flightNumber: string, notes: string, flightDate?: string) => void;
   alerts: FlightAlert[];
   unreadAlertCount: number;
   addAlert: (alert: FlightAlert, push?: boolean) => void;
@@ -84,17 +97,36 @@ interface AppContextValue {
   syncing: boolean;
   dataSourceMode: DataSourceMode;
   setQuotaFallback: () => void;
+  setLiveRecovered: () => void;
   aeroConfigured: boolean;
   toasts: Toast[];
   notify: (message: string, kind?: ToastKind) => void;
   dismissToast: (id: string) => void;
-  fcmToken: string;
   enableBrowserNotifications: () => Promise<void>;
   notificationPermission: NotificationPermission | "unsupported";
   supabaseReady: boolean;
+  webPushSupported: boolean;
+  webPushConfigured: boolean;
+  webPushSubscribed: boolean;
+  enableWebPush: () => Promise<void>;
+  accountUsage: AccountUsage | null;
+  refreshUsage: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  startUpgrade: (target: "PLUS" | "PRO") => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+/**
+ * Resolved theme lives in its own context so map-rich components (which only
+ * read the theme) stop re-rendering on every flight/telemetry update.
+ */
+const ThemeContext = createContext<"light" | "dark">("dark");
+
+export function useResolvedTheme(): "light" | "dark" {
+  const value = useContext(ThemeContext);
+  return value ?? "dark";
+}
 
 const GUEST_ACCOUNT: UserAccount = {
   name: "Guest Aviator",
@@ -114,23 +146,40 @@ const defaultPersisted: PersistedState = {
   offlineMode: false,
 };
 
-function readPersisted(): PersistedState {
-  if (typeof window === "undefined") return defaultPersisted;
+/** Cap so watchlist/flights/alerts cannot grow a device's storage unbounded. */
+const MAX_PERSISTED_FLIGHTS = 100;
+const MAX_PERSISTED_ALERTS = 200;
+
+/**
+ * Local storage is namespaced per Supabase uid: signing out switches to the
+ * guest namespace instead of leaving one user's watchlist/notes visible to
+ * the next person on a shared device.
+ */
+function storageKeyFor(uid: string | null | undefined): string {
+  return uid ? `${STORAGE_KEY}.${uid}` : STORAGE_KEY;
+}
+
+function readPersisted(key: string): PersistedState {
+  if (typeof window === "undefined") {
+    return { ...defaultPersisted };
+  }
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultPersisted;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return { ...defaultPersisted };
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
       flights: Array.isArray(parsed.flights)
-        ? (parsed.flights as unknown[]).map(normalizePersistedFlight)
+        ? (parsed.flights as unknown[])
+            .map(normalizePersistedFlight)
+            .slice(0, MAX_PERSISTED_FLIGHTS)
         : [],
-      alerts: Array.isArray(parsed.alerts) ? parsed.alerts : [],
-      recents: Array.isArray(parsed.recents) ? parsed.recents : [],
+      alerts: Array.isArray(parsed.alerts) ? parsed.alerts.slice(0, MAX_PERSISTED_ALERTS) : [],
+      recents: Array.isArray(parsed.recents) ? parsed.recents.slice(0, 5) : [],
       themeMode: parsed.themeMode ?? "SYSTEM",
       offlineMode: parsed.offlineMode ?? false,
     };
   } catch {
-    return defaultPersisted;
+    return { ...defaultPersisted };
   }
 }
 
@@ -155,7 +204,9 @@ function flightKey(flight: Pick<Flight, "flightNumber" | "flightDate">) {
 
 function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
   const alerts: FlightAlert[] = [];
-  const now = "Just now";
+  // Timestamps are stored as ISO instants (the alert engine writes the same);
+  // the UI renders them relative-to-now with formatAlertTimestamp().
+  const now = new Date().toISOString();
 
   if (previous.gateDeparture !== next.gateDeparture) {
     alerts.push({
@@ -246,14 +297,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useState<DataSourceMode>("NOT_CONFIGURED");
   const [aeroConfigured, setAeroConfigured] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [fcmToken, setFcmToken] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<
     NotificationPermission | "unsupported"
   >("default");
   const [supabaseReady, setSupabaseReady] = useState(false);
+  const [watchEngineEnabled, setWatchEngineEnabled] = useState(false);
+  const [webPushSubscribed, setWebPushSubscribed] = useState(false);
   const flightsRef = useRef<Flight[]>([]);
   const alertsRef = useRef<FlightAlert[]>([]);
   const refreshingRef = useRef(false);
+  // The namespace whose state is currently in memory; swapped per uid.
+  const storageKeyRef = useRef<string>(STORAGE_KEY);
 
   useEffect(() => {
     flightsRef.current = flights;
@@ -273,7 +327,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         : "light";
 
   useEffect(() => {
-    const persisted = readPersisted();
+    const key = storageKeyFor(null);
+    storageKeyRef.current = key;
+    const persisted = readPersisted(key);
     setThemeModeState(persisted.themeMode);
     setOfflineMode(persisted.offlineMode);
     setFlights(persisted.flights);
@@ -281,9 +337,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAlerts(persisted.alerts);
     alertsRef.current = persisted.alerts;
     setRecents(persisted.recents);
-    setFcmToken(window.localStorage.getItem(FCM_TOKEN_KEY) ?? "");
     setHydrated(true);
   }, []);
+
+  // Swap the persisted namespace when the signed-in user changes (P1 E11).
+  useEffect(() => {
+    if (!hydrated) return;
+    const key = storageKeyFor(account.uid);
+    if (storageKeyRef.current === key) return;
+    storageKeyRef.current = key;
+    const persisted = readPersisted(key);
+    setThemeModeState(persisted.themeMode);
+    setOfflineMode(persisted.offlineMode);
+    flightsRef.current = persisted.flights;
+    setFlights(persisted.flights);
+    alertsRef.current = persisted.alerts;
+    setAlerts(persisted.alerts);
+    setRecents(persisted.recents);
+  }, [hydrated, account.uid]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -296,14 +367,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme]);
+    // The pre-hydration inline script can only read a stable, non-scoped key.
+    try {
+      window.localStorage.setItem("skytrack.theme", JSON.stringify(themeMode));
+    } catch {
+      // Theme memory is cosmetic; namespace writes are handled elsewhere.
+    }
+  }, [resolvedTheme, themeMode]);
 
   useEffect(() => {
     fetch("/api/status")
       .then((response) => response.json())
-      .then((data: { aeroDataBoxConfigured?: boolean }) => {
-        setAeroConfigured(Boolean(data.aeroDataBoxConfigured));
-      })
+      .then(
+        (data: {
+          aeroDataBoxConfigured?: boolean;
+          watchEngine?: { enabled?: boolean } | null;
+        }) => {
+          setAeroConfigured(Boolean(data.aeroDataBoxConfigured));
+          setWatchEngineEnabled(Boolean(data.watchEngine?.enabled));
+        },
+      )
       .catch(() => {});
     if (typeof Notification === "undefined") {
       setNotificationPermission("unsupported");
@@ -322,17 +405,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [offlineMode, aeroConfigured]);
 
-  // Persist real cached data for offline mode. No demo records are ever seeded.
+  // Persist real cached data for offline mode, scoped to the active user
+  // namespace. No demo records are ever seeded. Quota errors are logged and
+  // never break rendering.
   useEffect(() => {
     if (!hydrated) return;
-    const value: PersistedState = {
-      flights,
-      alerts,
-      recents,
-      themeMode,
-      offlineMode,
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    try {
+      const value: PersistedState = {
+        flights: flights.slice(0, MAX_PERSISTED_FLIGHTS),
+        alerts: alerts.slice(0, MAX_PERSISTED_ALERTS),
+        recents,
+        themeMode,
+        offlineMode,
+      };
+      window.localStorage.setItem(storageKeyRef.current, JSON.stringify(value));
+    } catch (error) {
+      console.warn("local cache persist failed (storage may be full)", error);
+    }
   }, [hydrated, flights, alerts, recents, themeMode, offlineMode]);
 
   const dismissToast = useCallback((id: string) => {
@@ -375,7 +464,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const upsertFlights = useCallback(
-    (incoming: Flight[]) => {
+    (incoming: Flight[], options?: { source?: "live" | "cloud" }) => {
+      // Cloud merges carry a snapshot the server watch engine already wrote
+      // alerts for; diffing again here would double-fire every alert.
+      const source = options?.source ?? "live";
       if (!incoming.length) return;
       const map = new Map(flightsRef.current.map((flight) => [flightKey(flight), flight]));
       const newAlerts: FlightAlert[] = [];
@@ -396,7 +488,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 existing.telemetry.hasLiveLocation,
             },
           };
-          if (existing.isWatchlisted) {
+          if (existing.isWatchlisted && source !== "cloud") {
             newAlerts.push(...buildChangeAlerts(existing, merged));
           }
           map.set(key, merged);
@@ -419,7 +511,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!records.length) return;
       const cloudByNumber = new Map(
         records.map((record) => [
-          `${String(record.flightNumber).toLowerCase()}|${record.flightDate ?? "any"}`,
+          `${String(record.flightNumber).replace(/\s+/g, "").toLowerCase()}|${record.flightDate ?? "any"}`,
           record,
         ]),
       );
@@ -430,6 +522,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const key of missing.slice(0, 8)) {
         const record = cloudByNumber.get(key);
         if (!record) continue;
+        // The server watch engine keeps `snapshot` fresh; hydrating from it
+        // costs zero provider units. Only a missing snapshot falls back to a
+        // live lookup.
+        if (record.snapshot) {
+          fetched.push({
+            ...record.snapshot,
+            isWatchlisted: true,
+            customNotes: record.customNotes || record.snapshot.customNotes || "",
+          });
+          continue;
+        }
         try {
           const url = new URL("/api/flights/search", window.location.origin);
           url.searchParams.set(
@@ -450,15 +553,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // A missing cloud flight is retried on the next sync.
         }
       }
-      const merged = fetched.map((flight) => {
-        const record = cloudByNumber.get(flightKey(flight));
-        return {
-          ...flight,
-          isWatchlisted: true,
-          customNotes: String(record?.customNotes ?? ""),
-        };
-      });
-      if (merged.length) upsertFlights(merged);
+      upsertFlights(fetched, { source: "cloud" });
       // Re-flag anything already in the local cache that matches a cloud row.
       upsertFlights(
         flightsRef.current.map((flight) => {
@@ -467,9 +562,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return {
             ...flight,
             isWatchlisted: true,
-            customNotes: String(record.customNotes ?? flight.customNotes),
+            customNotes: record.customNotes || flight.customNotes,
           };
         }),
+        { source: "cloud" },
       );
     },
     [upsertFlights],
@@ -535,25 +631,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [aeroConfigured, offlineMode, updateAccountSync, upsertFlights]);
 
-  // Refresh watchlisted flights when live data is available.
+  // The server watch engine pushes status changes via Realtime, so browser
+  // polling is a fallback only: a safety net at a long interval when the
+  // engine is on, and the old 5-minute cadence when it is not. Hidden tabs
+  // never spend provider units either way.
+  const watchlistPollMs = watchEngineEnabled ? 30 * 60 * 1000 : 5 * 60 * 1000;
+
   useEffect(() => {
     if (!hydrated || !aeroConfigured || offlineMode) return;
-    void refreshWatchlistFlights();
-    const timer = window.setInterval(
-      () => void refreshWatchlistFlights(),
-      5 * 60 * 1000,
-    );
+    const poll = () => {
+      if (watchEngineEnabled && document.hidden) return;
+      void refreshWatchlistFlights();
+    };
+    poll();
+    const timer = window.setInterval(poll, watchlistPollMs);
     return () => window.clearInterval(timer);
-  }, [hydrated, aeroConfigured, offlineMode, refreshWatchlistFlights]);
+  }, [
+    hydrated,
+    aeroConfigured,
+    offlineMode,
+    watchEngineEnabled,
+    watchlistPollMs,
+    refreshWatchlistFlights,
+  ]);
 
   // Supabase auth observer. Demo accounts are never substituted.
   useEffect(() => {
     if (!supabaseEnabled) return;
-    const unsubscribe = observeSupabaseAuth((next, uidValue) => {
+    const unsubscribe = observeSupabaseAuth((next, uidValue, event) => {
       setSupabaseReady(true);
       if (next && uidValue) {
         setAccount((current) => ({ ...next, isOfflineMode: current.isOfflineMode }));
-        void saveUserProfile(next, uidValue);
+        // Profiles are written when authentication actually establishes or
+        // re-establishes a session — not on every token refresh.
+        if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
+          void saveUserProfile(next, uidValue);
+        }
         void mergeCloudWatchlist(uidValue);
         void mergeCloudAlerts(uidValue);
       } else {
@@ -572,29 +685,142 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [account.uid, mergeCloudAlerts, mergeCloudWatchlist]);
 
+  // Detect any existing Web Push subscription on this device so the UI can
+  // show accurate status. No token is fabricated for unsupported browsers.
   useEffect(() => {
-    if (!supabaseEnabled) return;
     let cancelled = false;
-    async function loadToken() {
-      const existing = window.localStorage.getItem(FCM_TOKEN_KEY);
-      if (existing) {
-        setFcmToken(existing);
-        return;
+    async function detectSubscription() {
+      try {
+        const subscribed = await hasWebPushSubscription();
+        if (!cancelled) setWebPushSubscribed(subscribed);
+      } catch {
+        // Push visibility is cosmetic; failures are surfaced by the dialog.
       }
-      const remote = await requestFcmToken();
-      if (cancelled || !remote) return;
-      window.localStorage.setItem(FCM_TOKEN_KEY, remote);
-      setFcmToken(remote);
     }
-    loadToken();
+    detectSubscription();
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const enableWebPush = useCallback(async () => {
+    const result = await enableWebPushSubscription();
+    if (result.ok) {
+      setWebPushSubscribed(true);
+      notify("Push notifications enabled for this device.", "success");
+    } else if (result.reason === "not_signed_in") {
+      notify("Notification permission was not granted.", "warning");
+    } else if (result.reason === "unsupported" || result.reason === "not_configured") {
+      notify("Web Push isn't available in this environment yet.", "warning");
+    } else {
+      notify("Could not enable push. In-app alerts still work.", "warning");
+    }
+  }, [notify]);
+
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
   }, []);
+
+  // Account beat (Track I): plan tier, tracking limit, watchlist size, and
+  // the month-to-date provider-unit budget, fetched from /v1/me through the
+  // gateway. Fetched on demand (account dialog) and on user change.
+  const [accountUsage, setAccountUsage] = useState<AccountUsage | null>(null);
+  const refreshUsage = useCallback(async () => {
+    const supabase = getSupabase();
+    if (!supabase || !account.uid) {
+      setAccountUsage(null);
+      return;
+    }
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setAccountUsage(null);
+        return;
+      }
+      const response = await fetch("/api/me", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accessToken: token }),
+      });
+      setAccountUsage(response.ok ? ((await response.json()) as AccountUsage) : null);
+    } catch {
+      setAccountUsage(null);
+    }
+  }, [account.uid]);
+
+  // Opens the hosted Lemon Squeezy checkout for a plan upgrade. Card data
+  // never touches Avi; the webhook assigns profiles.plan after payment.
+  const startUpgrade = useCallback(
+    async (target: "PLUS" | "PRO") => {
+      const supabase = getSupabase();
+      if (!supabase || !account.uid) {
+        notify("Sign in to upgrade your plan.", "warning");
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        notify("Sign out and sign in again to refresh your session.", "warning");
+        return;
+      }
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accessToken: token, target }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        url?: string;
+        message?: string;
+      } | null;
+      if (response.ok && payload?.url) {
+        window.location.assign(payload.url);
+        return;
+      }
+      notify(
+        payload?.message ??
+          "Billing isn't connected yet. Plans are assigned manually for early users.",
+        "info",
+      );
+    },
+    [account.uid, notify],
+  );
+
+  const deleteAccount = useCallback(async () => {
+    const supabase = getSupabase();
+    const uid = account.uid;
+    if (!supabase || !uid) return;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        notify("Sign out and sign in again, then delete from the account dialog.", "warning");
+        return;
+      }
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accessToken: token }),
+      });
+      if (!response.ok) {
+        notify("Account deletion could not be completed. Please try again.", "warning");
+        return;
+      }
+      // Purge the device-local namespace; nothing user-owned lingers.
+      try {
+        window.localStorage.removeItem(storageKeyFor(uid));
+        window.localStorage.removeItem("skytrack.theme");
+      } catch {
+        // Storage cleanup is best-effort.
+      }
+      await signOutSupabase();
+      setAccount({ ...GUEST_ACCOUNT, isOfflineMode: false });
+      setAccountUsage(null);
+      notify("Account deleted. Your data has been erased from Avi.", "success");
+    } catch {
+      notify("Account deletion could not be completed. Please try again.", "warning");
+    }
+  }, [account.uid, notify]);
 
   const toggleWatchlist = useCallback(
     (flight: Flight, notes = "") => {
@@ -620,7 +846,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (nextFlight.isWatchlisted) {
           void saveWatchlistItemCloud(account.uid, nextFlight);
         } else {
-          void deleteWatchlistItemCloud(account.uid, nextFlight.id);
+          // Deletes are date-scoped: removing one operating date leaves the
+          // other dates of the same flight number untouched.
+          void deleteWatchlistItemCloud(account.uid, watchRowId(nextFlight));
         }
       }
       notify(
@@ -634,18 +862,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const updateNotes = useCallback(
-    (flightNumber: string, notes: string) => {
+    (flightNumber: string, notes: string, flightDate?: string) => {
       const match = normalizeFlightNumber(flightNumber);
+      const targetKey = `${match.toLowerCase()}|${flightDate ?? "any"}`;
       const updated = flightsRef.current.map((flight) =>
-        normalizeFlightNumber(flight.flightNumber) === match
+        flightKey(flight) === targetKey
           ? { ...flight, customNotes: notes }
           : flight,
       );
       flightsRef.current = updated;
       setFlights(updated);
-      const flight = updated.find((item) =>
-        normalizeFlightNumber(item.flightNumber) === match,
-      );
+      const flight = updated.find((item) => flightKey(item) === targetKey);
       if (flight && account.uid && flight.isWatchlisted) {
         void saveWatchlistItemCloud(account.uid, {
           ...flight,
@@ -767,13 +994,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!offlineMode) setDataSourceMode("QUOTA_FALLBACK");
   }, [offlineMode]);
 
+  // The quota fallback used to stick until reload; clearing it on the next
+  // successful live response keeps the banner honest across outages.
+  const setLiveRecovered = useCallback(() => {
+    if (!offlineMode && aeroConfigured && dataSourceMode === "QUOTA_FALLBACK") {
+      setDataSourceMode("LIVE_AERODATABOX");
+    }
+  }, [offlineMode, aeroConfigured, dataSourceMode]);
+
   const refreshData = useCallback(async () => {
     setSyncing(true);
     try {
       const response = await fetch("/api/status", { cache: "no-store" });
       if (response.ok) {
-        const data = (await response.json()) as { aeroDataBoxConfigured?: boolean };
+        const data = (await response.json()) as {
+          aeroDataBoxConfigured?: boolean;
+          watchEngine?: { enabled?: boolean } | null;
+        };
         setAeroConfigured(Boolean(data.aeroDataBoxConfigured));
+        setWatchEngineEnabled(Boolean(data.watchEngine?.enabled));
       }
       await refreshWatchlistFlights();
       updateAccountSync();
@@ -813,7 +1052,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppContextValue = {
     hydrated,
     themeMode,
-    resolvedTheme,
     setThemeMode,
     flights,
     watchlist,
@@ -840,17 +1078,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncing,
     dataSourceMode,
     setQuotaFallback,
+    setLiveRecovered,
     aeroConfigured,
     toasts,
     notify,
     dismissToast,
-    fcmToken,
     enableBrowserNotifications,
     notificationPermission,
     supabaseReady,
+    webPushSupported: webPushSupportedCheck(),
+    webPushConfigured: webPushConfiguredCheck(),
+    webPushSubscribed,
+    enableWebPush,
+    accountUsage,
+    refreshUsage,
+    deleteAccount,
+    startUpgrade,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <ThemeContext.Provider value={resolvedTheme}>{children}</ThemeContext.Provider>
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {

@@ -49,8 +49,17 @@ import {
   kmToNm,
 } from "@/lib/utils";
 import { useApp } from "@/lib/store";
-import { OsmRouteMap } from "@/components/osm-map";
+import dynamic from "next/dynamic";
 import { Button, FilterChip, Modal, TextInput } from "@/components/ui";
+
+const OsmRouteMap = dynamic(() => import("@/components/osm-map").then((m) => m.OsmRouteMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-surface-2">
+      <p className="text-[11px] text-muted">Loading route network…</p>
+    </div>
+  ),
+});
 
 const HAULS = Object.keys(HAUL_META) as HaulCategory[];
 const REGIONS = Object.keys(REGION_META) as RouteRegion[];
@@ -179,7 +188,7 @@ function buildSummary(
 
 export default function RoutesPage() {
   const router = useRouter();
-  const { offlineMode, setQuotaFallback, refreshData } = useApp();
+  const { offlineMode, setQuotaFallback, setLiveRecovered, refreshData } = useApp();
 
   const [originIata, setOriginIata] = useState<string | null>(null);
   const [departureInput, setDepartureInput] = useState("");
@@ -279,6 +288,7 @@ export default function RoutesPage() {
           error?: string;
         };
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+        else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
             "Live flight data is unavailable right now.",
@@ -301,7 +311,7 @@ export default function RoutesPage() {
         setLoading(false);
       }
     },
-    [offlineMode, originIata, setQuotaFallback],
+    [offlineMode, originIata, setQuotaFallback, setLiveRecovered],
   );
 
   // Deep links from airport boards: /routes?hub=CAI
@@ -825,7 +835,13 @@ export default function RoutesPage() {
           <span>{summary.totalDailyFlights} daily flights</span>
         </div>
         <div className="flex items-center gap-2 text-[9px] text-subtle">
-          <button onClick={() => void refreshData()} className="font-semibold text-accent hover:underline">
+          <button
+            onClick={() => {
+              void refreshData();
+              if (originIata) void loadHub(originIata, false);
+            }}
+            className="font-semibold text-accent hover:underline"
+          >
             Refresh live data
           </button>
           <span>·</span>

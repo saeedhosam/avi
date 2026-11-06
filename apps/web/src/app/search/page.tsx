@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -53,6 +59,7 @@ export default function SearchPage() {
     deleteRecent,
     clearRecents,
     setQuotaFallback,
+    setLiveRecovered,
     aeroConfigured,
     offlineMode,
     upsertFlights,
@@ -72,6 +79,9 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultMode, setResultMode] = useState("");
+  // Bumping the nonce re-runs the current lookup so "Refresh" refreshes the
+  // page's own results, not just the background watchlist sync.
+  const [searchNonce, setSearchNonce] = useState(0);
   const departureDate = parseFlexibleDate(departureDateInput);
 
   useEffect(() => {
@@ -106,8 +116,8 @@ export default function SearchPage() {
     setLoading(false);
   };
 
-  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const runSearch = () => {
+    if (loading) return;
     if (mode === "FLIGHT_NUMBER") {
       const number = normalizeFlightNumber(flightNumber);
       // Both fields are mandatory: a valid number and a recognised day.
@@ -126,6 +136,20 @@ export default function SearchPage() {
       origin,
       destination: routeDestination.trim().toUpperCase(),
     });
+  };
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runSearch();
+  };
+
+  // Enter inside any search field runs the lookup, even when the submit
+  // button is disabled so the browser would swallow implicit submission.
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runSearch();
+    }
   };
 
   // Live lookups run only when the user submits the search form.
@@ -158,6 +182,7 @@ export default function SearchPage() {
           if (controller.signal.aborted) return;
           setResultMode(data.mode);
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+          else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
           if (data.mode === "NOT_CONFIGURED") {
             throw new Error("Live flight data is unavailable right now.");
           }
@@ -179,6 +204,7 @@ export default function SearchPage() {
           if (controller.signal.aborted) return;
           setResultMode(data.mode);
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+          else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
           if (data.mode === "NOT_CONFIGURED") {
             throw new Error("Live flight data is unavailable right now.");
           }
@@ -214,7 +240,7 @@ export default function SearchPage() {
 
     void run();
     return () => controller.abort();
-  }, [activeSearch, offlineMode, setQuotaFallback, upsertFlights]);
+  }, [activeSearch, searchNonce, offlineMode, setQuotaFallback, setLiveRecovered, upsertFlights]);
 
   const displayFlights = useMemo(
     () =>
@@ -332,20 +358,22 @@ export default function SearchPage() {
                         Flight number
                       </span>
                       <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-accent" />
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-accent" />
                         <TextInput
                           value={flightNumber}
                           onChange={(event) =>
                             setFlightNumber(event.target.value.toUpperCase())
                           }
                           placeholder="AA123"
-                          className="pl-9 pr-8 font-mono text-xs uppercase"
+                          className="h-9 pl-8 pr-8 font-mono text-xs uppercase"
                           autoComplete="off"
                           spellCheck={false}
+                          onKeyDown={submitOnEnter}
                         />
                         {flightNumber && (
                           <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() => setFlightNumber("")}
                             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
                             aria-label="Clear flight number"
@@ -368,10 +396,11 @@ export default function SearchPage() {
                           }
                           placeholder="01-Jan"
                           maxLength={24}
-                          className="pl-8 pr-2 font-mono text-xs uppercase"
+                          className="h-9 pl-8 pr-2 font-mono text-xs uppercase"
                           autoComplete="off"
                           spellCheck={false}
                           aria-label="Departure day"
+                          onKeyDown={submitOnEnter}
                         />
                       </div>
                     </label>
@@ -404,11 +433,13 @@ export default function SearchPage() {
                           placeholder="CAI"
                           maxLength={3}
                           className="h-9 pl-8 font-mono text-xs uppercase"
+                          onKeyDown={submitOnEnter}
                         />
                       </div>
                     </label>
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => {
                         const previous = routeOrigin;
                         setRouteOrigin(
@@ -435,6 +466,7 @@ export default function SearchPage() {
                           placeholder="JED"
                           maxLength={3}
                           className="h-9 pl-8 font-mono text-xs uppercase"
+                          onKeyDown={submitOnEnter}
                         />
                       </div>
                     </label>
@@ -603,21 +635,26 @@ export default function SearchPage() {
 
         <section className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <p className="label-caps text-accent">
-                {mode === "ROUTE"
-                  ? `Live departures · ${routeOrigin || "—"}${routeDestination ? ` → ${routeDestination}` : " → any"}`
-                  : "Live flight lookup"}
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
-                {mode === "ROUTE"
-                  ? "Live route departures"
-                  : "Live flight lookup"}
-                <span className="ml-2 text-sm font-semibold text-muted">
+            <h2 className="flex flex-wrap items-center gap-2 text-xl font-black tracking-tight text-ink">
+              {mode === "ROUTE" ? "Live route departures" : "Live flight lookup"}
+              {mode === "ROUTE" && routeOrigin && (
+                <span className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-accent">
+                  {routeOrigin}
+                  {routeDestination ? ` → ${routeDestination}` : ""}
+                </span>
+              )}
+              {mode === "FLIGHT_NUMBER" &&
+                activeSearch?.mode === "FLIGHT_NUMBER" && (
+                  <span className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-accent">
+                    {activeSearch.number} · {flightDateLabel(activeSearch.date)}
+                  </span>
+                )}
+              {hasLookup && (
+                <span className="text-sm font-semibold text-muted">
                   ({displayFlights.length})
                 </span>
-              </h2>
-            </div>
+              )}
+            </h2>
             <div className="flex items-center gap-2">
               {resultMode && (
                 <span className="rounded-lg border border-line/60 bg-surface-2 px-2 py-1 text-[9px] font-semibold text-muted">
@@ -642,7 +679,10 @@ export default function SearchPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={refreshData}
+                onClick={() => {
+                  void refreshData();
+                  setSearchNonce((value) => value + 1);
+                }}
                 disabled={syncing}
               >
                 {syncing ? "Refreshing…" : "Refresh"}
@@ -681,7 +721,14 @@ export default function SearchPage() {
                 title="No live results"
                 description={error}
                 action={
-                  <Button size="sm" variant="outline" onClick={refreshData}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      void refreshData();
+                      setSearchNonce((value) => value + 1);
+                    }}
+                  >
                     Retry live refresh
                   </Button>
                 }

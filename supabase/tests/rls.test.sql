@@ -1,6 +1,6 @@
 begin;
 
-select plan(5);
+select plan(6);
 
 -- RLS must be enabled on every user-owned table.
 select is(
@@ -9,10 +9,18 @@ select is(
   'profiles has RLS enabled'
 );
 
+-- The plan column must be backend-only: after column-level grants the
+-- authenticated role must not hold table-wide UPDATE (which would cover plan).
 select is(
-  (select relrowsecurity from pg_class where oid = 'public.tracked_flights'::regclass),
+  has_table_privilege('authenticated', 'public.profiles', 'UPDATE'),
+  false,
+  'authenticated cannot update arbitrary profile columns (plan is protected)'
+);
+
+select is(
+  (select relrowsecurity from pg_class where oid = 'public.watchlist_items'::regclass),
   true,
-  'tracked_flights has RLS enabled'
+  'watchlist_items has RLS enabled'
 );
 
 select is(

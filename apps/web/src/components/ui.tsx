@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -285,18 +286,45 @@ export function Modal({
   icon?: ReactNode;
 }) {
   const id = useId();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const titleId = `avi-modal-${id.replace(/:/g, "")}-title`;
+  const subtitleId = subtitle ? `avi-modal-${id.replace(/:/g, "")}-sub` : undefined;
+
+  const focusables = () =>
+    Array.from(
+      containerRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => !element.hasAttribute("disabled"));
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      // Focus trap: cycle inside the dialog instead of behind the overlay.
+      const items = focusables();
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      event.preventDefault();
+      const nextIndex = event.shiftKey
+        ? (index <= 0 ? items.length - 1 : index - 1)
+        : (index === items.length - 1 || index < 0 ? 0 : index + 1);
+      items[nextIndex]?.focus();
     };
     document.addEventListener("keydown", onKeyDown);
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    requestAnimationFrame(() => focusables()[0]?.focus());
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previous;
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 
@@ -312,14 +340,18 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
       <button
-        aria-label="Close dialog"
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
         className="absolute inset-0 bg-[#02060c]/70 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={id}
+        aria-labelledby={titleId}
+        aria-describedby={subtitleId}
         className={cn(
           "relative flex max-h-[88vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl animate-float-in",
           sizes[size],
@@ -333,11 +365,11 @@ export function Modal({
               </div>
             )}
             <div className="min-w-0">
-              <h2 id={id} className="truncate text-base font-bold text-ink">
+              <h2 id={titleId} className="truncate text-base font-bold text-ink">
                 {title}
               </h2>
               {subtitle && (
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                <p id={subtitleId} className="mt-0.5 text-xs leading-relaxed text-muted">
                   {subtitle}
                 </p>
               )}

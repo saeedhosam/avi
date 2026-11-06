@@ -69,6 +69,7 @@ export default function AirportsPage() {
     offlineMode,
     upsertFlights,
     setQuotaFallback,
+    setLiveRecovered,
     refreshData,
     syncing,
   } = useApp();
@@ -157,6 +158,7 @@ export default function AirportsPage() {
       if (requestId !== boardRequestRef.current) return;
       setBoardMode(data.mode);
       if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+      else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
       if (data.mode === "NOT_CONFIGURED") {
         throw new Error(
           "Live flight data is unavailable right now. Weather is unaffected.",
@@ -182,6 +184,7 @@ export default function AirportsPage() {
     airportCode,
     offlineMode,
     setQuotaFallback,
+    setLiveRecovered,
     upsertFlights,
   ]);
 
@@ -216,6 +219,7 @@ export default function AirportsPage() {
           airports?: AirportNode[];
         };
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
+        else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
         if (data.mode === "NOT_CONFIGURED") {
           throw new Error(
             "Live flight data is unavailable right now. Weather is unaffected.",
@@ -239,7 +243,7 @@ export default function AirportsPage() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [explorerQuery, offlineMode, setQuotaFallback]);
+  }, [explorerQuery, offlineMode, setQuotaFallback, setLiveRecovered]);
 
   const boardAirlines = useMemo(() => {
     const names = new Set(
@@ -325,7 +329,18 @@ export default function AirportsPage() {
               <Search className="size-3.5" /> Airport explorer
             </button>
           </div>
-          <Button size="sm" variant="outline" onClick={refreshData} disabled={syncing}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncing || boardLoading}
+            onClick={() => {
+              // The status/watchlist refresh alone never updated this page;
+              // the board and weather must be refetched too.
+              void refreshData();
+              void loadBoard();
+              void loadWeather();
+            }}
+          >
             <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
             Refresh
           </Button>

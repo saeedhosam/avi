@@ -10,6 +10,15 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import type { AppConfig } from "./config.js";
+import { SupabaseServer } from "./lib/supabase-server.js";
+import { UsageTracker } from "./lib/usage.js";
+import { WatchEngine } from "./engine/watch-engine.js";
+import { PushDelivery } from "./engine/push-delivery.js";
+import { ConsoleFlightProvider } from "./providers/console-flights.js";
+import { consoleFlightRoutes } from "./routes/console-flights.js";
+import { consoleAirportRoutes } from "./routes/console-airports.js";
+import { meRoutes } from "./routes/me.js";
+import { billingRoutes } from "./routes/billing.js";
 import { AeroDataBoxProvider } from "./providers/aerodatabox.js";
 import { healthRoutes } from "./routes/health.js";
 import { flightRoutes } from "./routes/flights.js";
@@ -45,21 +54,46 @@ export async function buildApp(config: AppConfig) {
         title: "Avi API",
         description:
           "Provider gateway for live flights, airports, weather, maps, and alerts.",
-        version: "1.0.0",
+        version: "1.1.0",
       },
       tags: [
         { name: "system", description: "Health and configuration" },
         { name: "flights", description: "Live flight data" },
+        { name: "airports", description: "Airport boards, routes, and search" },
       ],
     },
     transform: jsonSchemaTransform,
   });
 
   const provider = new AeroDataBoxProvider(config);
+  const consoleFlights = new ConsoleFlightProvider(config);
+  const supabaseServer = new SupabaseServer(config);
+  const usage = new UsageTracker(config.UNIT_BUDGET_PER_MONTH);
+
+  const engine =
+    config.WATCH_ENGINE_ENABLED && supabaseServer.ready && provider.configured
+      ? new WatchEngine(
+          config,
+          provider,
+          supabaseServer,
+          usage,
+          app.log,
+          new PushDelivery(config, supabaseServer, app.log),
+        )
+      : null;
+  if (engine) {
+    engine.register(app);
+  }
 
   await app.register(healthRoutes);
-  await app.register(statusRoutes, { config, provider });
+  await app.register(statusRoutes, { config, provider, engine });
   await app.register(flightRoutes, { provider });
+  await app.register(consoleFlightRoutes, { consoleFlights });
+  await app.register(consoleAirportRoutes, { consoleFlights });
+  if (supabaseServer.ready) {
+    await app.register(meRoutes, { supabaseServer, usage, billingProvider: config.BILLING_PROVIDER });
+  }
+  await app.register(billingRoutes, { config, supabaseServer });
 
   app.get(
     "/",

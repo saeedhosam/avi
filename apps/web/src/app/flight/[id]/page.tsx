@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -77,6 +77,10 @@ export default function FlightDetailPage() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [lookupState, setLookupState] = useState<"idle" | "loading" | "notfound">("idle");
+  // Tracks the previously seen config state so a lookup that failed just
+  // because /api/status had not resolved yet is retried once it does. A
+  // genuine miss (provider really returned nothing) stays final.
+  const configSeenRef = useRef(false);
 
   // Direct links to live flights that are not in the local cache yet.
   useEffect(() => {
@@ -92,6 +96,7 @@ export default function FlightDetailPage() {
     }
     let active = true;
     setLookupState("loading");
+    configSeenRef.current = true;
     const url = new URL(
       `/api/flights/search?flight=${encodeURIComponent(rawId)}`,
       window.location.origin,
@@ -114,6 +119,23 @@ export default function FlightDetailPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, flight?.id, lookupState, offlineMode, aeroConfigured, upsertFlights]);
+
+  // Retrying once when the provider config arrives late (cold load). The
+  // configSeenRef flip guard prevents a loop when the provider genuinely has
+  // nothing for this number.
+  useEffect(() => {
+    if (
+      aeroConfigured &&
+      !configSeenRef.current &&
+      lookupState === "notfound" &&
+      !offlineMode &&
+      /^\s*[A-Za-z0-9]{5,8}\s*$/.test(decodeURIComponent(params.id ?? "").replace(/\s+/g, ""))
+    ) {
+      setLookupState("idle");
+    }
+    configSeenRef.current = configSeenRef.current || aeroConfigured;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aeroConfigured, lookupState, offlineMode]);
 
   useEffect(() => {
     if (!flight) return;
@@ -539,7 +561,7 @@ export default function FlightDetailPage() {
         onDraft={setNoteDraft}
         onClose={() => setNotesOpen(false)}
         onSave={() => {
-          updateNotes(flight.flightNumber, noteDraft);
+          updateNotes(flight.flightNumber, noteDraft, flight.flightDate);
           setNotesOpen(false);
         }}
       />

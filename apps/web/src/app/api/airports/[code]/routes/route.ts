@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchAeroJson } from "@/lib/aerodatabox";
+import { gatewayFetchJson } from "@/lib/gateway";
 
 
 interface AeroRouteStat {
@@ -27,6 +28,27 @@ export async function GET(
       { mode: "NOT_CONFIGURED", routes: [], error: "Invalid IATA code" },
       { status: 400 },
     );
+  }
+
+  // Gateway-first: daily route stats are the same shape either way.
+  const gatewayResult = await gatewayFetchJson<{
+    mode: string;
+    status: number;
+    routes: Array<{
+      destination: string;
+      destinationName?: string;
+      city?: string;
+      country?: string;
+      icao?: string;
+      timezone?: string;
+      latitude: number;
+      longitude: number;
+      dailyFlights: number;
+      operators: Array<{ code: string; name: string }>;
+    }>;
+  }>(`/v1/airports/${code}/routes`);
+  if (gatewayResult) {
+    return NextResponse.json(gatewayResult);
   }
 
   const { data, status, mode } = await fetchAeroJson<{ routes?: AeroRouteStat[] }>(

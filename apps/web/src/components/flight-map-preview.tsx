@@ -1,10 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Fullscreen, LocateFixed, MapPinned, Minimize2 } from "lucide-react";
 import type { Flight } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { FlightMap } from "./flight-map";
+
+/** MapLibre is heavy; load it only when a map is actually on screen. */
+const FlightMap = dynamic(() => import("./flight-map").then((m) => m.FlightMap), {
+  ssr: false,
+  loading: () => (
+    <div className="absolute inset-0 flex items-center justify-center rounded-xl border border-line bg-surface-2">
+      <p className="text-[11px] text-muted">Loading live map…</p>
+    </div>
+  ),
+});
 
 export function FlightMapPreview({
   flight,

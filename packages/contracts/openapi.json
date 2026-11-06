@@ -3,7 +3,7 @@
   "info": {
     "title": "Avi API",
     "description": "Provider gateway for live flights, airports, weather, maps, and alerts.",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "components": {
     "schemas": {}
@@ -139,6 +139,89 @@
                       ],
                       "additionalProperties": false
                     },
+                    "watchEngine": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "lastTickAt": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "lastSwept": {
+                          "type": "number"
+                        },
+                        "backlog": {
+                          "type": "number"
+                        },
+                        "error": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "object",
+                          "properties": {
+                            "unitsUsed": {
+                              "type": "number"
+                            },
+                            "unitsBudget": {
+                              "type": "number"
+                            },
+                            "overBudget": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "unitsUsed",
+                            "unitsBudget",
+                            "overBudget"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "supabaseReady": {
+                          "type": "boolean"
+                        },
+                        "metered": {
+                          "type": "number"
+                        },
+                        "push": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "lastDelivered": {
+                              "type": "number"
+                            },
+                            "lastError": {
+                              "nullable": true,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "lastDelivered",
+                            "lastError"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "lastTickAt",
+                        "lastSwept",
+                        "backlog",
+                        "error",
+                        "units",
+                        "supabaseReady",
+                        "metered",
+                        "push"
+                      ],
+                      "additionalProperties": false
+                    },
                     "timestamp": {
                       "type": "string"
                     }
@@ -149,6 +232,7 @@
                     "environment",
                     "providers",
                     "map",
+                    "watchEngine",
                     "timestamp"
                   ],
                   "additionalProperties": false
@@ -496,6 +580,1304 @@
           }
         }
       }
+    },
+    "/v1/flights/lookup": {
+      "get": {
+        "summary": "Search live flights as console Flight objects",
+        "tags": [
+          "flights"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 12
+            },
+            "in": "query",
+            "name": "number",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "date",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "flights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "flightDate": {
+                            "type": "string"
+                          },
+                          "flightNumber": {
+                            "type": "string"
+                          },
+                          "airline": {
+                            "type": "string"
+                          },
+                          "airlineCode": {
+                            "type": "string"
+                          },
+                          "origin": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              },
+                              "weather": {
+                                "type": "object",
+                                "properties": {
+                                  "tempC": {
+                                    "type": "number"
+                                  },
+                                  "tempF": {
+                                    "type": "number"
+                                  },
+                                  "condition": {
+                                    "type": "string"
+                                  },
+                                  "wind": {
+                                    "type": "string"
+                                  },
+                                  "visibility": {
+                                    "type": "string"
+                                  },
+                                  "humidity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "tempC",
+                                  "tempF",
+                                  "condition",
+                                  "wind",
+                                  "visibility",
+                                  "humidity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude",
+                              "weather"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "destination": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              },
+                              "weather": {
+                                "type": "object",
+                                "properties": {
+                                  "tempC": {
+                                    "type": "number"
+                                  },
+                                  "tempF": {
+                                    "type": "number"
+                                  },
+                                  "condition": {
+                                    "type": "string"
+                                  },
+                                  "wind": {
+                                    "type": "string"
+                                  },
+                                  "visibility": {
+                                    "type": "string"
+                                  },
+                                  "humidity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "tempC",
+                                  "tempF",
+                                  "condition",
+                                  "wind",
+                                  "visibility",
+                                  "humidity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude",
+                              "weather"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "departureTimeScheduled": {
+                            "type": "string"
+                          },
+                          "departureTimeEstimated": {
+                            "type": "string"
+                          },
+                          "departureTimeActual": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "arrivalTimeScheduled": {
+                            "type": "string"
+                          },
+                          "arrivalTimeEstimated": {
+                            "type": "string"
+                          },
+                          "arrivalTimeActual": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "SCHEDULED",
+                              "BOARDING",
+                              "DEPARTED",
+                              "DELAYED",
+                              "LANDED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "statusNote": {
+                            "type": "string"
+                          },
+                          "delayMinutes": {
+                            "type": "number"
+                          },
+                          "delayReason": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "terminalDeparture": {
+                            "type": "string"
+                          },
+                          "gateDeparture": {
+                            "type": "string"
+                          },
+                          "checkInCounter": {
+                            "type": "string"
+                          },
+                          "terminalArrival": {
+                            "type": "string"
+                          },
+                          "gateArrival": {
+                            "type": "string"
+                          },
+                          "baggageCarousel": {
+                            "type": "string"
+                          },
+                          "aircraft": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "registration": {
+                                "type": "string"
+                              },
+                              "age": {
+                                "type": "string"
+                              },
+                              "wifiAvailable": {
+                                "type": "boolean"
+                              },
+                              "powerOutlets": {
+                                "type": "boolean"
+                              },
+                              "seatLayout": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "model",
+                              "registration",
+                              "age",
+                              "wifiAvailable",
+                              "powerOutlets",
+                              "seatLayout"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "telemetry": {
+                            "type": "object",
+                            "properties": {
+                              "hasLiveLocation": {
+                                "type": "boolean"
+                              },
+                              "locationUpdatedAt": {
+                                "type": "number"
+                              },
+                              "currentLatitude": {
+                                "type": "number"
+                              },
+                              "currentLongitude": {
+                                "type": "number"
+                              },
+                              "altitudeFeet": {
+                                "type": "number"
+                              },
+                              "groundSpeedKnots": {
+                                "type": "number"
+                              },
+                              "headingDegrees": {
+                                "type": "number"
+                              },
+                              "verticalSpeedFpm": {
+                                "type": "number"
+                              },
+                              "mach": {
+                                "type": "number"
+                              },
+                              "progressPercent": {
+                                "type": "number"
+                              },
+                              "distanceCoveredNm": {
+                                "type": "number"
+                              },
+                              "distanceRemainingNm": {
+                                "type": "number"
+                              },
+                              "etaMinutesRemaining": {
+                                "type": "number"
+                              },
+                              "waypoints": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "latitude": {
+                                      "type": "number"
+                                    },
+                                    "longitude": {
+                                      "type": "number"
+                                    },
+                                    "altitudeFeet": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "latitude",
+                                    "longitude",
+                                    "altitudeFeet"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "currentLatitude",
+                              "currentLongitude",
+                              "altitudeFeet",
+                              "groundSpeedKnots",
+                              "headingDegrees",
+                              "verticalSpeedFpm",
+                              "mach",
+                              "progressPercent",
+                              "distanceCoveredNm",
+                              "distanceRemainingNm",
+                              "etaMinutesRemaining",
+                              "waypoints"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "timeline": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string"
+                                },
+                                "time": {
+                                  "type": "string"
+                                },
+                                "isCompleted": {
+                                  "type": "boolean"
+                                },
+                                "isCurrent": {
+                                  "type": "boolean"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "time",
+                                "isCompleted",
+                                "isCurrent",
+                                "description"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "isWatchlisted": {
+                            "type": "boolean"
+                          },
+                          "customNotes": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "flightNumber",
+                          "airline",
+                          "airlineCode",
+                          "origin",
+                          "destination",
+                          "departureTimeScheduled",
+                          "departureTimeEstimated",
+                          "departureTimeActual",
+                          "arrivalTimeScheduled",
+                          "arrivalTimeEstimated",
+                          "arrivalTimeActual",
+                          "status",
+                          "statusNote",
+                          "delayMinutes",
+                          "delayReason",
+                          "terminalDeparture",
+                          "gateDeparture",
+                          "checkInCounter",
+                          "terminalArrival",
+                          "gateArrival",
+                          "baggageCarousel",
+                          "aircraft",
+                          "telemetry",
+                          "timeline"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "flights"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/airports/{code}/flights": {
+      "get": {
+        "summary": "Live departures + arrivals board (console Flight shape)",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "in": "path",
+            "name": "code",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "flights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "flightDate": {
+                            "type": "string"
+                          },
+                          "flightNumber": {
+                            "type": "string"
+                          },
+                          "airline": {
+                            "type": "string"
+                          },
+                          "airlineCode": {
+                            "type": "string"
+                          },
+                          "origin": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              },
+                              "weather": {
+                                "type": "object",
+                                "properties": {
+                                  "tempC": {
+                                    "type": "number"
+                                  },
+                                  "tempF": {
+                                    "type": "number"
+                                  },
+                                  "condition": {
+                                    "type": "string"
+                                  },
+                                  "wind": {
+                                    "type": "string"
+                                  },
+                                  "visibility": {
+                                    "type": "string"
+                                  },
+                                  "humidity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "tempC",
+                                  "tempF",
+                                  "condition",
+                                  "wind",
+                                  "visibility",
+                                  "humidity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude",
+                              "weather"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "destination": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "city": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number"
+                              },
+                              "longitude": {
+                                "type": "number"
+                              },
+                              "weather": {
+                                "type": "object",
+                                "properties": {
+                                  "tempC": {
+                                    "type": "number"
+                                  },
+                                  "tempF": {
+                                    "type": "number"
+                                  },
+                                  "condition": {
+                                    "type": "string"
+                                  },
+                                  "wind": {
+                                    "type": "string"
+                                  },
+                                  "visibility": {
+                                    "type": "string"
+                                  },
+                                  "humidity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "tempC",
+                                  "tempF",
+                                  "condition",
+                                  "wind",
+                                  "visibility",
+                                  "humidity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "city",
+                              "country",
+                              "timezone",
+                              "latitude",
+                              "longitude",
+                              "weather"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "departureTimeScheduled": {
+                            "type": "string"
+                          },
+                          "departureTimeEstimated": {
+                            "type": "string"
+                          },
+                          "departureTimeActual": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "arrivalTimeScheduled": {
+                            "type": "string"
+                          },
+                          "arrivalTimeEstimated": {
+                            "type": "string"
+                          },
+                          "arrivalTimeActual": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "SCHEDULED",
+                              "BOARDING",
+                              "DEPARTED",
+                              "DELAYED",
+                              "LANDED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "statusNote": {
+                            "type": "string"
+                          },
+                          "delayMinutes": {
+                            "type": "number"
+                          },
+                          "delayReason": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "terminalDeparture": {
+                            "type": "string"
+                          },
+                          "gateDeparture": {
+                            "type": "string"
+                          },
+                          "checkInCounter": {
+                            "type": "string"
+                          },
+                          "terminalArrival": {
+                            "type": "string"
+                          },
+                          "gateArrival": {
+                            "type": "string"
+                          },
+                          "baggageCarousel": {
+                            "type": "string"
+                          },
+                          "aircraft": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "registration": {
+                                "type": "string"
+                              },
+                              "age": {
+                                "type": "string"
+                              },
+                              "wifiAvailable": {
+                                "type": "boolean"
+                              },
+                              "powerOutlets": {
+                                "type": "boolean"
+                              },
+                              "seatLayout": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "model",
+                              "registration",
+                              "age",
+                              "wifiAvailable",
+                              "powerOutlets",
+                              "seatLayout"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "telemetry": {
+                            "type": "object",
+                            "properties": {
+                              "hasLiveLocation": {
+                                "type": "boolean"
+                              },
+                              "locationUpdatedAt": {
+                                "type": "number"
+                              },
+                              "currentLatitude": {
+                                "type": "number"
+                              },
+                              "currentLongitude": {
+                                "type": "number"
+                              },
+                              "altitudeFeet": {
+                                "type": "number"
+                              },
+                              "groundSpeedKnots": {
+                                "type": "number"
+                              },
+                              "headingDegrees": {
+                                "type": "number"
+                              },
+                              "verticalSpeedFpm": {
+                                "type": "number"
+                              },
+                              "mach": {
+                                "type": "number"
+                              },
+                              "progressPercent": {
+                                "type": "number"
+                              },
+                              "distanceCoveredNm": {
+                                "type": "number"
+                              },
+                              "distanceRemainingNm": {
+                                "type": "number"
+                              },
+                              "etaMinutesRemaining": {
+                                "type": "number"
+                              },
+                              "waypoints": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "latitude": {
+                                      "type": "number"
+                                    },
+                                    "longitude": {
+                                      "type": "number"
+                                    },
+                                    "altitudeFeet": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "latitude",
+                                    "longitude",
+                                    "altitudeFeet"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "currentLatitude",
+                              "currentLongitude",
+                              "altitudeFeet",
+                              "groundSpeedKnots",
+                              "headingDegrees",
+                              "verticalSpeedFpm",
+                              "mach",
+                              "progressPercent",
+                              "distanceCoveredNm",
+                              "distanceRemainingNm",
+                              "etaMinutesRemaining",
+                              "waypoints"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "timeline": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string"
+                                },
+                                "time": {
+                                  "type": "string"
+                                },
+                                "isCompleted": {
+                                  "type": "boolean"
+                                },
+                                "isCurrent": {
+                                  "type": "boolean"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "time",
+                                "isCompleted",
+                                "isCurrent",
+                                "description"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "isWatchlisted": {
+                            "type": "boolean"
+                          },
+                          "customNotes": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "flightNumber",
+                          "airline",
+                          "airlineCode",
+                          "origin",
+                          "destination",
+                          "departureTimeScheduled",
+                          "departureTimeEstimated",
+                          "departureTimeActual",
+                          "arrivalTimeScheduled",
+                          "arrivalTimeEstimated",
+                          "arrivalTimeActual",
+                          "status",
+                          "statusNote",
+                          "delayMinutes",
+                          "delayReason",
+                          "terminalDeparture",
+                          "gateDeparture",
+                          "checkInCounter",
+                          "terminalArrival",
+                          "gateArrival",
+                          "baggageCarousel",
+                          "aircraft",
+                          "telemetry",
+                          "timeline"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "flights"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/airports/{code}/routes": {
+      "get": {
+        "summary": "Daily route stats from the origin airport",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "in": "path",
+            "name": "code",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "routes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "destination": {
+                            "type": "string"
+                          },
+                          "destinationName": {
+                            "type": "string"
+                          },
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "icao": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          },
+                          "latitude": {
+                            "type": "number"
+                          },
+                          "longitude": {
+                            "type": "number"
+                          },
+                          "dailyFlights": {
+                            "type": "number"
+                          },
+                          "operators": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "name"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "destination",
+                          "latitude",
+                          "longitude",
+                          "dailyFlights",
+                          "operators"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "routes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/airports/search": {
+      "get": {
+        "summary": "Search airports worldwide by code or name",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64
+            },
+            "in": "query",
+            "name": "q",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "airports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "iata": {
+                            "type": "string"
+                          },
+                          "icao": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "ALL",
+                              "MENA",
+                              "EUROPE",
+                              "AFRICA",
+                              "ASIA_PACIFIC",
+                              "AMERICAS"
+                            ]
+                          },
+                          "latitude": {
+                            "type": "number"
+                          },
+                          "longitude": {
+                            "type": "number"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          },
+                          "hubAirlines": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "iata",
+                          "icao",
+                          "name",
+                          "city",
+                          "country",
+                          "region",
+                          "latitude",
+                          "longitude",
+                          "timezone",
+                          "hubAirlines"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "airports"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -506,6 +1888,10 @@
     {
       "name": "flights",
       "description": "Live flight data"
+    },
+    {
+      "name": "airports",
+      "description": "Airport boards, routes, and search"
     }
   ]
 }

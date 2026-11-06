@@ -114,8 +114,15 @@ export function DestinationWeatherCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="hidden rounded-md border border-landed/30 bg-landed/10 px-1.5 py-1 text-[8px] font-bold text-landed sm:inline">
-            LIVE OPEN-METEO
+          <span
+            className={cn(
+              "hidden rounded-md border px-1.5 py-1 text-[8px] font-bold sm:inline",
+              forecast.isEstimated
+                ? "border-delayed/30 bg-delayed/10 text-delayed"
+                : "border-landed/30 bg-landed/10 text-landed",
+            )}
+          >
+            {forecast.isEstimated ? "ESTIMATED · NOT LIVE" : "LIVE OPEN-METEO"}
           </span>
           <span
             className="rounded-md border px-1.5 py-1 text-[8px] font-bold"

@@ -22,17 +22,8 @@ export function SourceBanner({ className }: { className?: string }) {
   return (
     <>
       <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
         className={cn(
-          "flex w-full cursor-pointer items-center gap-2 rounded-xl border bg-surface-2/80 px-3 py-2 text-left transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          "flex w-full items-center gap-2 rounded-xl border bg-surface-2/80 px-3 py-2 text-left transition-colors hover:border-accent/40",
           className,
         )}
         style={{ borderColor: `${meta.color}66` }}
@@ -45,20 +36,27 @@ export function SourceBanner({ className }: { className?: string }) {
             style={{ backgroundColor: meta.color }}
           />
         )}
-        <span
-          className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.1em]"
-          style={{ color: meta.color }}
-        >
-          {syncing ? "SYNCING…" : meta.badge}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[10px] text-muted">
-          · {meta.summary}
-        </span>
-        <Info className="size-3 shrink-0 text-subtle" />
+        {/* Real button + separate refresh control: no nested interactive widgets. */}
         <button
           type="button"
-          onClick={(event) => {
-            event.stopPropagation();
+          onClick={() => setOpen(true)}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          aria-label="Open data and sync status details"
+        >
+          <span
+            className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.1em]"
+            style={{ color: meta.color }}
+          >
+            {syncing ? "SYNCING…" : meta.badge}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[10px] text-muted">
+            · {meta.summary}
+          </span>
+          <Info className="size-3 shrink-0 text-subtle" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             void refreshData();
           }}
           className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-3"

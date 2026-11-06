@@ -273,6 +273,7 @@ export function mapOpenMeteoToForecast(
       condition,
     ),
     lastUpdated: Date.now(),
+    isEstimated: false,
   };
 }
 
@@ -368,6 +369,9 @@ export function generateFallbackForecast(
     },
     packingAdvice: packingAdviceFor(arrivalTempC, precipChance, base.condition),
     lastUpdated: Date.now(),
+    // This path is used when the Open-Meteo call fails: it models conditions
+    // from cached values, so the UI must never present it as live data.
+    isEstimated: true,
   };
 }
 

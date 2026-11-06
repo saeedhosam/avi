@@ -293,6 +293,8 @@ export interface DestinationArrivalForecast {
   advisory: ArrivalAviationAdvisory;
   packingAdvice: string;
   lastUpdated: number;
+  /** True when the forecast is a model-less estimate, not live Open-Meteo data. */
+  isEstimated?: boolean;
 }
 
 export type AmenityCategory =

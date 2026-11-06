@@ -15,7 +15,7 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
-import { useApp } from "@/lib/store";
+import { useResolvedTheme } from "@/lib/store";
 import { FlightMap } from "./flight-map";
 
 export function OsmRouteMap({
@@ -33,7 +33,7 @@ export function OsmRouteMap({
   onSelectAirport: (iata: string) => void;
   className?: string;
 }) {
-  const { resolvedTheme } = useApp();
+  const resolvedTheme = useResolvedTheme();
   const { containerRef, map } = useMapLibre(resolvedTheme, {
     center: [10, 22],
     zoom: 2,

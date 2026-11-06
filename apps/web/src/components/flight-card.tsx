@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowRight,
   Bookmark,
@@ -23,8 +23,10 @@ export function FlightCard({
   showWatchlist?: boolean;
   className?: string;
 }) {
-  const router = useRouter();
   const { toggleWatchlist, addRecent } = useApp();
+  const href = flight.flightDate
+    ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
+    : `/flight/${encodeURIComponent(flight.id)}`;
   const progress =
     flight.status === "LANDED"
       ? 1
@@ -35,30 +37,14 @@ export function FlightCard({
           : 0;
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <Link
+      href={href}
       onClick={() => {
         addRecent(flight);
-        router.push(
-          flight.flightDate
-            ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
-            : `/flight/${encodeURIComponent(flight.id)}`,
-        );
       }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          addRecent(flight);
-          router.push(
-          flight.flightDate
-            ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
-            : `/flight/${encodeURIComponent(flight.id)}`,
-        );
-        }
-      }}
+      aria-label={`Open ${flight.flightNumber} flight details`}
       className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-2xl border border-line/90 bg-surface/95 p-4 transition-all hover:border-accent/35 hover:shadow-[0_18px_40px_-30px_rgba(0,229,255,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+        "group relative block overflow-hidden rounded-2xl border border-line/90 bg-surface/95 p-4 transition-all hover:border-accent/35 hover:shadow-[0_18px_40px_-30px_rgba(0,229,255,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
         className,
       )}
     >
@@ -208,6 +194,6 @@ export function FlightCard({
           </p>
         )}
       </div>
-    </div>
+    </Link>
   );
 }

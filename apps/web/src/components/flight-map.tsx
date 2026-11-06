@@ -20,9 +20,8 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
+import { useResolvedTheme } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { useApp } from "@/lib/store";
-
 export function FlightMap({
   flight,
   className,
@@ -34,7 +33,7 @@ export function FlightMap({
   showAttribution?: boolean;
   recenterSignal?: number;
 }) {
-  const { resolvedTheme } = useApp();
+  const resolvedTheme = useResolvedTheme();
   const { containerRef, map } = useMapLibre(resolvedTheme, {
     center: [10, 24],
     zoom: 2.4,

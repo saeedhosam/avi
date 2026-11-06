@@ -4,7 +4,8 @@ import {
   mapAeroFids,
   type AeroFidsResponseDto,
 } from "@/lib/aerodatabox";
-
+import { gatewayFetchJson } from "@/lib/gateway";
+import type { Flight } from "@/lib/types";
 
 export async function GET(
   _request: Request,
@@ -17,6 +18,16 @@ export async function GET(
       { mode: "NOT_CONFIGURED", flights: [], error: "Invalid IATA code" },
       { status: 400 },
     );
+  }
+
+  // Gateway-first parity with the shared backend; direct fallback otherwise.
+  const gatewayResult = await gatewayFetchJson<{
+    mode: string;
+    status?: number;
+    flights: Flight[];
+  }>(`/v1/airports/${code}/flights`);
+  if (gatewayResult) {
+    return NextResponse.json(gatewayResult);
   }
 
   const { data, status, mode } = await fetchAeroJson<AeroFidsResponseDto>(

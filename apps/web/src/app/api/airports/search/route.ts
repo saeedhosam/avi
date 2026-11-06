@@ -3,6 +3,7 @@ import {
   fetchAeroJson,
   type AeroAirportDto,
 } from "@/lib/aerodatabox";
+import { gatewayFetchJson } from "@/lib/gateway";
 import { inferRegionFromCoords } from "@/lib/data";
 import type { AirportNode } from "@/lib/types";
 
@@ -15,6 +16,15 @@ export async function GET(request: Request) {
   const q = (searchParams.get("q") ?? "").trim();
   if (q.length < 2) {
     return NextResponse.json({ mode: "LIVE_AERODATABOX", airports: [] });
+  }
+
+  const gatewayResult = await gatewayFetchJson<{
+    mode: string;
+    status: number;
+    airports: AirportNode[];
+  }>(`/v1/airports/search?q=${encodeURIComponent(q)}`);
+  if (gatewayResult) {
+    return NextResponse.json(gatewayResult);
   }
 
   const { data, status, mode } = await fetchAeroJson<AeroAirportSearchResponse>(

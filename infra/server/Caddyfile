@@ -2,7 +2,34 @@
 	admin off
 }
 
-# Temporary bootstrap hostnames until the production domain is connected.
+# ── Production (avi.codestep.org) ────────────────────────────────────────────
+# Keep both blocks during the transition: new domains go live as soon as DNS
+# resolves, while the sslip names keep serving until Supabase/dashboard
+# redirects are updated and the staging links die.
+avi.codestep.org {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+	reverse_proxy web:3000
+}
+
+api.codestep.org {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+	reverse_proxy api:8080
+}
+
+# ── Legacy staging (sslip.io) — keep until the cutover completes ────────────
 app.2-31-110-53.sslip.io {
 	encode zstd gzip
 	header {

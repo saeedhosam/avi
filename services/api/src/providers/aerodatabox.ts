@@ -321,4 +321,64 @@ export class AeroDataBoxProvider {
       },
     };
   }
+
+  /**
+   * Whole-airport board (departures + arrivals) in the summary shape used by
+   * the watch engine. One request covers every watched flight sharing that
+   * airport in the refresh window — a 2-unit call replacing N × 2-unit calls.
+   */
+  async lookupFids(rawCode: string): Promise<{
+    meta: { source: "live" | "cached" | "quota_fallback" | "not_configured" | "error" };
+    summaries: FlightSummary[];
+  }> {
+    const code = rawCode.trim().toUpperCase();
+    if (!this.configured) {
+      return { meta: { source: "not_configured" }, summaries: [] };
+    }
+    const cacheKey = `fids:${code}`;
+    const cached = this.cache.get<FlightSummary[]>(cacheKey);
+    if (cached) {
+      return {
+        meta: { source: "cached" },
+        summaries: cached,
+      };
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://${this.host}/flights/airports/iata/${encodeURIComponent(code)}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
+        {
+          headers: this.headers(),
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+    } catch {
+      return { meta: { source: "error" }, summaries: [] };
+    }
+
+    if (response.status === 429) {
+      return { meta: { source: "quota_fallback" }, summaries: [] };
+    }
+    if (!response.ok) {
+      return { meta: { source: "error" }, summaries: [] };
+    }
+
+    let payload: { departures?: unknown[]; arrivals?: unknown[] } = {};
+    try {
+      payload = (await response.json()) as { departures?: unknown[]; arrivals?: unknown[] };
+    } catch {
+      return { meta: { source: "error" }, summaries: [] };
+    }
+
+    const summaries = [
+      ...(Array.isArray(payload.departures) ? payload.departures : []),
+      ...(Array.isArray(payload.arrivals) ? payload.arrivals : []),
+    ]
+      .map((dto) => mapFlight((dto as unknown as AeroFlightDto), true))
+      .filter((flight): flight is FlightSummary => flight !== null);
+
+    this.cache.set(cacheKey, summaries, 60_000);
+    return { meta: { source: "live" }, summaries };
+  }
 }

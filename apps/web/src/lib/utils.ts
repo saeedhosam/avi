@@ -372,6 +372,16 @@ export function timeAgo(timestamp: number) {
   return `${hours} hr${hours === 1 ? "" : "s"} ago`;
 }
 
+/**
+ * Alert timestamps are ISO instants (client + server engine agree on this);
+ * anything unparseable renders as-is instead of being silently reformatted.
+ */
+export function formatAlertTimestamp(timestamp: string) {
+  const ms = Date.parse(timestamp);
+  if (!Number.isFinite(ms)) return timestamp;
+  return timeAgo(ms);
+}
+
 export function pad(n: number) {
   return String(n).padStart(2, "0");
 }

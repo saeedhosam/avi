@@ -30,6 +30,42 @@ export function getSupabase(): SupabaseClient<Database> | null {
   return browserClient;
 }
 
+/**
+ * Watchlist rows are keyed by (user_id, flight_id) where flight_id is the
+ * flight number *and* operating date. A number watched on two dates must get
+ * two rows with independent snapshots, notes, and alert history.
+ */
+export function watchRowId(
+  flight: Pick<Flight, "id" | "flightNumber" | "flightDate">,
+): string {
+  const compact = (flight.id || flight.flightNumber)
+    .replace(/\s+/g, "")
+    .toUpperCase();
+  return flight.flightDate ? `${compact}-${flight.flightDate}` : compact;
+}
+
+export interface CloudWatchlistRecord {  flightId: string;
+  flightNumber: string;
+  flightDate?: string;
+  airline: string;
+  originCode: string;
+  destCode: string;
+  status: string;
+  customNotes: string;
+  isWatchlisted: boolean;
+  /** Server watch engine keeps this fresh; the web hydrates from it for free. */
+  snapshot: Flight | null;
+}
+
+/** A snapshot is usable only when it carries a recognizable Flight face. */
+function asFlightSnapshot(value: unknown): Flight | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<Flight>;
+  if (typeof candidate.flightNumber !== "string" || !candidate.flightNumber) return null;
+  if (!candidate.origin || !candidate.destination) return null;
+  return value as Flight;
+}
+
 function toAccount(user: User): UserAccount {
   const name =
     (user.user_metadata?.full_name as string | undefined) ??
@@ -50,29 +86,41 @@ function toAccount(user: User): UserAccount {
   };
 }
 
+export type SupabaseAuthEvent =
+  | "INITIAL_SESSION"
+  | "SIGNED_IN"
+  | "SIGNED_OUT"
+  | "TOKEN_REFRESHED"
+  | "USER_UPDATED"
+  | string;
+
 export function observeSupabaseAuth(
-  callback: (account: UserAccount | null, uid: string | null) => void,
+  callback: (
+    account: UserAccount | null,
+    uid: string | null,
+    event: SupabaseAuthEvent,
+  ) => void,
 ) {
   const supabase = getSupabase();
   if (!supabase) return () => {};
 
-  const emit = (user: User | null) => {
+  const emit = (user: User | null, event: SupabaseAuthEvent) => {
     if (!user) {
-      callback(null, null);
+      callback(null, null, event);
       return;
     }
-    callback(toAccount(user), user.id);
+    callback(toAccount(user), user.id, event);
   };
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    emit(session?.user ?? null);
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    emit(session?.user ?? null, event);
   });
 
-  void supabase.auth.getSession().then(({ data }) => {
-    emit(data.session?.user ?? null);
-  });
+  void supabase.auth
+    .getSession()
+    .then(({ data }) => emit(data.session?.user ?? null, "INITIAL_SESSION"));
 
   return () => subscription.unsubscribe();
 }
@@ -100,15 +148,16 @@ export async function saveUserProfile(account: UserAccount, uid: string) {
   const supabase = getSupabase();
   if (!supabase) return;
   try {
+    // Only write the fields the web owns. Re-upserting on every auth event
+    // (including token refreshes) previously clobbered `home_airport` and
+    // `theme_preference` saved by other clients — and now those columns are
+    // still user-writable but this call simply no longer touches them.
     await supabase.from("profiles").upsert(
       {
         id: uid,
         display_name: account.name.slice(0, 100) || "Aviation Navigator",
         email: account.email.slice(0, 150),
         photo_url: account.photoUrl ?? null,
-        home_airport: "JFK",
-        theme_preference: "SYSTEM",
-        updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },
     );
@@ -124,10 +173,13 @@ export async function saveWatchlistItemCloud(
   const supabase = getSupabase();
   if (!supabase) return;
   try {
+    // Watchlist identity is date-scoped (P1 Track B): the same flight number
+    // on two operating dates occupies two independent rows keyed by
+    // (user_id, flight_id = "<COMPACT>-<date>").
     await supabase.from("watchlist_items").upsert(
       {
         user_id: uid,
-        flight_id: flight.id,
+        flight_id: watchRowId(flight),
         flight_number: flight.flightNumber,
         flight_date: flight.flightDate ?? null,
         airline: flight.airline.slice(0, 100),
@@ -222,7 +274,9 @@ export async function fetchCloudAlerts(uid: string): Promise<FlightAlert[]> {
   }
 }
 
-export async function fetchCloudWatchlist(uid: string) {
+export async function fetchCloudWatchlist(
+  uid: string,
+): Promise<CloudWatchlistRecord[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
   try {
@@ -231,18 +285,21 @@ export async function fetchCloudWatchlist(uid: string) {
       .select("*")
       .eq("user_id", uid);
     if (error) throw error;
-    return (data ?? []).map((record) => ({
-      flightId: record.flight_id,
-      flightNumber: record.flight_number,
-      flightDate: record.flight_date ?? undefined,
-      airline: record.airline,
-      originCode: record.origin_code,
-      destCode: record.dest_code,
-      status: record.status,
-      customNotes: record.notes,
-      isWatchlisted: true,
-      snapshot: record.snapshot,
-    }));
+    return (data ?? []).map((record) => {
+      const snapshot = asFlightSnapshot(record.snapshot);
+      return {
+        flightId: record.flight_id,
+        flightNumber: record.flight_number,
+        flightDate: record.flight_date ?? undefined,
+        airline: record.airline,
+        originCode: record.origin_code,
+        destCode: record.dest_code,
+        status: record.status,
+        customNotes: record.notes ?? snapshot?.customNotes ?? "",
+        isWatchlisted: true,
+        snapshot,
+      };
+    });
   } catch (error) {
     console.warn("Supabase watchlist fetch failed", error);
     return [];

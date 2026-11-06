@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
   ],
 };
 
-const THEME_SCRIPT = `(function(){try{var raw=localStorage.getItem('skytrack.desktop.v1');var p=raw?JSON.parse(raw):{};var mode=p.themeMode||'SYSTEM';var dark=mode==='DARK'||(mode==='SYSTEM'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.documentElement.style.colorScheme=dark?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+const THEME_SCRIPT = `(function(){try{var raw=localStorage.getItem('skytrack.theme');var mode=raw?JSON.parse(raw):'SYSTEM';var dark=mode==='DARK'||(mode==='SYSTEM'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.documentElement.style.colorScheme=dark?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }
         >
           <AppProvider>
+            <ServiceWorkerRegistrar />
             <AppShell>{children}</AppShell>
           </AppProvider>
         </Suspense>
