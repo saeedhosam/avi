@@ -1,5 +1,5 @@
 import type { FastifyRequest } from "fastify";
-import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
+import type { FastifyPluginAsyncZod, ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { SupabaseServer } from "../lib/supabase-server.js";
@@ -91,14 +91,15 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
   // Encapsulated content parser: this scope parses JSON as a raw buffer so the
   // signature can be computed over the exact bytes LS signed.
   if (config.BILLING_PROVIDER === "lemon_squeezy") {
-    app.addContentTypeParser(
-      ["application/json", LS_WEBHOOK_TYPE],
-      { parseAs: "buffer" },
-      (_request, body, done) => done(null, body),
-    );
+    await app.register(async (webhookOnly) => {
+      webhookOnly.addContentTypeParser(
+        ["application/json", LS_WEBHOOK_TYPE],
+        { parseAs: "buffer" },
+        (_request, body, done) => done(null, body),
+      );
 
-    app.post(
-      "/v1/webhooks/lemon-squeezy",
+      webhookOnly.post(
+        "/v1/webhooks/lemon-squeezy",
       { schema: { hide: true, response: { 200: z.void(), 401: z.object({ error: z.string() }) } } },
       async (request, reply) => {
         const raw = (request as RawBodyRequest).rawBody ?? (request as { body?: unknown }).body;
@@ -148,20 +149,25 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           "billing webhook updated plan",
         );
         return reply.code(200).send();
-      },
-    );
+        },
+      );
+    });
   }
 
   // ── Polar.sh webhooks (Merchant of Record; Egypt payout verified) ─────────
   if (config.BILLING_PROVIDER === "polar") {
-    app.addContentTypeParser(
-      ["application/json"],
-      { parseAs: "buffer" },
-      (_request, body, done) => done(null, body),
-    );
+    // ── Polar.sh webhooks (Merchant of Record; Egypt payout verified) ───
+    // Encapsulated for the same reason as the LS branch: keep normal JSON
+    // parsing alive for the checkout route outside this sub-plugin.
+    await app.register(async (hooked) => {
+      hooked.addContentTypeParser(
+        ["application/json"],
+        { parseAs: "buffer" },
+        (_request, body, done) => done(null, body),
+      );
 
-    app.post(
-      "/v1/webhooks/polar",
+      hooked.post(
+        "/v1/webhooks/polar",
       { schema: { hide: true, response: { 200: z.void(), 401: z.object({ error: z.string() }) } } },
       async (request, reply) => {
         const raw = (request as RawBodyRequest).rawBody ?? (request as { body?: unknown }).body;
@@ -217,8 +223,9 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           "polar webhook updated plan",
         );
         return reply.code(200).send();
-      },
-    );
+        },
+      );
+    });
   }
 
   // ── Checkout creation ─────────────────────────────────────────────────────

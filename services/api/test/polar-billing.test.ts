@@ -81,6 +81,34 @@ describe("Polar plan mapping", () => {
   });
 });
 
+describe("polar checkout route encapulation", () => {
+  it("checkout keeps normal JSON parsing (auth gate returns 401, not 400)", async () => {
+    const { buildApp } = await import("../src/app.js");
+    const app = await buildApp(
+      loadConfig({
+        NODE_ENV: "test",
+        LOG_LEVEL: "silent",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SECRET_KEY: "sb_secret_test",
+        BILLING_PROVIDER: "polar",
+        POLAR_WEBHOOK_SECRET: SECRET,
+        POLAR_PRICE_PRO: "prd_pro_777",
+      }),
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/billing/checkout",
+      headers: { "content-type": "application/json" },
+      payload: { target: "PLUS" },
+    });
+    // Missing access token must surface as unauthorized — a 400 body/target
+    // validation error would mean the buffer-parser leaked into this route.
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body).error).toBe("unauthorized");
+    await app.close();
+  });
+});
+
 describe("polar webhook route", () => {
   it("rejects unsigned payloads and writes plan for signed ones", async () => {
     const { buildApp } = await import("../src/app.js");
