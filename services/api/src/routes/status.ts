@@ -63,7 +63,7 @@ async function fetchRemoteEngineStats(
     const response = await fetch(`${base}/v1/status`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
-      signal: AbortSignal.timeout(2_000),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       log.info(`engine stats probe failed: HTTP ${response.status}`);
