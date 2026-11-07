@@ -147,8 +147,23 @@ export function SourceBanner({ className }: { className?: string }) {
                 className="underline underline-offset-2 hover:text-accent"
               >
                 OpenFreeMap
+              </a> .
+            </p>
+            <p className="mt-2 flex items-center gap-2 border-t border-line/60 pt-2 text-[9px] text-muted">
+              <a
+                href="/legal/privacy"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                Privacy Policy
               </a>
-              . Not for operational navigation use.
+              <span className="text-subtle">·</span>
+              <a
+                href="/legal/terms"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                Terms of Service
+              </a>
+              <span className="text-subtle">· Not for operational navigation. Contact: makymaky757@gmail.com</span>
             </p>
           </div>
           {offlineMode ? (

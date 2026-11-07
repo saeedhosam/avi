@@ -40,8 +40,23 @@ Everything split between "code" and "your side" for going live at
 5. **Uptime monitoring** on
    `https://api.codestep.org/healthz` and `https://avi.codestep.org/` (e.g.
    Better Uptime / UptimeRobot) with an email alert target.
-6. **Legal pages** — privacy policy + terms text (jurisdiction/support email
-   needed), to be linked from the web app footer.
+6. **Legal text** — ✅ shipped 2026-11-07. `/legal/privacy` and `/legal/terms`
+   are live (linked from the in-app data-sources modal), written for
+   Saeed Jumaa (individual, Egypt), contact makymaky757@gmail.com. Swap the
+   support email everywhere once a domain mailbox exists.
+   **⚠️ Compliance notes surfaced while reviewing provider legal docs:**
+   - **Open-Meteo free tier is non-commercial only** (their Terms). Avi has
+     paid plans → counts as commercial use. When the first subscription
+     revenue lands, subscribe to their API Standard tier (or higher) to stay
+     compliant — open-meteo.com/en/pricing.
+   - **AeroDataBox Starter plan is compliant** for Avi's use: commercial use
+     allowed on paid plans, attribution not required, End-Use sale (users
+     viewing results) explicitly allowed. Their **Caching Terms cap flight
+     payload retention at 7 days** → the engine now auto-purges stale
+     watchlist snapshots after 7 days (`pruneStaleFlightSnapshots` in the
+     daily tick). Never republish raw API payloads as datasets or feeds.
+   - **Polar** (MoR) covers checkout buyer terms + taxes; AUP satisfied
+     (software/SaaS ✅). `/legal/terms → 4` links their Checkout Buyer Terms.
 
 ## Already done in code
 

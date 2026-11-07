@@ -291,4 +291,36 @@ export class SupabaseServer {
       throw new Error(`alert insert failed with HTTP ${response.status}`);
     }
   }
+
+  /**
+   * Clears stale flight snapshots from watchlist rows (AeroDataBox Starter
+   * plan Caching Terms cap retention at 7 days). Row identity is kept — the
+   * customer's watchlist entry survives — but cached flight contents are
+   * dropped; they are re-fetched live by the engine (for active flights) or
+   * live lookup on the web when the user re-activates the entry.
+   */
+  async pruneStaleFlightSnapshots(retentionDays: number): Promise<number> {
+    if (!this.ready) return 0;
+    const cutoff = new Date(
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const search = new URLSearchParams({
+      "updated_at": `lt.${cutoff}`,
+      "snapshot": "not.is.null",
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/watchlist_items?${search.toString()}`,
+      {
+        method: "PATCH",
+        headers: this.headers(),
+        body: JSON.stringify({ snapshot: null }),
+        signal: AbortSignal.timeout(60_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`stale snapshot prune failed with HTTP ${response.status}`);
+    }
+    // Prefer: return=minimal gives us no count; the 204 means "purge ran".
+    return 1;
+  }
 }

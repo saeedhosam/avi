@@ -134,6 +134,9 @@ describe("watch engine FIDS consolidation", () => {
       if (url.includes("/rest/v1/watchlist_items?select=")) {
         return new Response(JSON.stringify(rows), { status: 200 });
       }
+      if (url.includes("updated_at=lt.")) {
+        return new Response(null, { status: 204 });
+      }
       if (url.includes("/rest/v1/flight_alerts?select=flight_number")) {
         return new Response(JSON.stringify([]), { status: 200 });
       }
@@ -203,7 +206,14 @@ describe("watch engine FIDS consolidation", () => {
     expect(stats.units.unitsUsed).toBe(2);
     // Both rows patched with a board-derived snapshot.
     const patchCalls = fetchMock.mock.calls.filter(
-      (call) => String(call[0]).includes("/rest/v1/watchlist_items?") && !String(call[0]).includes("select="),
+      (call) => {
+        const url = String(call[0]);
+        return (
+          url.includes("/rest/v1/watchlist_items?") &&
+          !url.includes("select=") &&
+          !url.includes("updated_at=lt.") // snapshot purge is counted separately
+        );
+      },
     );
     expect(patchCalls).toHaveLength(2);
   });

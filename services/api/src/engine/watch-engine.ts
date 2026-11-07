@@ -50,6 +50,8 @@ export class WatchEngine {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private lastTickAt: number | null = null;
+  // Daily purge of stale flight payloads (AeroDataBox 7-day cache term).
+  private lastPruneAt: number | null = null;
   private lastSwept = 0;
   private backlog = 0;
   private lastError: string | null = null;
@@ -178,6 +180,21 @@ export class WatchEngine {
     try {
       await this.runTick();
       this.lastError = null;
+      this.checkBudgetThresholds();
+      if (this.lastPruneAt == null || Date.now() - this.lastPruneAt >= 86_400_000) {
+        try {
+          const purged = await this.supabase.pruneStaleFlightSnapshots(7);
+          this.lastPruneAt = Date.now();
+          if (purged) {
+            this.log.info(
+              { purged },
+              "watch engine purged stale flight snapshots (7d cache term)",
+            );
+          }
+        } catch (pruneError) {
+          this.log.warn({ err: pruneError }, "watch engine snapshot prune failed");
+        }
+      }
       this.checkBudgetThresholds();
       if (this.pushDelivery) {
         this.lastPushStats = await this.pushDelivery.deliver();
