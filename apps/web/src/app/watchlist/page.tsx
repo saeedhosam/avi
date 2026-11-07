@@ -1,20 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   BellRing,
-  Bookmark,
   CheckCheck,
+  Glasses,
   Plane,
   RefreshCw,
-  Share2,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import type { Flight } from "@/lib/types";
 import { ALERT_META, cn, formatAlertTimestamp } from "@/lib/utils";
 import { FlightCard } from "@/components/flight-card";
-import { ShareFlightDialog } from "@/components/share-dialog";
 import { Button, EmptyState, Panel } from "@/components/ui";
 
 export default function WatchlistPage() {
@@ -26,7 +22,6 @@ export default function WatchlistPage() {
     refreshData,
     syncing,
   } = useApp();
-  const [shareFlight, setShareFlight] = useState<Flight | null>(null);
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6">
@@ -83,7 +78,7 @@ export default function WatchlistPage() {
           {watchlist.length === 0 ? (
             <Panel>
               <EmptyState
-                icon={<Bookmark className="size-6" />}
+                icon={<Glasses className="size-6 text-accent" />}
                 title="Your watchlist is empty"
                 description="Open any flight and tap Watchlist to save it. You'll receive live gate, delay, boarding, and baggage alerts."
                 action={
@@ -172,27 +167,8 @@ export default function WatchlistPage() {
               )}
             </div>
           </Panel>
-
-          {watchlist.length > 0 && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setShareFlight(watchlist[0])}
-            >
-              <Share2 className="size-3.5" />
-              Share watchlist flight
-            </Button>
-          )}
         </div>
       </div>
-
-      {shareFlight && (
-        <ShareFlightDialog
-          flight={shareFlight}
-          open
-          onClose={() => setShareFlight(null)}
-        />
-      )}
     </div>
   );
 }

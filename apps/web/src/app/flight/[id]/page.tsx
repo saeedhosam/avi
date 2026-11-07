@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  Bookmark,
   ChevronRight,
   Edit3,
   Expand,
+  Glasses,
   Layers,
   Map as MapIcon,
   MapPin,
@@ -238,7 +238,7 @@ export default function FlightDetailPage() {
           />
           <ActionButton
             icon={
-              <Bookmark
+              <Glasses
                 fill={flight.isWatchlisted ? "currentColor" : "none"}
                 className={cn(
                   "size-3.5 transition-colors",
@@ -370,9 +370,9 @@ export default function FlightDetailPage() {
                 <Button size="sm" onClick={() => setMapExpanded((value) => !value)} variant="outline">
                   <Expand className="size-3.5" /> {mapExpanded ? "Compact radar" : "Expand radar"}
                 </Button>
-                <Link href={`/terminals?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`}>
+                <Link href={`/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`}>
                   <Button size="sm" variant="outline">
-                    <Layers className="size-3.5" /> Terminal map
+                    <Layers className="size-3.5" /> Airport indoor map
                   </Button>
                 </Link>
                 <Button size="sm" variant="ghost" onClick={() => setShareOpen(true)}>
@@ -391,7 +391,7 @@ export default function FlightDetailPage() {
               icon={<PlaneTakeoff className="size-4" />}
               onMap={() =>
                 router.push(
-                  `/terminals?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
+                  `/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
                 )
               }
             />
@@ -402,7 +402,7 @@ export default function FlightDetailPage() {
               icon={<PlaneLanding className="size-4" />}
               onMap={() =>
                 router.push(
-                  `/terminals?airport=${flight.destination.code}&gate=${encodeURIComponent(flight.gateArrival)}`,
+                  `/airports?airport=${flight.destination.code}&gate=${encodeURIComponent(flight.gateArrival)}`,
                 )
               }
             />
@@ -453,7 +453,7 @@ export default function FlightDetailPage() {
                       : "border-line bg-surface-2 text-muted",
                   )}
                 >
-                  <Bookmark
+                  <Glasses
                     fill={flight.isWatchlisted ? "currentColor" : "none"}
                     className={cn(
                       "size-4 transition-colors",
@@ -510,10 +510,10 @@ export default function FlightDetailPage() {
               />
               <MiniAction
                 icon={<Layers className="size-3.5" />}
-                label="Terminal"
+                label="Indoor Map"
                 onClick={() =>
                   router.push(
-                    `/terminals?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
+                    `/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
                   )
                 }
               />

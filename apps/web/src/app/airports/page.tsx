@@ -1,1003 +1,602 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   Building2,
-  Compass,
-  Eye,
-  Gauge,
+  ChevronRight,
+  Clock,
+  Coffee,
+  DoorOpen,
   Layers,
-  Loader2,
   MapPin,
-  PlaneLanding,
-  Bookmark,
-  PlaneTakeoff,
-  RefreshCw,
+  Navigation,
   Search,
-  Wind,
+  Shield,
+  ShoppingBag,
+  Ticket,
+  Toilet,
+  Footprints,
+  Plane,
   X,
+  Share2,
 } from "lucide-react";
-import { authFetch } from "@/lib/authed-fetch";
-import { useApp } from "@/lib/store";
-import {
-  findAirportNode,
-  routeAirports,
-} from "@/lib/data";
-import type {
-  AirportNode,
-  Flight,
-  RealtimeAirportWeather,
-} from "@/lib/types";
-import { REGION_META, cn, normalizeFlightNumber } from "@/lib/utils";
-import { SourceBanner } from "@/components/source-banner";
+import { terminalLayouts } from "@/lib/data";
+import type { AmenityCategory, TerminalAmenity } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { AMENITY_META, TerminalMap } from "@/components/terminal-map";
 import {
   Button,
   EmptyState,
-  FilterChip,
   MetricTile,
   Modal,
   Panel,
-  StatusBadge,
 } from "@/components/ui";
 
-type BoardTab = "BOARD" | "EXPLORER";
-type Direction = "DEPARTURES" | "ARRIVALS";
+const CATEGORY_ICONS: Record<AmenityCategory, typeof DoorOpen> = {
+  ALL: Layers,
+  GATE: DoorOpen,
+  LOUNGE: Coffee,
+  SECURITY: Shield,
+  DINING: Coffee,
+  SHOPPING: ShoppingBag,
+  RESTROOM: Toilet,
+  TRANSIT: Ticket,
+};
 
-const BOARD_AIRPORT_CODES = [
-  "JFK",
-  "LHR",
-  "SFO",
-  "HND",
-  "DXB",
-  "CDG",
-  "SIN",
-  "FRA",
-  "CAI",
-  "IST",
-  "ATL",
-  "AMS",
-  "LAX",
-  "SYD",
-  "ORD",
+const CATEGORY_ORDER: AmenityCategory[] = [
+  "ALL",
+  "GATE",
+  "LOUNGE",
+  "SECURITY",
+  "DINING",
+  "SHOPPING",
+  "RESTROOM",
+  "TRANSIT",
 ];
 
 export default function AirportsPage() {
-  const router = useRouter();
-  const {
-    flights,
-    aeroConfigured,
-    offlineMode,
-    upsertFlights,
-    setQuotaFallback,
-    setLiveRecovered,
-    refreshData,
-    syncing,
-  } = useApp();
-
-  const [tab, setTab] = useState<BoardTab>("BOARD");
-  const [airportCode, setAirportCode] = useState("JFK");
-  const [direction, setDirection] = useState<Direction>("DEPARTURES");
-  const [airline, setAirline] = useState("All");
-  const [boardFlights, setBoardFlights] = useState<Flight[]>([]);
-  const [boardLoading, setBoardLoading] = useState(true);
-  const [boardError, setBoardError] = useState<string | null>(null);
-  const [boardMode, setBoardMode] = useState("");
-  const boardRequestRef = useRef(0);
-
-  const [explorerQuery, setExplorerQuery] = useState("");
-  const [explorerRegion, setExplorerRegion] = useState("All");
-  const [explorerCategory, setExplorerCategory] = useState("All");
-  const [searchAirports, setSearchAirports] = useState<AirportNode[] | null>(
-    null,
+  const [airportCode, setAirportCode] = useState(
+    terminalLayouts[0]?.airportCode ?? "JFK",
   );
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [liveWeather, setLiveWeather] = useState<
-    Record<string, RealtimeAirportWeather>
-  >({});
-  const [selectedAirport, setSelectedAirport] = useState<AirportNode | null>(
-    null,
-  );
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code && code.length === 3) setAirportCode(code.toUpperCase());
-    if (params.get("view") === "explorer") setTab("EXPLORER");
-  }, []);
-
-  const airport = useMemo(
+  const layout = useMemo(
     () =>
-      findAirportNode(airportCode) ??
-      routeAirports.find((item) => item.iata === airportCode) ??
-      routeAirports[0],
+      terminalLayouts.find((item) => item.airportCode === airportCode) ??
+      terminalLayouts[0],
     [airportCode],
   );
-
-  // Live weather for every reference airport (single Open-Meteo multi-location request).
-  const loadWeather = useCallback(async () => {
-    try {
-      const codes = routeAirports.map((item) => item.iata).join(",");
-      const response = await authFetch(`/api/weather/airports?codes=${codes}`, {
-        cache: "no-store",
-      });
-      const data = (await response.json()) as {
-        live?: boolean;
-        weather?: Record<string, RealtimeAirportWeather>;
-      };
-      if (data.live && data.weather) setLiveWeather(data.weather);
-    } catch {
-      // Weather stays unavailable rather than showing stale values.
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadWeather();
-  }, [loadWeather]);
-
-  const loadBoard = useCallback(async () => {
-    if (offlineMode) {
-      setBoardLoading(false);
-      setBoardError("Offline mode is active. Live airport boards are paused.");
-      return;
-    }
-    const requestId = ++boardRequestRef.current;
-    setBoardLoading(true);
-    setBoardError(null);
-    setBoardFlights([]);
-    try {
-      const response = await authFetch(`/api/airports/${airportCode}/flights`, {
-        cache: "no-store",
-      });
-      const data = (await response.json()) as {
-        mode: string;
-        status?: number;
-        flights?: Flight[];
-        error?: string;
-      };
-      if (requestId !== boardRequestRef.current) return;
-      setBoardMode(data.mode);
-      if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
-      else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
-      if (data.mode === "NOT_CONFIGURED") {
-        throw new Error(
-          "Live flight data is unavailable right now. Weather is unaffected.",
-        );
-      }
-      if (data.error) throw new Error(data.error);
-      const flights = data.flights ?? [];
-      setBoardFlights(flights);
-      if (flights.length) upsertFlights(flights);
-      if (!flights.length) {
-        setBoardError("No live flights were returned for this airport.");
-      }
-    } catch (error) {
-      if (requestId === boardRequestRef.current) {
-        setBoardError(
-          error instanceof Error ? error.message : "Live airport board request failed.",
-        );
-      }
-    } finally {
-      if (requestId === boardRequestRef.current) setBoardLoading(false);
-    }
-  }, [
-    airportCode,
-    offlineMode,
-    setQuotaFallback,
-    setLiveRecovered,
-    upsertFlights,
-  ]);
-
-  useEffect(() => {
-    void loadBoard();
-  }, [loadBoard]);
-
-  useEffect(() => {
-    const query = explorerQuery.trim();
-    if (query.length < 2) {
-      setSearchAirports(null);
-      setSearchError(null);
-      setSearchLoading(false);
-      return;
-    }
-    if (offlineMode) {
-      setSearchError("Offline mode is active.");
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setSearchLoading(true);
-      setSearchError(null);
-      try {
-        const response = await authFetch(
-          `/api/airports/search?q=${encodeURIComponent(query)}`,
-          { signal: controller.signal, cache: "no-store" },
-        );
-        const data = (await response.json()) as {
-          mode: string;
-          airports?: AirportNode[];
-        };
-        if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
-        else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
-        if (data.mode === "NOT_CONFIGURED") {
-          throw new Error(
-            "Live flight data is unavailable right now. Weather is unaffected.",
-          );
-        }
-        setSearchAirports(data.airports ?? []);
-        if (!(data.airports ?? []).length) {
-          setSearchError("No live airports matched this search.");
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setSearchError(
-            error instanceof Error ? error.message : "Airport search failed.",
-          );
-        }
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 350);
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [explorerQuery, offlineMode, setQuotaFallback, setLiveRecovered]);
-
-  const boardAirlines = useMemo(() => {
-    const names = new Set(
-      boardFlights.map((flight) => flight.airline).filter(Boolean),
-    );
-    return ["All", ...names];
-  }, [boardFlights]);
-
-  const visibleBoardFlights = useMemo(
-    () =>
-      boardFlights.filter((flight) => {
-        const matchesDirection =
-          direction === "DEPARTURES"
-            ? flight.origin.code === airportCode
-            : flight.destination.code === airportCode;
-        const matchesAirline =
-          airline === "All" || flight.airline === airline;
-        return matchesDirection && matchesAirline;
-      }),
-    [boardFlights, direction, airline, airportCode],
+  const [level, setLevel] = useState(
+    layout?.availableLevels.includes(1) ? 1 : layout?.availableLevels[0] ?? 1,
   );
+  const [category, setCategory] = useState<AmenityCategory>("ALL");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<TerminalAmenity | null>(null);
+  const [walkingRoute, setWalkingRoute] = useState(true);
+  const [airportPickerOpen, setAirportPickerOpen] = useState(false);
+  const [gateQuickJump, setGateQuickJump] = useState("");
 
-  const explorerBase = searchAirports ?? routeAirports;
-  const explorerResults = useMemo(() => {
-    const regionFiltered =
-      explorerRegion === "All"
-        ? explorerBase
-        : explorerBase.filter(
-            (item) =>
-              (REGION_META[item.region]?.label ?? item.region) ===
-                explorerRegion ||
-              item.region === explorerRegion,
-          );
+  const floor =
+    layout?.floors[String(level)] ??
+    layout?.floors[String(layout.availableLevels[0])] ??
+    Object.values(layout?.floors ?? {})[0];
 
-    if (explorerCategory === "All") return regionFiltered;
-    return regionFiltered.filter(
-      (item) => liveWeather[item.iata]?.flightCategory === explorerCategory,
+  const amenities = useMemo(() => {
+    if (!layout || !floor) return [];
+    const q = query.trim().toLowerCase();
+    return layout.amenities.filter((amenity) => {
+      const matchesLevel = amenity.level === floor.level;
+      const matchesCategory =
+        category === "ALL" || amenity.category === category;
+      const matchesQuery =
+        !q ||
+        amenity.name.toLowerCase().includes(q) ||
+        (amenity.gateNumber ?? "").toLowerCase().includes(q) ||
+        amenity.locationDescription.toLowerCase().includes(q) ||
+        AMENITY_META[amenity.category].label.toLowerCase().includes(q) ||
+        (amenity.accessInfo ?? "").toLowerCase().includes(q);
+      return matchesLevel && matchesCategory && matchesQuery;
+    });
+  }, [layout, floor, category, query]);
+
+  // Deep-link support from flight detail or external parameters
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get("airport") || params.get("code"))?.toUpperCase();
+    const gate = params.get("gate");
+    if (code) {
+      const next = terminalLayouts.find((item) => item.airportCode === code);
+      if (next) setAirportCode(code);
+    }
+    if (gate && layout) {
+      const clean = gate.replace(/^Gate\s*/i, "").trim();
+      const matched = layout.amenities.find(
+        (amenity) =>
+          amenity.gateNumber?.toLowerCase() === clean.toLowerCase() ||
+          amenity.name.toLowerCase().includes(clean.toLowerCase()),
+      );
+      if (matched) {
+        setLevel(matched.level);
+        setSelected(matched);
+        setWalkingRoute(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout?.airportCode]);
+
+  useEffect(() => {
+    if (!layout) return;
+    if (!layout.availableLevels.includes(level)) {
+      setLevel(layout.availableLevels[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout?.airportCode]);
+
+  if (!layout || !floor) {
+    return (
+      <div className="p-6">
+        <Panel>
+          <EmptyState
+            icon={<Layers className="size-6" />}
+            title="Airport indoor map unavailable"
+            description="This airport does not have an indoor layout configured yet. Try JFK, LHR, SFO, or DXB."
+          />
+        </Panel>
+      </div>
     );
-  }, [explorerBase, explorerRegion, explorerCategory, liveWeather]);
+  }
 
-  const weather = liveWeather[airport.iata];
-  const lastSync = boardLoading ? "Loading…" : `${visibleBoardFlights.length} live flights`;
+  const categoryCounts = new Map<AmenityCategory, number>();
+  for (const item of layout.amenities) {
+    if (item.level !== floor.level) continue;
+    categoryCounts.set(item.category, (categoryCounts.get(item.category) ?? 0) + 1);
+  }
+
+  const selectAmenity = (amenity: TerminalAmenity) => {
+    setSelected(amenity);
+    setWalkingRoute(true);
+  };
+
+  const handleGateJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gateQuickJump.trim() || !layout) return;
+    const clean = gateQuickJump.replace(/^Gate\s*/i, "").trim().toLowerCase();
+    const matched = layout.amenities.find(
+      (a) =>
+        a.category === "GATE" &&
+        (a.gateNumber?.toLowerCase() === clean || a.name.toLowerCase().includes(clean)),
+    );
+    if (matched) {
+      setLevel(matched.level);
+      setSelected(matched);
+      setWalkingRoute(true);
+      setGateQuickJump("");
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6">
+    <div className="mx-auto max-w-[1680px] px-4 py-4 lg:px-6">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="label-caps text-accent">Airport operations</p>
+          <p className="label-caps text-accent">Indoor Airport Navigation & Wayfinding</p>
           <h2 className="mt-1 flex items-center gap-2 text-xl font-black tracking-tight text-ink">
-            {tab === "BOARD" ? "Live airport flight boards" : "Live airport explorer"}
-            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-accent">
-              {tab === "BOARD" ? airportCode : "LIVE + WEATHER"}
+            {layout.airportCode} Indoor Airport Map
+            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-bold text-accent">
+              {layout.terminalId}
+            </span>
+            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 text-[8px] font-bold text-subtle">
+              LIVE INDOOR RADAR
             </span>
           </h2>
-          <p className="mt-1 text-[11px] text-muted">
-            {tab === "BOARD"
-              ? `${airport.iata} · ${airport.name}`
-              : "Search any worldwide airport with live METAR conditions"}
+          <p className="mt-1 max-w-xl text-[11px] text-muted">
+            {layout.airportName} · {layout.terminalName} · {layout.city}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-2 p-1">
-            <button
-              onClick={() => setTab("BOARD")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors",
-                tab === "BOARD"
-                  ? "bg-accent text-[color:var(--bg)]"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <PlaneLanding className="size-3.5" /> Flight board
-            </button>
-            <button
-              onClick={() => setTab("EXPLORER")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors",
-                tab === "EXPLORER"
-                  ? "bg-accent text-[color:var(--bg)]"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <Search className="size-3.5" /> Airport explorer
-            </button>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={syncing || boardLoading}
-            onClick={() => {
-              // The status/watchlist refresh alone never updated this page;
-              // the board and weather must be refetched too.
-              void refreshData();
-              void loadBoard();
-              void loadWeather();
-            }}
+          <button
+            onClick={() => setAirportPickerOpen(true)}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-accent/35 bg-surface-2 px-2.5 text-[10px] font-bold text-accent transition-colors hover:bg-accent-soft"
           >
-            <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
-            Refresh
-          </Button>
+            <Building2 className="size-3.5" />
+            Switch airport ({layout.airportCode})
+            <ChevronRight className="size-3" />
+          </button>
+          <Link href="/airplanes">
+            <Button size="sm" variant="outline">
+              <Plane className="size-3.5 text-accent" /> Airplane seatmaps
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {!aeroConfigured && !offlineMode && (
-        <div className="mb-3 rounded-xl border border-delayed/40 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-          <strong className="text-delayed">Live flight data is unavailable.</strong>{" "}
-          Airport weather stays live for the current session and saved boards,
-          routes, and data from your last sync are shown here. Weather stays live; no simulated flights ever appear.
-        </div>
-      )}
-
-      {tab === "BOARD" ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-1.5 pb-1">
+      <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)_330px]">
+        {/* Left controls */}
+        <aside className="space-y-2.5">
+          <Panel className="p-3">
+            <p className="label-caps text-subtle">Airport & Terminal</p>
             <button
-              onClick={() => setTab("EXPLORER")}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/50 bg-accent-soft px-2.5 py-2 text-[10px] font-bold text-accent"
+              onClick={() => setAirportPickerOpen(true)}
+              className="mt-1.5 flex w-full items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-left transition-colors hover:border-accent/40"
             >
-              <Search className="size-3.5" /> Search worldwide
+              <span className="flex size-7 items-center justify-center rounded-md bg-accent-soft font-mono text-[10px] font-bold text-accent">
+                {layout.airportCode}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[10px] font-bold text-ink">
+                  {layout.terminalId} · {layout.city}
+                </span>
+                <span className="block truncate text-[8px] text-subtle">
+                  {layout.terminalName}
+                </span>
+              </span>
             </button>
-            {BOARD_AIRPORT_CODES.map((code) => {
-              const node = findAirportNode(code);
-              if (!node) return null;
-              const active = code === airportCode;
-              return (
-                <button
-                  key={code}
-                  onClick={() => {
-                    setAirportCode(code);
-                    setAirline("All");
-                  }}
-                  className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[10px] font-bold transition-colors",
-                    active
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-line bg-surface-2 text-muted hover:text-ink",
-                  )}
-                >
-                  <MapPin className="size-3" />
-                  <span className="font-mono">{code}</span>
-                  <span className="font-normal text-subtle">{node.city}</span>
-                </button>
-              );
-            })}
-          </div>
 
-          <SourceBanner />
+            {/* Quick Gate Finder */}
+            <form onSubmit={handleGateJump} className="mt-2.5">
+              <label className="label-caps block text-[8px] text-subtle">Quick Gate Finder</label>
+              <div className="mt-1 flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder="e.g. A3, B22..."
+                  value={gateQuickJump}
+                  onChange={(e) => setGateQuickJump(e.target.value)}
+                  className="h-7 w-full rounded-md border border-line bg-surface px-2 text-[10px] text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
+                />
+                <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-[9px]">
+                  Go
+                </Button>
+              </div>
+            </form>
 
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2 p-1">
+            <div className="mt-3 space-y-1">
+              <p className="label-caps mb-1 text-[8px] text-subtle">Concourse Levels</p>
+              {layout.availableLevels.map((levelValue) => {
+                const levelFloor = layout.floors[String(levelValue)];
+                if (!levelFloor) return null;
+                const active = levelValue === floor.level;
+                return (
                   <button
+                    key={levelValue}
                     onClick={() => {
-                      setDirection("DEPARTURES");
-                      setAirline("All");
+                      setLevel(levelValue);
+                      setSelected(null);
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors",
-                      direction === "DEPARTURES"
-                        ? "bg-accent text-[color:var(--bg)]"
-                        : "text-muted hover:text-ink",
+                      "flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left text-[10px] transition-colors",
+                      active
+                        ? "border-accent/50 bg-accent-soft font-bold text-accent"
+                        : "border-line bg-surface-2 text-ink hover:bg-surface-3",
                     )}
                   >
-                    <PlaneTakeoff className="size-3.5" /> Departures
+                    <span>
+                      <span className="font-mono font-bold">L{levelValue}</span>{" "}
+                      {levelFloor.levelName}
+                    </span>
+                    <span className="text-[8px] text-subtle">
+                      {layout.amenities.filter((a) => a.level === levelValue).length} pts
+                    </span>
                   </button>
-                  <button
-                    onClick={() => {
-                      setDirection("ARRIVALS");
-                      setAirline("All");
-                    }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors",
-                      direction === "ARRIVALS"
-                        ? "bg-accent text-[color:var(--bg)]"
-                        : "text-muted hover:text-ink",
-                    )}
-                  >
-                    <PlaneLanding className="size-3.5" /> Arrivals
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {boardAirlines.slice(0, 6).map((airlineName) => (
-                    <FilterChip
-                      key={airlineName}
-                      active={airline === airlineName}
-                      onClick={() => setAirline(airlineName)}
-                    >
-                      {airlineName === "All" ? "All airlines" : airlineName}
-                    </FilterChip>
-                  ))}
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-                <div className="grid grid-cols-[1.1fr_1.2fr_0.8fr_1.1fr] gap-2 border-b border-line/70 bg-surface-2 px-4 py-2">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    Time / flight
-                  </p>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    {direction === "DEPARTURES" ? "Destination" : "Origin"}
-                  </p>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    Gate
-                  </p>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-subtle">
-                    Status
-                  </p>
-                </div>
-
-                {boardLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-14 text-xs text-muted">
-                    <Loader2 className="size-4 animate-spin text-accent" />
-                    Fetching live {direction.toLowerCase()} for {airportCode}…
-                  </div>
-                ) : boardError ? (
-                  <EmptyState
-                    icon={<PlaneTakeoff className="size-6" />}
-                    title="No live board data"
-                    description={boardError}
-                    action={
-                      <Button size="sm" variant="outline" onClick={loadBoard}>
-                        <RefreshCw className="size-3.5" /> Retry
-                      </Button>
-                    }
-                  />
-                ) : visibleBoardFlights.length === 0 ? (
-                  <EmptyState
-                    icon={<PlaneTakeoff className="size-6" />}
-                    title={`No live ${direction.toLowerCase()} found`}
-                    description={`No live ${direction.toLowerCase()} found for ${airportCode}${airline !== "All" ? ` operated by ${airline}` : ""}.`}
-                  />
-                ) : (
-                  <div className="divide-y divide-line/50">
-                    {visibleBoardFlights.map((flight) => {
-                      const isWatchlisted =
-                        Boolean(flight.isWatchlisted) ||
-                        flights.some(
-                          (f) =>
-                            f.isWatchlisted &&
-                            normalizeFlightNumber(f.flightNumber).toLowerCase() ===
-                              normalizeFlightNumber(flight.flightNumber).toLowerCase(),
-                        );
-                      return (
-                        <BoardRow
-                          key={`${flight.id}-${direction}`}
-                          flight={flight}
-                          direction={direction}
-                          isWatchlisted={isWatchlisted}
-                          onClick={() =>
-                            router.push(`/flight/${encodeURIComponent(flight.id)}`)
-                          }
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-line/60 bg-surface px-3 py-2 text-[9px] text-subtle">
-                <span>
-                  {lastSync} · {boardMode || "live boards"}
-                </span>
-                <span className={cn("flex items-center gap-1", boardError ? "text-delayed" : "text-landed")}>
-                  <span
-                    className={cn(
-                      "size-1.5 rounded-full",
-                      boardError ? "bg-delayed" : "animate-pulse-dot bg-landed",
-                    )}
-                  />
-                  {boardError ? "Unavailable" : "Live"}
-                </span>
-              </div>
+                );
+              })}
             </div>
+          </Panel>
 
-            <aside className="space-y-3">
-              <Panel className="p-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-mono text-2xl font-black text-ink">{airport.iata}</p>
-                    <p className="mt-0.5 text-[11px] font-semibold text-accent-2">
-                      {airport.name}
-                    </p>
-                    <p className="text-[10px] text-subtle">
-                      {airport.city}, {airport.country}
-                    </p>
+          {/* Amenity category filters */}
+          <Panel className="p-3">
+            <p className="label-caps text-subtle">Indoor Categories</p>
+            <div className="mt-1.5 space-y-1">
+              {CATEGORY_ORDER.map((cat) => {
+                const meta = AMENITY_META[cat];
+                const Icon = CATEGORY_ICONS[cat];
+                const active = category === cat;
+                const count =
+                  cat === "ALL"
+                    ? layout.amenities.filter((a) => a.level === floor.level).length
+                    : (categoryCounts.get(cat) ?? 0);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[10px] transition-colors",
+                      active
+                        ? "bg-accent-soft font-bold text-accent"
+                        : "text-muted hover:bg-surface-2 hover:text-ink",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Icon
+                        className="size-3"
+                        style={{ color: active ? undefined : meta.color }}
+                      />
+                      <span>{meta.label}</span>
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded px-1 font-mono text-[8px]",
+                        active ? "bg-accent/20 text-accent" : "text-subtle",
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+
+          {/* Quick Route summary */}
+          <Panel className="p-3">
+            <p className="label-caps text-subtle">Wayfinding Engine</p>
+            <div className="mt-2 space-y-2 text-[10px]">
+              <div className="flex items-center justify-between text-muted">
+                <span className="flex items-center gap-1">
+                  <Shield className="size-3 text-red-400" /> Origin:
+                </span>
+                <span className="font-semibold text-ink">Main Security TSA</span>
+              </div>
+              <div className="flex items-center justify-between text-muted">
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-3 text-accent" /> Destination:
+                </span>
+                <span className="font-semibold text-ink">
+                  {selected ? selected.name : "Select point on map"}
+                </span>
+              </div>
+              {selected && (
+                <div className="rounded-md border border-accent/20 bg-accent-soft p-2 text-accent">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 font-bold">
+                      <Footprints className="size-3" /> Walk time:
+                    </span>
+                    <span className="font-mono font-bold text-ink">
+                      {selected.walkTimeFromSecurityMinutes} min
+                    </span>
                   </div>
-                  <span className="rounded-md border border-line bg-surface-2 px-1.5 py-1 text-[8px] font-bold text-muted">
-                    {airport.timezone}
+                  <div className="mt-1 flex items-center justify-between text-[8px] text-subtle">
+                    <span>Direct distance:</span>
+                    <span className="font-mono">
+                      {selected.walkDistanceMeters} m / ~{Math.round(selected.walkDistanceMeters * 3.28)} ft
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Panel>
+        </aside>
+
+        {/* Center: The Indoor Map */}
+        <main className="space-y-3">
+          <TerminalMap
+            layout={layout}
+            floor={floor}
+            amenities={amenities}
+            selectedAmenity={selected}
+            showWalkingRoute={walkingRoute}
+            onSelectAmenity={selectAmenity}
+          />
+
+          {/* Level description & metrics */}
+          <div className="grid gap-2 sm:grid-cols-4">
+            <MetricTile
+              label="Concourse Level"
+              value={`L${floor.level} · ${floor.levelName}`}
+              sub={floor.description}
+            />
+            <MetricTile
+              label="Active Gates"
+              value={String(layout.amenities.filter((a) => a.category === "GATE" && a.level === floor.level).length)}
+              sub="Departures & arrivals"
+            />
+            <MetricTile
+              label="Lounges & Dining"
+              value={String(
+                layout.amenities.filter(
+                  (a) => (a.category === "LOUNGE" || a.category === "DINING") && a.level === floor.level,
+                ).length,
+              )}
+              sub="Retail & food court"
+            />
+            <MetricTile
+              label="Security Throughput"
+              value="~8-12 min"
+              sub="Standard & PreCheck"
+            />
+          </div>
+        </main>
+
+        {/* Right: Directory list and selected details */}
+        <aside className="space-y-2.5">
+          {selected ? (
+            <Panel className="p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span
+                    className="inline-block rounded px-1.5 py-0.5 text-[8px] font-bold text-white"
+                    style={{ backgroundColor: AMENITY_META[selected.category].color }}
+                  >
+                    {AMENITY_META[selected.category].label}
+                  </span>
+                  <h3 className="mt-1 text-sm font-black text-ink">{selected.name}</h3>
+                  <p className="text-[10px] text-muted">{selected.locationDescription}</p>
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="rounded p-1 text-subtle hover:bg-surface-2 hover:text-ink"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-2 border-t border-line pt-3 text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 text-muted">
+                    <Clock className="size-3 text-accent" /> Walk from security
+                  </span>
+                  <span className="font-mono font-bold text-accent">
+                    ~{selected.walkTimeFromSecurityMinutes} min
                   </span>
                 </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <MetricTile
-                    label="Weather"
-                    value={weather ? `${weather.tempC}°C` : "—"}
-                    sub={weather?.condition ?? "Live weather unavailable"}
-                    accent={Boolean(weather)}
-                  />
-                  <MetricTile
-                    label="Wind"
-                    value={weather?.wind ?? "—"}
-                    sub={weather ? `Vis ${weather.visibility}` : "Live weather unavailable"}
-                  />
-                  <MetricTile
-                    label="Departures"
-                    value={boardFlights.filter((f) => f.origin.code === airportCode).length}
-                    sub="Live feed"
-                  />
-                  <MetricTile
-                    label="Arrivals"
-                    value={boardFlights.filter((f) => f.destination.code === airportCode).length}
-                    sub="Live feed"
-                  />
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 text-muted">
+                    <Footprints className="size-3" /> Concourse distance
+                  </span>
+                  <span className="font-mono text-ink">
+                    {selected.walkDistanceMeters} m
+                  </span>
                 </div>
-
-                {weather ? (
-                  <div className="mt-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-2">
-                    <p className="label-caps text-subtle">METAR · live</p>
-                    <p className="mt-1 break-words font-mono text-[8px] leading-relaxed text-muted">
-                      {weather.metarRaw}
-                    </p>
-                    <p className="mt-1 flex items-center justify-between text-[9px]">
-                      <span className="text-subtle">Flight rules</span>
-                      <span className="font-bold text-ink">{weather.flightCategory}</span>
-                    </p>
+                {selected.openingHours && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Opening hours</span>
+                    <span className="text-ink">{selected.openingHours}</span>
                   </div>
-                ) : (
-                  <p className="mt-2 rounded-lg border border-dashed border-line px-2.5 py-2 text-[9px] text-subtle">
-                    Live weather is unavailable for this airport. No cached weather
-                    is displayed.
-                  </p>
                 )}
-
-                <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  <Link href={`/routes?hub=${airport.iata}`}>
-                    <Button size="sm" variant="outline" className="w-full">
-                      <Compass className="size-3" /> Route map
-                    </Button>
-                  </Link>
-                  <Link href={`/terminals?airport=${airport.iata}`}>
-                    <Button size="sm" variant="outline" className="w-full">
-                      <Layers className="size-3" /> Terminal
-                    </Button>
-                  </Link>
-                </div>
-              </Panel>
-
-              <Panel className="p-3">
-                <p className="label-caps text-subtle">Airport reference</p>
-                <div className="mt-2 space-y-1.5 text-[10px]">
-                  <p className="flex items-center justify-between gap-2">
-                    <span className="text-subtle">IATA / ICAO</span>
-                    <span className="font-mono font-semibold text-ink">
-                      {airport.iata} / {airport.icao}
+                {selected.accessInfo && (
+                  <div>
+                    <span className="text-[8px] uppercase tracking-wider text-subtle">
+                      Access & Eligibility
                     </span>
-                  </p>
-                  <p className="flex items-center justify-between gap-2">
-                    <span className="text-subtle">Region</span>
-                    <span className="font-semibold text-ink">
-                      {REGION_META[airport.region]?.label ?? airport.region}
-                    </span>
-                  </p>
-                  <p className="flex items-center justify-between gap-2">
-                    <span className="text-subtle">Coordinates</span>
-                    <span className="font-mono text-[9px] font-semibold text-ink">
-                      {airport.latitude.toFixed(3)}, {airport.longitude.toFixed(3)}
-                    </span>
-                  </p>
-                </div>
-                <p className="mt-2 border-t border-line/60 pt-2 text-[8px] leading-relaxed text-subtle">
-                  Coordinates and timezone are geographic reference data. Weather,
-                  flights, and operational status are live feeds.
-                </p>
-              </Panel>
-            </aside>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-line bg-surface p-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-accent" />
-                <input
-                  value={explorerQuery}
-                  onChange={(event) => setExplorerQuery(event.target.value)}
-                  placeholder="Search any airport (code, city, name, country)…"
-                  className="h-10 w-full rounded-xl border border-line bg-surface-2 pl-9 pr-9 text-xs text-ink outline-none placeholder:text-subtle focus:border-accent"
-                />
-                {explorerQuery ? (
-                  <button
-                    onClick={() => setExplorerQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
-                    aria-label="Clear search"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                ) : null}
+                    <p className="mt-0.5 text-[10px] text-muted">{selected.accessInfo}</p>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center gap-1.5 rounded-lg border border-landed/35 bg-landed/10 px-2 py-1.5 text-[9px] font-bold text-landed">
-                  <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                  LIVE WEATHER
-                </span>
-                <span className="text-[9px] text-subtle">
-                  {searchLoading ? "Searching…" : `${explorerResults.length} airports`}
-                </span>
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {["All", "Americas", "Europe", "Asia-Pacific", "MENA", "Africa"].map(
-                (regionName) => (
-                  <FilterChip
-                    key={regionName}
-                    active={explorerRegion === regionName}
-                    onClick={() => setExplorerRegion(regionName)}
-                  >
-                    {regionName === "MENA" ? "Middle East & N. Africa" : regionName}
-                  </FilterChip>
-                ),
-              )}
-              <span className="mx-1 h-4 w-px bg-line" />
-              {["All", "VFR", "MVFR", "IFR"].map((category) => (
-                <FilterChip
-                  key={category}
-                  active={explorerCategory === category}
-                  onClick={() => setExplorerCategory(category)}
+
+              <div className="mt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setWalkingRoute((val) => !val)}
                 >
-                  {category === "All" ? "All conditions" : category}
-                </FilterChip>
-              ))}
-            </div>
-          </div>
-
-          {searchError && (
-            <div className="rounded-xl border border-delayed/35 bg-delayed/10 px-3 py-2 text-[10px] text-muted">
-              {searchError}
-            </div>
-          )}
-
-          {explorerResults.length === 0 ? (
-            <Panel>
-              <EmptyState
-                icon={<Search className="size-6" />}
-                title={searchLoading ? "Searching live airports…" : "No airports found"}
-                description={
-                  searchLoading
-                    ? "Searching live airport data."
-                    : "Try a different IATA code, city, or country."
-                }
-              />
-            </Panel>
-          ) : (
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {explorerResults.map((item) => (
-                <AirportCard
-                  key={item.iata}
-                  airport={item}
-                  weather={liveWeather[item.iata]}
-                  onOpen={() => setSelectedAirport(item)}
-                  onBoard={() => {
-                    setAirportCode(item.iata);
-                    setTab("BOARD");
-                    setDirection("DEPARTURES");
-                    setAirline("All");
+                  <Navigation className="size-3" />
+                  {walkingRoute ? "Hide route" : "Show route"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const text = `${layout.airportCode} Terminal ${layout.terminalId} - ${selected.name} (${selected.locationDescription})`;
+                    if (navigator.share) {
+                      navigator.share({ title: selected.name, text }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(text);
+                    }
                   }}
+                >
+                  <Share2 className="size-3" />
+                </Button>
+              </div>
+            </Panel>
+          ) : null}
+
+          {/* Directory Search & List */}
+          <Panel className="flex max-h-[520px] flex-col p-3">
+            <div className="mb-2">
+              <p className="label-caps text-subtle">Terminal Directory</p>
+              <div className="relative mt-1.5">
+                <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-subtle" />
+                <input
+                  type="text"
+                  placeholder="Search gate, lounge, coffee..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="h-7 w-full rounded-md border border-line bg-surface-2 pl-7 pr-7 text-[10px] text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
                 />
-              ))}
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      )}
 
-      <AirportDetailModal
-        airport={selectedAirport}
-        weather={
-          selectedAirport ? liveWeather[selectedAirport.iata] : undefined
-        }
-        onClose={() => setSelectedAirport(null)}
-        onBoard={(code) => {
-          setAirportCode(code);
-          setTab("BOARD");
-          setDirection("DEPARTURES");
-          setAirline("All");
-          setSelectedAirport(null);
-        }}
-      />
-    </div>
-  );
-}
-
-function BoardRow({
-  flight,
-  direction,
-  onClick,
-  isWatchlisted,
-}: {
-  flight: Flight;
-  direction: Direction;
-  onClick: () => void;
-  isWatchlisted?: boolean;
-}) {
-  const other = direction === "DEPARTURES" ? flight.destination : flight.origin;
-  const time =
-    direction === "DEPARTURES"
-      ? flight.departureTimeEstimated
-      : flight.arrivalTimeEstimated;
-  const gate =
-    direction === "DEPARTURES" ? flight.gateDeparture : flight.gateArrival;
-  const terminal =
-    direction === "DEPARTURES" ? flight.terminalDeparture : flight.terminalArrival;
-
-  return (
-    <button
-      onClick={onClick}
-      className="grid w-full grid-cols-[1.1fr_1.2fr_0.8fr_1.1fr] items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/70"
-    >
-      <div className="min-w-0">
-        <p className="text-[13px] font-bold text-accent tabular">{time}</p>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <p className="truncate font-mono text-[10px] font-semibold text-ink">
-            {flight.flightNumber}
-          </p>
-          {isWatchlisted && (
-            <Bookmark
-              fill="currentColor"
-              className="size-2.5 shrink-0 fill-current text-accent"
-            />
-          )}
-        </div>
-        <p className="truncate text-[8px] text-subtle">{flight.airline}</p>
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-black text-ink">{other.code}</p>
-        <p className="truncate text-[9px] text-muted">
-          {other.city && other.city !== other.code ? other.city : other.name}
-        </p>
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-[10px] font-bold text-ink">{gate}</p>
-        <p className="text-[8px] text-subtle">T{terminal}</p>
-      </div>
-      <div className="min-w-0">
-        <StatusBadge status={flight.status} delayMinutes={flight.delayMinutes} />
-      </div>
-    </button>
-  );
-}
-
-function AirportCard({
-  airport,
-  weather,
-  onOpen,
-  onBoard,
-}: {
-  airport: AirportNode;
-  weather?: RealtimeAirportWeather;
-  onOpen: () => void;
-  onBoard: () => void;
-}) {
-  const category = weather?.flightCategory;
-  const color =
-    category === "IFR"
-      ? "#EF4444"
-      : category === "MVFR"
-        ? "#F59E0B"
-        : "#10B981";
-
-  return (
-    <div className="group overflow-hidden rounded-xl border border-line bg-surface transition-colors hover:border-accent/35">
-      <button onClick={onOpen} className="w-full p-3 text-left">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-1 font-mono text-[11px] font-extrabold text-accent">
-              {airport.iata}
-            </span>
-            <div>
-              <p className="text-[11px] font-bold text-ink">{airport.city}</p>
-              <p className="text-[8px] text-subtle">{airport.country}</p>
-            </div>
-          </div>
-          <span
-            className="rounded-md border px-1.5 py-0.5 text-[8px] font-bold"
-            style={{
-              color: weather ? color : "var(--subtle)",
-              borderColor: weather ? `${color}55` : "var(--border)",
-              backgroundColor: weather ? `${color}14` : "transparent",
-            }}
-          >
-            {weather ? weather.flightCategory : "NO WX"}
-          </span>
-        </div>
-        <p className="mt-1.5 truncate text-[9px] text-muted">{airport.name}</p>
-        <div className="mt-2 flex items-center justify-between rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5">
-          <span>
-            <span className="block text-[11px] font-bold text-ink">
-              {weather ? `${weather.tempC}°C` : "—"}
-            </span>
-            <span className="block text-[8px] text-subtle">
-              {weather?.condition ?? "Weather unavailable"}
-            </span>
-          </span>
-          <span className="text-right">
-            <span className="block text-[9px] font-bold text-ink">
-              {weather?.wind ?? "—"}
-            </span>
-            <span className="block text-[8px] text-subtle">
-              {weather ? `Vis ${weather.visibility}` : "No stale weather"}
-            </span>
-          </span>
-        </div>
-      </button>
-      <div className="border-t border-line/60 bg-surface-2/50 px-3 py-1.5">
-        <button
-          onClick={onBoard}
-          className="flex w-full items-center justify-between text-[9px] font-bold text-accent"
-        >
-          Open live flight board <ArrowRight className="size-3" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AirportDetailModal({
-  airport,
-  weather,
-  onClose,
-  onBoard,
-}: {
-  airport: AirportNode | null;
-  weather?: RealtimeAirportWeather;
-  onClose: () => void;
-  onBoard: (code: string) => void;
-}) {
-  return (
-    <Modal
-      open={Boolean(airport)}
-      onClose={onClose}
-      title={airport ? `${airport.iata} · ${airport.city}` : "Airport"}
-      subtitle={airport?.name}
-      icon={<Building2 className="size-4" />}
-      size="lg"
-      footer={
-        airport ? (
-          <>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Close
-            </Button>
-            <Button size="sm" onClick={() => onBoard(airport.iata)}>
-              <PlaneLanding className="size-3.5" /> Open live flight board
-            </Button>
-          </>
-        ) : null
-      }
-    >
-      {airport && (
-        <div className="space-y-3">
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Location</p>
-              <p className="mt-1 text-xs font-bold text-ink">
-                {airport.city}, {airport.country}
-              </p>
-              <p className="mt-1 font-mono text-[9px] text-muted">
-                {airport.latitude.toFixed(4)}, {airport.longitude.toFixed(4)}
-              </p>
-              <p className="mt-1 text-[9px] text-subtle">{airport.timezone}</p>
-            </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Live weather</p>
-              {weather ? (
-                <>
-                  <p className="mt-1 text-xs font-bold text-ink">
-                    {weather.tempC}°C · {weather.condition}
-                  </p>
-                  <p className="mt-1 text-[9px] text-muted">
-                    {weather.wind} · {weather.visibility}
-                  </p>
-                  <p className="mt-1 font-mono text-[8px] leading-relaxed text-subtle">
-                    {weather.metarRaw}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-[10px] text-subtle">
-                  Live weather is unavailable.
-                </p>
+            <div className="flex-1 divide-y divide-line/40 overflow-y-auto pr-1">
+              {amenities.map((item) => {
+                const isSelected = selected?.id === item.id;
+                const meta = AMENITY_META[item.category];
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => selectAmenity(item)}
+                    className={cn(
+                      "flex w-full items-center justify-between py-2 text-left transition-colors",
+                      isSelected
+                        ? "bg-accent-soft px-1.5 font-bold text-accent"
+                        : "hover:bg-surface-2 hover:px-1.5",
+                    )}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="size-1.5 rounded-full"
+                          style={{ backgroundColor: meta.color }}
+                        />
+                        <span className="truncate text-[10px] font-semibold text-ink">
+                          {item.name}
+                        </span>
+                      </div>
+                      <span className="block truncate text-[8px] text-subtle">
+                        {item.locationDescription}
+                      </span>
+                    </div>
+                    <span className="shrink-0 font-mono text-[9px] text-muted">
+                      {item.walkTimeFromSecurityMinutes}m
+                    </span>
+                  </button>
+                );
+              })}
+              {amenities.length === 0 && (
+                <div className="py-6 text-center text-[10px] text-subtle">
+                  No indoor points match your filter on this level.
+                </div>
               )}
             </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="label-caps text-subtle">Reference</p>
-              <p className="mt-1 text-xs font-bold text-ink">
-                {REGION_META[airport.region]?.label ?? airport.region}
-              </p>
-              <p className="mt-1 text-[9px] text-muted">
-                IATA {airport.iata} · ICAO {airport.icao}
-              </p>
-              <p className="mt-1 text-[9px] text-subtle">
-                Coordinates are static reference data; operational values are live.
-              </p>
-            </div>
-          </div>
+          </Panel>
+        </aside>
+      </div>
 
-          {weather && (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <DetailMetric icon={<Wind className="size-3.5" />} label="Wind" value={weather.wind} />
-              <DetailMetric icon={<Eye className="size-3.5" />} label="Visibility" value={weather.visibility} />
-              <DetailMetric icon={<Gauge className="size-3.5" />} label="Pressure" value={`${weather.pressureInHg} inHg`} />
-              <DetailMetric icon={<PlaneLanding className="size-3.5" />} label="Flight rules" value={weather.flightCategory} />
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Link href={`/routes?hub=${airport.iata}`} className="flex-1">
-              <Button size="sm" variant="outline" className="w-full">
-                <Compass className="size-3.5" /> Live route network
-              </Button>
-            </Link>
-            <Link href={`/terminals?airport=${airport.iata}`} className="flex-1">
-              <Button size="sm" variant="outline" className="w-full">
-                <Layers className="size-3.5" /> Terminal map
-              </Button>
-            </Link>
-          </div>
-
-          <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[9px] leading-relaxed text-subtle">
-            Weather is live and flight boards, routes, gates, and statuses come
-            from the live feed — nothing on this screen is simulated.
-          </p>
+      {/* Airport Switcher Modal */}
+      <Modal
+        open={airportPickerOpen}
+        onClose={() => setAirportPickerOpen(false)}
+        title="Select Airport Indoor Layout"
+      >
+        <div className="space-y-2 py-1">
+          {terminalLayouts.map((t) => (
+            <button
+              key={t.airportCode}
+              onClick={() => {
+                setAirportCode(t.airportCode);
+                setLevel(t.availableLevels[0] ?? 1);
+                setSelected(null);
+                setAirportPickerOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors",
+                t.airportCode === airportCode
+                  ? "border-accent bg-accent-soft"
+                  : "border-line bg-surface-2 hover:bg-surface-3",
+              )}
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-black text-accent">
+                    {t.airportCode}
+                  </span>
+                  <span className="text-xs font-bold text-ink">{t.airportName}</span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-muted">
+                  {t.terminalName} · {t.city}
+                </p>
+              </div>
+              <ChevronRight className="size-4 text-subtle" />
+            </button>
+          ))}
         </div>
-      )}
-    </Modal>
-  );
-}
-
-function DetailMetric({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-line/70 bg-surface-2 px-2 py-1.5">
-      <p className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-subtle">
-        <span className="text-accent">{icon}</span>
-        {label}
-      </p>
-      <p className="mt-0.5 truncate text-[10px] font-semibold text-ink">{value}</p>
+      </Modal>
     </div>
   );
 }

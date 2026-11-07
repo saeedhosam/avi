@@ -229,3 +229,46 @@ body {
 input[type="range"] {
   accent-color: var(--accent);
 }
+
+/* MapLibre Attribution Control — collapsed by default */
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  min-height: 22px;
+  border-radius: 9999px !important;
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner {
+  display: none !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
+  padding: 3px 26px 3px 10px !important;
+  border-radius: 8px !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a:hover {
+  text-decoration: underline;
+}
+
+.maplibregl-ctrl-attrib-button {
+  border-radius: 9999px !important;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+
+.maplibregl-ctrl-attrib-button:hover {
+  opacity: 1;
+}

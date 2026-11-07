@@ -416,7 +416,7 @@ export default function RoutesPage() {
 
   return (
     <div className="mx-auto max-w-[1680px] px-3 py-3 lg:px-5">
-      <div className="relative h-[calc(100vh-150px)] min-h-160 overflow-hidden rounded-2xl border border-line">
+      <div className="relative h-[calc(100vh-150px)] min-h-160 overflow-hidden rounded-none border border-line">
         <OsmRouteMap
           connections={filteredConnections}
           origin={summary.originAirport}
@@ -432,7 +432,7 @@ export default function RoutesPage() {
         />
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-center lg:inset-x-4 lg:top-4">
-          <div className="pointer-events-auto w-full max-w-220 rounded-2xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-xl">
+          <div className="pointer-events-auto w-full max-w-220 rounded-none border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="rounded-md bg-accent px-1.5 py-1 font-mono text-[11px] font-extrabold text-bg">

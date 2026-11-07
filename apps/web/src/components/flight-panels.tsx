@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import {
   Armchair,
   Bolt,
   Check,
+  ChevronRight,
   Circle,
   Clock3,
   Plane,
@@ -144,11 +146,19 @@ export function AircraftInfoCard({
           available={aircraft.powerOutlets}
         />
       </div>
-      <div className="mt-2 flex items-start gap-2 rounded-lg bg-surface-2 px-2.5 py-2">
-        <Armchair className="mt-0.5 size-3.5 shrink-0 text-accent-2" />
-        <p className="text-[10px] font-medium leading-relaxed text-muted">
-          {aircraft.seatLayout}
-        </p>
+      <div className="mt-2 flex items-center justify-between rounded-lg bg-surface-2 px-2.5 py-2">
+        <div className="flex items-start gap-2">
+          <Armchair className="mt-0.5 size-3.5 shrink-0 text-accent-2" />
+          <p className="text-[10px] font-medium leading-relaxed text-muted">
+            {aircraft.seatLayout}
+          </p>
+        </div>
+        <Link
+          href={`/airplanes?model=${encodeURIComponent(aircraft.model)}`}
+          className="ml-2 flex shrink-0 items-center gap-1 rounded border border-accent/30 bg-accent-soft px-2 py-0.5 text-[9px] font-bold text-accent transition-colors hover:bg-accent/25"
+        >
+          View seatmap <ChevronRight className="size-3" />
+        </Link>
       </div>
     </div>
   );

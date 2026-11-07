@@ -55,13 +55,25 @@ export function createBaseMap(
     attributionControl: false,
   });
 
-  map.addControl(
-    new AttributionControl({
-      compact: true,
-      customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
-    }),
-    "bottom-right",
-  );
+  const attribControl = new AttributionControl({
+    compact: true,
+    customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
+  });
+  map.addControl(attribControl, "bottom-right");
+
+  const collapseAttribution = () => {
+    const attribContainer = (attribControl as unknown as { _container?: HTMLElement })._container;
+    if (attribContainer) {
+      attribContainer.classList.add("maplibregl-compact");
+      attribContainer.classList.remove("maplibregl-compact-show");
+      attribContainer.removeAttribute("open");
+    }
+  };
+
+  collapseAttribution();
+  map.on("load", collapseAttribution);
+  map.on("styledata", collapseAttribution);
+
   map.addControl(new NavigationControl({ showCompass: false }), "top-right");
   map.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
 

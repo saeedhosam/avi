@@ -5,14 +5,13 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Bell,
+  Building2,
   CheckCircle2,
   CircleAlert,
-  Heart,
+  Glasses,
   Info,
-  Layers,
   Network,
   Plane,
-  PlaneTakeoff,
   RefreshCw,
   Search,
   Settings2,
@@ -36,26 +35,29 @@ const NAV_ITEMS = [
   {
     href: "/airports",
     label: "Airports",
-    icon: PlaneTakeoff,
-    tag: "Boards & METAR",
+    icon: Building2,
+    tag: "Indoor terminal maps",
   },
   {
-    href: "/terminals",
-    label: "Terminals",
-    icon: Layers,
-    tag: "Gate navigation",
+    href: "/airplanes",
+    label: "Airplanes",
+    icon: Plane,
+    tag: "Cabin seatmaps",
   },
-  { href: "/watchlist", label: "Watchlist", icon: Heart, tag: "Saved flights" },
+  { href: "/watchlist", label: "Watchlist", icon: Glasses, tag: "Watched flights" },
 ];
 
 const PAGE_TITLES: Record<string, { title: string; eyebrow: string }> = {
   "/search": { title: "Flight Search", eyebrow: "Live telemetry console" },
   "/routes": { title: "Route Network", eyebrow: "Global direct connections" },
   "/airports": {
-    title: "Airport Boards",
-    eyebrow: "Departures, arrivals & METAR",
+    title: "Airport Indoor Maps",
+    eyebrow: "Gate-level indoor wayfinding",
   },
-  "/terminals": { title: "Terminal Maps", eyebrow: "Gate-level wayfinding" },
+  "/airplanes": {
+    title: "Airplane Seat Maps",
+    eyebrow: "Aircraft cabin layouts & seat specs",
+  },
   "/watchlist": { title: "Watchlist", eyebrow: "Saved flights & live alerts" },
 };
 

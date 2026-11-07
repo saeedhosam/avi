@@ -289,7 +289,7 @@ function buildTimeline(
   add(
     "Scheduled departure",
     flight.departureTimeScheduled,
-    `${flight.origin.code} · live AeroDataBox schedule`,
+    `${flight.origin.code} · live departure schedule`,
   );
   if (flight.departureTimeEstimated !== flight.departureTimeScheduled) {
     add(
@@ -307,7 +307,7 @@ function buildTimeline(
   add(
     "Scheduled arrival",
     flight.arrivalTimeScheduled,
-    `${flight.destination.code} · live AeroDataBox schedule`,
+    `${flight.destination.code} · live arrival schedule`,
   );
   if (flight.arrivalTimeEstimated !== flight.arrivalTimeScheduled) {
     add(

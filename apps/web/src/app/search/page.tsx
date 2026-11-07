@@ -7,12 +7,10 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
-  Bookmark,
   CalendarDays,
-  History,
+  Glasses,
   Plane,
   PlaneLanding,
   PlaneTakeoff,
@@ -21,7 +19,6 @@ import {
   Route,
   Search,
   Tag,
-  Trash2,
   X,
 } from "lucide-react";
 import { authFetch } from "@/lib/authed-fetch";
@@ -52,13 +49,8 @@ type ActiveSearch =
 const STATUSES = Object.keys(STATUS_META) as FlightStatus[];
 
 export default function SearchPage() {
-  const router = useRouter();
   const {
     flights,
-    recents,
-    addRecent,
-    deleteRecent,
-    clearRecents,
     setQuotaFallback,
     setLiveRecovered,
     aeroConfigured,
@@ -79,7 +71,6 @@ export default function SearchPage() {
   const [results, setResults] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultMode, setResultMode] = useState("");
   // Bumping the nonce re-runs the current lookup so "Refresh" refreshes the
   // page's own results, not just the background watchlist sync.
   const [searchNonce, setSearchNonce] = useState(0);
@@ -113,7 +104,6 @@ export default function SearchPage() {
     setActiveSearch(null);
     setResults([]);
     setError(null);
-    setResultMode("");
     setLoading(false);
   };
 
@@ -167,7 +157,6 @@ export default function SearchPage() {
     const run = async () => {
       setLoading(true);
       setError(null);
-      setResultMode("");
       setResults([]);
       try {
         if (activeSearch.mode === "FLIGHT_NUMBER") {
@@ -181,7 +170,6 @@ export default function SearchPage() {
             error?: string;
           };
           if (controller.signal.aborted) return;
-          setResultMode(data.mode);
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
           else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
           if (data.mode === "NOT_CONFIGURED") {
@@ -203,7 +191,6 @@ export default function SearchPage() {
             error?: string;
           };
           if (controller.signal.aborted) return;
-          setResultMode(data.mode);
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
           else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
           if (data.mode === "NOT_CONFIGURED") {
@@ -285,34 +272,6 @@ export default function SearchPage() {
     () => resolvedResults.filter((flight) => flight.isWatchlisted).length,
     [resolvedResults],
   );
-
-  const openRecent = (recentFlightNumber: string, flightDate?: string) => {
-    setMode("FLIGHT_NUMBER");
-    setStatusFilter(null);
-    setOnlyWatchlisted(false);
-    setFlightNumber(recentFlightNumber);
-    setDepartureDateInput(flightDateLabel(flightDate ?? isoDateToday()));
-    const matched = flights.find(
-      (flight) =>
-        normalizeFlightNumber(flight.flightNumber) ===
-          normalizeFlightNumber(recentFlightNumber) &&
-        flight.flightDate === flightDate,
-    );
-    if (matched) {
-      addRecent(matched);
-      const query = new URLSearchParams();
-      if (matched.flightDate) query.set("date", matched.flightDate);
-      router.push(
-        `/flight/${encodeURIComponent(matched.id)}?${query.toString()}`,
-      );
-    } else {
-      setActiveSearch({
-        mode: "FLIGHT_NUMBER",
-        number: normalizeFlightNumber(recentFlightNumber),
-        date: flightDate ?? isoDateToday(),
-      });
-    }
-  };
 
   const hasLookup = activeSearch !== null;
   const canSearch =
@@ -553,7 +512,7 @@ export default function SearchPage() {
                     : "text-muted hover:text-ink",
                 )}
               >
-                <Bookmark className={cn("size-3", onlyWatchlisted && "fill-current")} />
+                <Glasses className={cn("size-3.5", onlyWatchlisted && "fill-current")} />
                 Watchlisted
                 {watchlistedResultsCount > 0 && (
                   <span
@@ -604,81 +563,6 @@ export default function SearchPage() {
               </p>
             )}
           </Panel>
-
-          <Panel className="p-3">
-            <div className="flex items-center justify-between pb-2">
-              <p className="flex items-center gap-1.5 label-caps text-subtle">
-                <History className="size-3 text-accent" /> Recent searches
-              </p>
-              {recents.length > 0 && (
-                <button
-                  onClick={clearRecents}
-                  className="text-[9px] cursor-pointer font-semibold text-muted hover:text-cancelled"
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
-            {recents.length === 0 ? (
-              <p className="py-2 text-[10px] leading-relaxed text-subtle">
-                Flights you open are saved here for one-tap recall.
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {recents.map((recent) => (
-                  <div
-                    key={`${recent.flightNumber}|${recent.flightDate ?? "any"}`}
-                    className="group flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2/70 p-2"
-                  >
-                    <button
-                      onClick={() =>
-                        openRecent(recent.flightNumber, recent.flightDate)
-                      }
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink">
-                        {recent.flightNumber}
-                        <span
-                          className="size-1 rounded-full"
-                          style={{
-                            backgroundColor: STATUS_META[recent.status].color,
-                          }}
-                        />
-                        {flights.some(
-                          (f) =>
-                            f.isWatchlisted &&
-                            normalizeFlightNumber(f.flightNumber).toLowerCase() ===
-                              normalizeFlightNumber(recent.flightNumber).toLowerCase(),
-                        ) && (
-                          <Bookmark
-                            fill="currentColor"
-                            className="size-2.5 fill-current text-accent shrink-0"
-                          />
-                        )}
-                      </p>
-                      <p className="mt-0.5 truncate text-[9px] text-subtle">
-                        {recent.originCode} → {recent.destCode}
-                        {recent.flightDate
-                          ? ` · ${flightDateLabel(recent.flightDate)}`
-                          : ""}
-                        {" · "}
-                        {recent.airline}
-                      </p>
-                    </button>
-                    <button
-                      onClick={() =>
-                        deleteRecent(recent.flightNumber, recent.flightDate)
-                      }
-                      aria-label={`Remove ${recent.flightNumber} from recent searches`}
-                      className="text-subtle opacity-0 transition-opacity hover:text-cancelled group-hover:opacity-100"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
         </aside>
 
         <section className="min-w-0 space-y-3">
@@ -704,11 +588,6 @@ export default function SearchPage() {
               )}
             </h2>
             <div className="flex items-center gap-2">
-              {resultMode && (
-                <span className="rounded-lg border border-line/60 bg-surface-2 px-2 py-1 text-[9px] font-semibold text-muted">
-                  {resultMode}
-                </span>
-              )}
               <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-1.5">
                 <span
                   className={cn(
@@ -819,7 +698,12 @@ export default function SearchPage() {
               />
             </Panel>
           ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div
+              className={cn(
+                "grid gap-3",
+                mode === "FLIGHT_NUMBER" ? "grid-cols-1" : "lg:grid-cols-2",
+              )}
+            >
               {displayFlights.map((flight) => (
                 <FlightCard key={`${flight.id}-${flight.flightDate ?? "any"}`} flight={flight} />
               ))}

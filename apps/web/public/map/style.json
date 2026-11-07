@@ -1692,6 +1692,9 @@
           11,
           2
         ]
+      },
+      "layout": {
+        "visibility": "none"
       }
     },
     {
@@ -2633,7 +2636,8 @@
           12,
           10
         ],
-        "text-transform": "uppercase"
+        "text-transform": "uppercase",
+        "visibility": "none"
       },
       "paint": {
         "text-color": "#334155",
@@ -2874,7 +2878,8 @@
           8,
           14
         ],
-        "text-transform": "uppercase"
+        "text-transform": "uppercase",
+        "visibility": "none"
       },
       "paint": {
         "text-color": "#334155",
@@ -3158,7 +3163,8 @@
           9,
           7,
           17
-        ]
+        ],
+        "visibility": "none"
       },
       "paint": {
         "text-color": "#334155",
@@ -3239,7 +3245,8 @@
           9,
           5,
           17
-        ]
+        ],
+        "visibility": "none"
       },
       "paint": {
         "text-color": "#334155",
@@ -3320,7 +3327,8 @@
           9,
           4,
           17
-        ]
+        ],
+        "visibility": "none"
       },
       "paint": {
         "text-color": "#334155",

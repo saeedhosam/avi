@@ -281,3 +281,77 @@ export interface RouteSpec {
   dailyFlights: number;
   carriers: OperatingCarrierRoute[];
 }
+
+export type CabinClass = "FIRST" | "BUSINESS" | "PREMIUM_ECONOMY" | "ECONOMY";
+
+export type SeatFeature =
+  | "EXTRA_LEGROOM"
+  | "LIE_FLAT"
+  | "DIRECT_AISLE"
+  | "POWER_OUTLET"
+  | "USB_C"
+  | "BASSINET"
+  | "EXIT_ROW"
+  | "WING_VIEW"
+  | "QUIET_ZONE"
+  | "LIMITED_RECLINE";
+
+export interface SeatInfo {
+  id: string; // e.g. "12A"
+  row: number;
+  letter: string;
+  cabin: CabinClass;
+  isWindow: boolean;
+  isAisle: boolean;
+  isMiddle: boolean;
+  isExitRow?: boolean;
+  isBulkhead?: boolean;
+  status: "AVAILABLE" | "OCCUPIED" | "SELECTED" | "BLOCKED";
+  pitchInches: number;
+  widthInches: number;
+  reclineInches: number;
+  features: SeatFeature[];
+  review?: {
+    rating: "GOOD" | "STANDARD" | "CAUTION";
+    notes: string;
+  };
+}
+
+export interface AircraftCabinSpec {
+  id: string;
+  airlineCode: string;
+  airlineName: string;
+  aircraftModel: string;
+  manufacturer: "Airbus" | "Boeing";
+  tailNumberSample: string;
+  totalSeats: number;
+  wingsRowRange: [number, number];
+  exitRows: number[];
+  cabins: {
+    name: string;
+    classType: CabinClass;
+    rowStart: number;
+    rowEnd: number;
+    layout: string;
+    aislesAfterLetters: string[];
+    letters: string[];
+    pitchInches: number;
+    widthInches: number;
+  }[];
+  amenities: {
+    wifi: string;
+    power: string;
+    ife: string;
+    usb: string;
+    overheadBins: string;
+  };
+  rows: {
+    rowNumber: number;
+    cabin: CabinClass;
+    isExitRow?: boolean;
+    isBulkhead?: boolean;
+    hasLavatoryBehind?: boolean;
+    hasGalleyAhead?: boolean;
+    seats: SeatInfo[];
+  }[];
+}

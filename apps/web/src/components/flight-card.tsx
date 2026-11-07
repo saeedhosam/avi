@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Bookmark,
+  Glasses,
   Luggage,
   MapPin,
   Plane,
@@ -110,10 +110,10 @@ export function FlightCard({
                   : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
               )}
             >
-              <Bookmark
+              <Glasses
                 fill={isWatchlisted ? "currentColor" : "none"}
                 className={cn(
-                  "size-3 transition-colors",
+                  "size-3.5 transition-colors",
                   isWatchlisted ? "fill-current text-accent" : "text-muted",
                 )}
               />
