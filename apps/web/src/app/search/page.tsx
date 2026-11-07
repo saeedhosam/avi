@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { authFetch } from "@/lib/authed-fetch";
-import { useApp } from "@/lib/store";
+import { flightKey, useApp } from "@/lib/store";
 import type { Flight, FlightStatus } from "@/lib/types";
 import {
   STATUS_META,
@@ -243,23 +243,37 @@ export default function SearchPage() {
     return () => controller.abort();
   }, [activeSearch, searchNonce, offlineMode, setQuotaFallback, setLiveRecovered, upsertFlights]);
 
+  const resolvedResults = useMemo(() => {
+    if (!results.length) return [];
+    const flightMap = new Map(flights.map((f) => [flightKey(f), f]));
+    return results.map((flight) => {
+      const stored = flightMap.get(flightKey(flight));
+      return stored ? { ...flight, ...stored } : flight;
+    });
+  }, [results, flights]);
+
   const displayFlights = useMemo(
     () =>
-      results.filter((flight) => {
+      resolvedResults.filter((flight) => {
         const matchesStatus = !statusFilter || flight.status === statusFilter;
         const matchesWatchlist = !onlyWatchlisted || flight.isWatchlisted;
         return matchesStatus && matchesWatchlist;
       }),
-    [results, statusFilter, onlyWatchlisted],
+    [resolvedResults, statusFilter, onlyWatchlisted],
   );
 
   const statusCounts = useMemo(() => {
     const counts = Object.fromEntries(
       STATUSES.map((status) => [status, 0]),
     ) as Record<FlightStatus, number>;
-    for (const flight of results) counts[flight.status] += 1;
+    for (const flight of resolvedResults) counts[flight.status] += 1;
     return counts;
-  }, [results]);
+  }, [resolvedResults]);
+
+  const watchlistedResultsCount = useMemo(
+    () => resolvedResults.filter((flight) => flight.isWatchlisted).length,
+    [resolvedResults],
+  );
 
   const openRecent = (recentFlightNumber: string, flightDate?: string) => {
     setMode("FLIGHT_NUMBER");
@@ -522,13 +536,24 @@ export default function SearchPage() {
                 type="button"
                 onClick={() => setOnlyWatchlisted((value) => !value)}
                 className={cn(
-                  "flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold transition-colors",
+                  "flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold transition-colors",
                   onlyWatchlisted
                     ? "bg-accent text-bg"
                     : "text-muted hover:text-ink",
                 )}
               >
-                <Bookmark className="size-3" /> Watchlisted
+                <Bookmark className={cn("size-3", onlyWatchlisted && "fill-current")} />
+                Watchlisted
+                {watchlistedResultsCount > 0 && (
+                  <span
+                    className={cn(
+                      "ml-0.5 rounded px-1 text-[9px]",
+                      onlyWatchlisted ? "bg-bg/20 text-bg" : "bg-surface-3 text-muted",
+                    )}
+                  >
+                    {watchlistedResultsCount}
+                  </span>
+                )}
               </button>
             </div>
 

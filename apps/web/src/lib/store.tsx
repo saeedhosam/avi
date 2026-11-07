@@ -198,7 +198,7 @@ function normalizePersistedFlight(value: unknown): Flight {
   };
 }
 
-function flightKey(flight: Pick<Flight, "flightNumber" | "flightDate">) {
+export function flightKey(flight: Pick<Flight, "flightNumber" | "flightDate">) {
   const number = normalizeFlightNumber(flight.flightNumber).toLowerCase();
   return flight.flightDate ? `${number}|${flight.flightDate}` : `${number}|any`;
 }
@@ -844,13 +844,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleWatchlist = useCallback(
     (flight: Flight, notes = "") => {
       const targetKey = flightKey(flight);
-      const current = flightsRef.current.find(
+      let current = flightsRef.current.find(
         (item) => flightKey(item) === targetKey,
       );
-      if (!current) return;
+      if (!current) {
+        current = flightsRef.current.find(
+          (item) =>
+            normalizeFlightNumber(item.flightNumber).toLowerCase() ===
+            normalizeFlightNumber(flight.flightNumber).toLowerCase(),
+        );
+      }
+      if (!current) {
+        const newFlight: Flight = {
+          ...flight,
+          isWatchlisted: true,
+          customNotes: notes || flight.customNotes,
+        };
+        const updated = [newFlight, ...flightsRef.current];
+        flightsRef.current = updated;
+        setFlights(updated);
+        if (account.uid) {
+          void saveWatchlistItemCloud(account.uid, newFlight);
+        }
+        notify(
+          `Added ${flight.flightNumber} to your watchlist. Live status changes will create alerts.`,
+          "success",
+        );
+        return;
+      }
       const willWatch = !current.isWatchlisted;
+      const currentKey = flightKey(current);
       const updated = flightsRef.current.map((item) =>
-        flightKey(item) === targetKey
+        flightKey(item) === currentKey || flightKey(item) === targetKey
           ? {
               ...item,
               isWatchlisted: willWatch,
@@ -860,7 +885,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
       flightsRef.current = updated;
       setFlights(updated);
-      const nextFlight = updated.find((item) => flightKey(item) === targetKey);
+      const nextFlight = updated.find(
+        (item) => flightKey(item) === currentKey || flightKey(item) === targetKey,
+      );
       if (nextFlight && account.uid) {
         if (nextFlight.isWatchlisted) {
           void saveWatchlistItemCloud(account.uid, nextFlight);

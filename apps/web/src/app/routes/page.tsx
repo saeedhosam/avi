@@ -1,25 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeftRight,
-  Building2,
-  ChevronRight,
   ChevronUp,
-  Compass,
-  Expand,
   Filter,
-  Globe2,
-  Layers,
   Loader2,
   MapPin,
   PlaneLanding,
   PlaneTakeoff,
   Search,
-  Shrink,
   SlidersHorizontal,
-  Sparkles,
   Undo2,
   X,
 } from "lucide-react";
@@ -27,7 +18,6 @@ import { authFetch } from "@/lib/authed-fetch";
 import {
   findAirportNode,
   inferRegionFromCoords,
-  QUICK_HUBS,
   searchAirportNodes,
 } from "@/lib/data";
 import type {
@@ -188,7 +178,6 @@ function buildSummary(
 }
 
 export default function RoutesPage() {
-  const router = useRouter();
   const { offlineMode, setQuotaFallback, setLiveRecovered, refreshData } = useApp();
 
   const [originIata, setOriginIata] = useState<string | null>(null);
@@ -206,7 +195,6 @@ export default function RoutesPage() {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [hubSheetOpen, setHubSheetOpen] = useState(false);
   const [hubQuery, setHubQuery] = useState("");
-  const [inspectorExpanded, setInspectorExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -382,7 +370,6 @@ export default function RoutesPage() {
     setSelectedDest(iata.toUpperCase());
     setDestinationInput(node ? `${node.iata} · ${node.city}` : iata.toUpperCase());
     setDestinationSuggestions([]);
-    setInspectorExpanded(true);
   };
 
   const pivotToDestination = (iata: string) => {
@@ -427,15 +414,9 @@ export default function RoutesPage() {
   const hasFilters = Boolean(airlineCode) || haul !== "ALL" || region !== "ALL";
   const hubResults = useMemo(() => searchAirportNodes(hubQuery), [hubQuery]);
 
-  const openRouteFlights = (connection: DirectFlightConnection) => {
-    router.push(
-      `/search?mode=ROUTE&origin=${encodeURIComponent(connection.origin.iata)}&dest=${encodeURIComponent(connection.destination.iata)}`,
-    );
-  };
-
   return (
     <div className="mx-auto max-w-[1680px] px-3 py-3 lg:px-5">
-      <div className="relative h-[calc(100vh-150px)] min-h-[640px] overflow-hidden rounded-2xl border border-line">
+      <div className="relative h-[calc(100vh-150px)] min-h-160 overflow-hidden rounded-2xl border border-line">
         <OsmRouteMap
           connections={filteredConnections}
           origin={summary.originAirport}
@@ -451,10 +432,10 @@ export default function RoutesPage() {
         />
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-center lg:inset-x-4 lg:top-4">
-          <div className="pointer-events-auto w-full max-w-[880px] rounded-2xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-xl">
+          <div className="pointer-events-auto w-full max-w-220 rounded-2xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="rounded-md bg-accent px-1.5 py-1 font-mono text-[11px] font-extrabold text-[color:var(--bg)]">
+                <span className="rounded-md bg-accent px-1.5 py-1 font-mono text-[11px] font-extrabold text-bg">
                   {summary.originAirport?.iata ??
                     (departureInput ? departureInput.slice(0, 3).toUpperCase() : "—")}
                 </span>
@@ -644,185 +625,6 @@ export default function RoutesPage() {
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-xl border border-line/80 bg-surface/92 p-2.5 shadow-lg backdrop-blur md:block">
-          <div className="flex items-center gap-1.5">
-            <Globe2 className="size-3 text-accent" />
-            <p className="text-[9px] font-bold uppercase tracking-wider text-ink">
-              Live direct route network
-            </p>
-          </div>
-          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[8px] text-muted">
-            <span className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-[#0077FF]" /> Origin hub
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-[#0A335C]" /> Destination
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-[#FFB800]" /> Selected
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-px w-3 bg-[#D94A6A]" /> Live route
-            </span>
-          </div>
-          <p className="mt-1.5 text-[8px] text-subtle">
-            {summary.totalDirectDestinations} destinations · {summary.totalCountriesServed} countries ·{" "}
-            {summary.totalDailyFlights} daily flights
-          </p>
-        </div>
-
-        <div className="absolute bottom-3 right-3 z-10 w-[320px] max-w-[calc(100%-24px)]">
-          <div className="overflow-hidden rounded-xl border border-line/80 bg-surface/95 shadow-2xl backdrop-blur-xl">
-            <button
-              onClick={() => setInspectorExpanded((value) => !value)}
-              className="flex w-full items-center justify-between gap-2 border-b border-line/60 px-3 py-2"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-md bg-accent-soft text-accent">
-                  {selectedConnection ? <Building2 className="size-3.5" /> : <Compass className="size-3.5" />}
-                </span>
-                <div className="min-w-0 text-left">
-                  <p className="truncate text-[10px] font-bold text-ink">
-                    {selectedConnection
-                      ? `${selectedConnection.origin.iata} → ${selectedConnection.destination.iata}`
-                      : summary.originAirport
-                        ? `Live routes from ${summary.originAirport.iata}`
-                        : "Live route network"}
-                  </p>
-                  <p className="text-[8px] text-subtle">
-                    {selectedConnection
-                      ? `${selectedConnection.destination.city}, ${selectedConnection.destination.country}`
-                      : summary.originAirport
-                        ? `${filteredConnections.length} direct connections`
-                        : "Select a hub"}
-                  </p>
-                </div>
-              </div>
-              {inspectorExpanded ? <Shrink className="size-3.5 text-subtle" /> : <Expand className="size-3.5 text-subtle" />}
-            </button>
-
-            {inspectorExpanded && (
-              <div className="max-h-[330px] overflow-y-auto p-3">
-                {selectedConnection ? (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <InspectorMetric label="Distance" value={`${selectedConnection.distanceKm.toLocaleString()} km`} />
-                      <InspectorMetric label="Duration" value={selectedConnection.durationFormatted} />
-                      <InspectorMetric label="Daily flights" value={`${selectedConnection.dailyFlightsCount}`} />
-                      <InspectorMetric label="Haul" value={HAUL_META[selectedConnection.haulCategory].label} />
-                    </div>
-                    <div className="rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5">
-                      <p className="flex items-center justify-between text-[9px]">
-                        <span className="text-subtle">Nonstop distance</span>
-                        <span className="font-semibold text-ink">
-                          {selectedConnection.distanceNm.toLocaleString()} nm
-                        </span>
-                      </p>
-                      <p className="mt-0.5 flex items-center justify-between text-[9px]">
-                        <span className="text-subtle">Region</span>
-                        <span className="font-semibold text-ink">
-                          {REGION_META[selectedConnection.destination.region]?.label ??
-                            selectedConnection.destination.region}
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="label-caps text-subtle">Live operating carriers</p>
-                      <div className="mt-1 space-y-1">
-                        {selectedConnection.operatingCarriers.length ? (
-                          selectedConnection.operatingCarriers.map((carrier) => (
-                            <div
-                              key={carrier.airlineCode}
-                              className="flex items-center gap-1.5 rounded-md border border-line/60 bg-surface-2 px-1.5 py-1"
-                            >
-                              <span className="font-mono text-[9px] font-bold text-accent">
-                                {carrier.airlineCode}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate text-[9px] text-ink">
-                                {carrier.airlineName}
-                              </span>
-                              <span className="text-[8px] text-subtle">
-                                {carrier.dailyFrequencies}/day
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-[9px] text-subtle">
-                            Carrier data was not included in the live route feed.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        onClick={() => openRouteFlights(selectedConnection)}
-                        className="flex items-center justify-center gap-1 rounded-lg bg-accent px-2 py-1.5 text-[9px] font-bold text-[color:var(--bg)] transition-colors hover:brightness-110"
-                      >
-                        <Search className="size-3" /> Find flights
-                      </button>
-                      <button
-                        onClick={() => router.push(`/airports?code=${selectedConnection.origin.iata}`)}
-                        className="flex items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[9px] font-bold text-ink transition-colors hover:border-accent/40"
-                      >
-                        <Layers className="size-3" /> Airport board
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => pivotToDestination(selectedConnection.destination.iata)}
-                      className="flex w-full items-center justify-center gap-1 rounded-lg border border-accent/35 bg-accent-soft px-2 py-1.5 text-[9px] font-bold text-accent transition-colors hover:bg-accent/15"
-                    >
-                      <Sparkles className="size-3" /> Pivot map to {selectedConnection.destination.iata}
-                    </button>
-                  </div>
-                ) : summary.originAirport ? (
-                  <div>
-                    <p className="mb-1.5 text-[9px] leading-relaxed text-muted">
-                      Select a destination pin or one of the live direct routes from{" "}
-                      {summary.originAirport.city}.
-                    </p>
-                    <div className="space-y-1">
-                      {filteredConnections.slice(0, 7).map((connection) => (
-                        <button
-                          key={connection.id}
-                          onClick={() => selectDestination(connection.destination.iata)}
-                          className="flex w-full items-center gap-2 rounded-md border border-line/60 bg-surface-2 px-1.5 py-1.5 text-left transition-colors hover:border-accent/40"
-                        >
-                          <span className="font-mono text-[10px] font-bold text-accent">
-                            {connection.destination.iata}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[9px] text-ink">
-                            {connection.destination.city}
-                          </span>
-                          <span className="text-[8px] text-subtle">
-                            {connection.dailyFlightsCount}/day
-                          </span>
-                          <ChevronRight className="size-2.5 text-subtle" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="mb-1.5 text-[9px] leading-relaxed text-muted">
-                      Pick an origin hub to load live direct routes.
-                    </p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {QUICK_HUBS.map((code) => (
-                        <button
-                          key={code}
-                          onClick={() => void loadHub(code)}
-                          className="rounded-md border border-line/60 bg-surface-2 px-1.5 py-1.5 text-center font-mono text-[9px] font-bold text-accent transition-colors hover:border-accent/40"
-                        >
-                          {code}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line/70 bg-surface px-3 py-2">
@@ -869,7 +671,7 @@ export default function RoutesPage() {
               className="pl-9"
             />
           </div>
-          <div className="max-h-[420px] space-y-1.5 overflow-y-auto">
+          <div className="max-h-105 space-y-1.5 overflow-y-auto">
             {hubResults.slice(0, 24).map((airport) => (
               <button
                 key={airport.iata}
@@ -972,15 +774,6 @@ export default function RoutesPage() {
           )}
         </div>
       </Modal>
-    </div>
-  );
-}
-
-function InspectorMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-line/60 bg-surface-2 px-2 py-1.5">
-      <p className="text-[8px] font-bold uppercase tracking-wider text-subtle">{label}</p>
-      <p className="mt-0.5 text-[10px] font-bold text-ink">{value}</p>
     </div>
   );
 }

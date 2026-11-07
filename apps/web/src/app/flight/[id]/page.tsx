@@ -6,7 +6,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Bookmark,
-  BookmarkCheck,
   ChevronRight,
   Edit3,
   Expand,
@@ -238,11 +237,12 @@ export default function FlightDetailPage() {
           />
           <ActionButton
             icon={
-              flight.isWatchlisted ? (
-                <BookmarkCheck className="size-3.5" />
-              ) : (
-                <Bookmark className="size-3.5" />
-              )
+              <Bookmark
+                className={cn(
+                  "size-3.5 transition-colors",
+                  flight.isWatchlisted ? "fill-accent text-accent" : "text-muted",
+                )}
+              />
             }
             label={flight.isWatchlisted ? "Watchlisted" : "Watchlist"}
             active={flight.isWatchlisted}
@@ -439,17 +439,34 @@ export default function FlightDetailPage() {
         <aside className="space-y-3">
           <Panel className="p-3.5">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-ink">
-                  {flight.isWatchlisted
-                    ? "Saved to your watchlist"
-                    : "Add this flight to your watchlist"}
-                </p>
-                <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
-                  {flight.isWatchlisted
-                    ? "Offline-cached with alerts for gate, delay, boarding, and baggage."
-                    : "Persist to the local cache for offline monitoring and alerts."}
-                </p>
+              <div className="flex items-start gap-2.5">
+                <div
+                  className={cn(
+                    "mt-0.5 rounded-lg border p-1.5 transition-colors",
+                    flight.isWatchlisted
+                      ? "border-accent/40 bg-accent-soft text-accent"
+                      : "border-line bg-surface-2 text-muted",
+                  )}
+                >
+                  <Bookmark
+                    className={cn(
+                      "size-4 transition-colors",
+                      flight.isWatchlisted && "fill-accent text-accent",
+                    )}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-ink">
+                    {flight.isWatchlisted
+                      ? "Saved to your watchlist"
+                      : "Add this flight to your watchlist"}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                    {flight.isWatchlisted
+                      ? "Offline-cached with alerts for gate, delay, boarding, and baggage."
+                      : "Persist to the local cache for offline monitoring and alerts."}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => toggleWatchlist(flight)}

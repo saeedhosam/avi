@@ -1,15 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
   Bookmark,
-  BookmarkCheck,
   Luggage,
   MapPin,
   Plane,
 } from "lucide-react";
-import { useApp } from "@/lib/store";
+import { flightKey, useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
 import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
 import { StatusBadge } from "./ui";
@@ -23,7 +23,13 @@ export function FlightCard({
   showWatchlist?: boolean;
   className?: string;
 }) {
-  const { toggleWatchlist, addRecent } = useApp();
+  const { toggleWatchlist, addRecent, flights } = useApp();
+  const isWatchlisted = useMemo(() => {
+    const key = flightKey(flight);
+    const inStore = flights.find((f) => flightKey(f) === key);
+    if (inStore !== undefined) return Boolean(inStore.isWatchlisted);
+    return Boolean(flight.isWatchlisted);
+  }, [flights, flight]);
   const href = flight.flightDate
     ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
     : `/flight/${encodeURIComponent(flight.id)}`;
@@ -81,25 +87,26 @@ export function FlightCard({
                 event.stopPropagation();
                 toggleWatchlist(flight);
               }}
-              aria-pressed={flight.isWatchlisted}
+              aria-pressed={isWatchlisted}
               aria-label={
-                flight.isWatchlisted
+                isWatchlisted
                   ? "Remove from watchlist"
                   : "Add to watchlist"
               }
               className={cn(
-                "inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-colors",
-                flight.isWatchlisted
-                  ? "border-accent/50 bg-accent-soft text-accent"
+                "inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-all",
+                isWatchlisted
+                  ? "border-accent/60 bg-accent-soft text-accent shadow-sm"
                   : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
               )}
             >
-              {flight.isWatchlisted ? (
-                <BookmarkCheck className="size-3" />
-              ) : (
-                <Bookmark className="size-3" />
-              )}
-              {flight.isWatchlisted ? "Watchlisted" : "Watchlist"}
+              <Bookmark
+                className={cn(
+                  "size-3 transition-colors",
+                  isWatchlisted ? "fill-accent text-accent" : "text-muted",
+                )}
+              />
+              {isWatchlisted ? "Watchlisted" : "Watchlist"}
             </button>
           )}
         </div>
