@@ -249,24 +249,43 @@ export class SupabaseServer {
 
   /**
    * Rows the engine is due to poll right now. `next_poll_at is null` is an
-   * adoption case (row written before the engine state migration); it pairs
-   * the OR so both shapes arrive on the same query.
+   * adoption case (row written before the engine state migration). We fetch
+   * both shapes with two plain requests instead of a PostgREST `or=(...)`
+   * filter, which requires yuck URL-encoding of `:` in timestamps and breaks
+   * otherwise.
    */
   async listWatchlist(limit: number): Promise<SupabaseWatchRow[]> {
     const nowIso = new Date().toISOString();
     const params = new URLSearchParams({
-      select: "user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot,next_poll_at,poll_priority",
-      or: `(next_poll_at.is.null,next_poll_at.le.${nowIso})`,
+      select:
+        "user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot,next_poll_at,poll_priority",
       order: "next_poll_at.asc.nullsfirst",
       limit: String(limit),
     });
-    const url = `${this.base()}/rest/v1/watchlist_items?${params.toString()}`;
-    const response = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) {
-      throw new Error(`watchlist fetch failed with HTTP ${response.status}`);
+    const rows: SupabaseWatchRow[] = [];
+    const seen = new Set<string>();
+    for (const filter of [
+      `next_poll_at=le.${nowIso}`,
+      "next_poll_at=is.null",
+    ] as const) {
+      const url = `${this.base()}/rest/v1/watchlist_items?${filter}&${params.toString()}`;
+      const response = await fetch(url, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        throw new Error(`watchlist fetch failed with HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as SupabaseWatchRow[];
+      for (const row of Array.isArray(payload) ? payload : []) {
+        const key = `${row.user_id}|${row.flight_id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push(row);
+      }
+      if (rows.length >= limit) return rows.slice(0, limit);
     }
-    const rows = (await response.json()) as SupabaseWatchRow[];
-    return Array.isArray(rows) ? rows : [];
+    return rows;
   }
 
   /**

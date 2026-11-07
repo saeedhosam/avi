@@ -482,30 +482,35 @@ describe("SupabaseServer", () => {
     expect(new SupabaseServer(loadConfig({ NODE_ENV: "test" })).ready).toBe(false);
   });
 
-  it("reads the watchlist through PostgREST", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify([
-          {
-            user_id: "u1",
-            flight_id: "BA117",
-            flight_number: "BA 117",
-            flight_date: "2026-11-08",
-            status: "SCHEDULED",
-            notes: "",
-            snapshot: baseSnapshot(),
-          },
-        ]),
-        { status: 200 },
-      ),
-    );
+  it("reads the watchlist through PostgREST without double fetches", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              user_id: "u1",
+              flight_id: "BA117",
+              flight_number: "BA 117",
+              flight_date: "2026-11-08",
+              status: "SCHEDULED",
+              notes: "",
+              next_poll_at: "2026-11-07T00:00:00Z",
+              poll_priority: 4,
+              snapshot: baseSnapshot(),
+            },
+          ]),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const rows = await new SupabaseServer(serverConfig).listWatchlist(1000);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.flight_number).toBe("BA 117");
-    const [, options] = fetchMock.mock.calls[0]!;
-    const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain("/rest/v1/watchlist_items");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, options] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain("/rest/v1/watchlist_items?next_poll_at=le.");
     expect((options as RequestInit).headers).toMatchObject({
       Authorization: "Bearer sb_secret_test",
       Prefer: "return=minimal",

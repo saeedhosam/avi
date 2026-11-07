@@ -131,7 +131,7 @@ describe("watch engine FIDS consolidation", () => {
     ];
     const fetchMock = vi.fn().mockImplementation(async (input: unknown) => {
       const url = String(input);
-      if (url.includes("/rest/v1/watchlist_items?select=")) {
+      if (url.includes("/rest/v1/watchlist_items?next_poll_at")) {
         return new Response(JSON.stringify(rows), { status: 200 });
       }
       if (url.includes("updated_at=lt.")) {
@@ -204,7 +204,8 @@ describe("watch engine FIDS consolidation", () => {
     expect(stats.lastSwept).toBe(2);
     // One 2-unit board call, not 2 × 2-unit flight lookups.
     expect(stats.units.unitsUsed).toBe(2);
-    // Both rows patched with a board-derived snapshot.
+    // Both rows patched with a board-derived snapshot. Two due-list fetches
+    // (`next_poll_at=le.<now>` and `next_poll_at=is.null`) precede the patch.
     const patchCalls = fetchMock.mock.calls.filter(
       (call) => {
         const url = String(call[0]);
@@ -232,7 +233,7 @@ describe("watch engine FIDS consolidation", () => {
     ];
     const fetchMock = vi.fn().mockImplementation(async (input: unknown) => {
       const url = String(input);
-      if (url.includes("/rest/v1/watchlist_items?select=")) {
+      if (url.includes("/rest/v1/watchlist_items?next_poll_at")) {
         return new Response(JSON.stringify(rows), { status: 200 });
       }
       if (url.includes("/rest/v1/flight_alerts?select=user_id")) {
