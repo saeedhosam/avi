@@ -77,7 +77,6 @@ services:
       # The gateway never runs the poll engine anymore: exactly one container
       # drives watchlist refreshes (the `avi-engine` worker below).
       WATCH_ENGINE_ENABLED: "false"
-      ENGINE_API_BASE_URL: http://engine:8090
     expose:
       - "8080"
     depends_on:

@@ -18,9 +18,6 @@ const ConfigSchema = z.object({
   // access token. "log" observes and logs; "enforce" rejects requests that
   // lack one.
   PROVIDER_AUTH_MODE: z.enum(["log", "enforce"]).default("log"),
-  // Internal base URL of the engine worker; the gateway proxies engine stats
-  // from there so `/v1/status` stays meaningful after the split.
-  ENGINE_API_BASE_URL: z.string().optional(),
   // Dockerfile entrypoint for `node dist/engine.js` (compose service `avi-engine`).
   ENGINE_PORT: z.coerce.number().int().positive().default(8090),
   // Watch engine: server-side lifecycle polling for watchlist items.

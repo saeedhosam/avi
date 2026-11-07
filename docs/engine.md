@@ -17,7 +17,7 @@
 avi-web (Next.js)
 avi-api (HTTP gateway; WATCH_ENGINE_ENABLED=false)
 avi-engine (worker; WATCH_ENGINE_ENABLED=true, port 8090)
-avi-redis (shared counters)
+avi-redis (shared counters + engine stats)
 ```
 
 - `scheduleNextPoll()` in `services/api/src/engine/snapshot.ts` is the
@@ -28,9 +28,8 @@ avi-redis (shared counters)
 - `flight_alerts` dedupes on `(user_id, flight_number, alert_type, message)`
   via `Prefer: resolution=ignore-duplicates`; `seenAlerts` in-process set is
   gone.
-- `avi-api` `/v1/status` proxies to `ENGINE_API_BASE_URL` (worker
-  `/v1/status`), so deploy / rollback gates on the same health signal used
-  by web probes today.
+- Engine stats ride on Redis (`avi:engine:status`, TTL 90 s). `/v1/status`
+  on the gateway reads that key — no HTTP proxy between gateway and worker.
 
 ## Where to look in code
 
@@ -38,6 +37,7 @@ avi-redis (shared counters)
 - `services/api/src/engine/watch-engine.ts` — tick loop.
 - `services/api/src/engine/snapshot.ts` — ladder (`scheduleNextPoll`).
 - `services/api/src/lib/supabase-server.ts` — `patchPollSchedule`.
+- `services/api/src/lib/engine-status.ts` — Redis stats exchange.
 - `supabase/migrations/20261107000300_engine_state.sql` — the state change.
 
 ## Adding a new poll rule

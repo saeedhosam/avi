@@ -12,6 +12,7 @@ import {
 import type { AppConfig } from "./config.js";
 import { SupabaseServer } from "./lib/supabase-server.js";
 import { UsageTracker } from "./lib/usage.js";
+import { EngineStatusStore } from "./lib/engine-status.js";
 import { UserQuotaService } from "./lib/user-quota.js";
 import { registerProviderAuth } from "./plugins/provider-auth.js";
 import { WatchEngine } from "./engine/watch-engine.js";
@@ -86,6 +87,9 @@ export async function buildApp(config: AppConfig) {
       warn: (message: string) => app.log.warn(message),
     },
   );
+  const engineStatus = new EngineStatusStore(config.REDIS_URL, {
+    warn: (message) => app.log.warn(message),
+  });
 
   registerProviderAuth(app, {
     supabaseServer,
@@ -101,6 +105,7 @@ export async function buildApp(config: AppConfig) {
           usage,
           app.log,
           new PushDelivery(config, supabaseServer, app.log),
+          engineStatus,
         )
       : null;
   if (engine) {
@@ -108,7 +113,7 @@ export async function buildApp(config: AppConfig) {
   }
 
   await app.register(healthRoutes);
-  await app.register(statusRoutes, { config, provider, engine });
+  await app.register(statusRoutes, { config, provider, engine, engineStatus });
   await app.register(flightRoutes, { provider, usage, userQuota, config });
   await app.register(consoleFlightRoutes, { consoleFlights, usage, userQuota, config });
   await app.register(consoleAirportRoutes, { consoleFlights, usage, userQuota, config });

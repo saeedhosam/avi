@@ -16,6 +16,7 @@ import {
   snapshotFromRow,
   type WatchJob,
 } from "./snapshot.js";import { PushDelivery, type PushDeliveryStats } from "./push-delivery.js";
+import { EngineStatusStore } from "../lib/engine-status.js";
 
 export interface EngineStats {
   enabled: boolean;
@@ -85,6 +86,7 @@ export class WatchEngine {
     private readonly usage: UsageTracker,
     private readonly log: FastifyBaseLogger,
     private readonly pushDelivery?: PushDelivery,
+    private readonly statusStore?: EngineStatusStore,
   ) {}
 
   /** Schedules the first tick after the app is ready and stops on close. */
@@ -181,6 +183,13 @@ export class WatchEngine {
       await this.runTick();
       this.lastError = null;
       this.checkBudgetThresholds();
+      if (this.statusStore) {
+        try {
+          await this.statusStore.write(this.stats());
+        } catch (statusError) {
+          this.log.warn({ err: statusError }, "watch engine status store write failed");
+        }
+      }
       if (this.lastPruneAt == null || Date.now() - this.lastPruneAt >= 86_400_000) {
         try {
           const purged = await this.supabase.pruneStaleFlightSnapshots(7);

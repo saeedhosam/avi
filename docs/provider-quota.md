@@ -80,8 +80,8 @@ poll ladder lives in Postgres (`watchlist_items.next_poll_at`), and dedup is
 enforced by a unique index on `flight_alerts`. That makes restarts and
 future scale-out safe.
 
-- `avi-api`: HTTP gateway, `WATCH_ENGINE_ENABLED=false`; proxies engine stats
-  from `ENGINE_API_BASE_URL=http://engine:8090` for `/v1/status`.
+- `avi-api`: HTTP gateway, `WATCH_ENGINE_ENABLED=false`; reads engine stats
+  from Redis (`avi:engine:status`, TTL 90 s) under `/v1/status`.
 - `avi-engine`: worker image from the same codebase
   (`node dist/engine/worker.js`), `WATCH_ENGINE_ENABLED=true` by default.
 - No new service dependency: single-writer via compose, plus advisory lock is

@@ -1,14 +1,15 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
-import type { WatchEngine } from "../engine/watch-engine.js";
+import type { EngineStats, WatchEngine } from "../engine/watch-engine.js";
 import { AeroDataBoxProvider } from "../providers/aerodatabox.js";
-import type { EngineStats } from "../engine/watch-engine.js";
+import { EngineStatusStore, engineStatusStoreFor } from "../lib/engine-status.js";
 
 interface StatusOptions {
   config: AppConfig;
   provider: AeroDataBoxProvider;
   engine?: WatchEngine | null;
+  engineStatus?: EngineStatusStore | null;
 }
 
 const statusResponse = z.object({
@@ -52,37 +53,10 @@ const statusResponse = z.object({
 
 type StatusPayload = z.infer<typeof statusResponse>;
 
-/** Best-effort worker stats; cached briefly so the gateway never hammers it. */
-async function fetchRemoteEngineStats(
-  log: { info: (msg: string) => void },
-  config: AppConfig,
-): Promise<EngineStats | null> {
-  const base = config.ENGINE_API_BASE_URL?.trim().replace(/\/+$/, "");
-  if (!base) return null;
-  try {
-    const response = await fetch(`${base}/v1/status`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) {
-      log.info(`engine stats probe failed: HTTP ${response.status}`);
-      return null;
-    }
-    const payload = (await response.json()) as Partial<StatusPayload>;
-    log.info(`engine stats probe ok: ${payload.watchEngine ? "stats" : "null"}`);
-    return payload.watchEngine ?? null;
-  } catch (error) {
-    log.info(`engine stats probe error: ${String(error)}`);
-    return null;
-  }
-}
-
 export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
   app,
   options,
 ) => {
-  let cached: { value: EngineStats | null; at: number } | null = null;
   app.get(
     "/v1/status",
     {
@@ -93,13 +67,15 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
       },
     },
     async () => {
-      if (!cached || Date.now() - cached.at > 5_000) {
-        cached = {
-          value: await fetchRemoteEngineStats(app.log, options.config),
-          at: Date.now(),
-        };
-      }
-      const workerStats = options.engine ? options.engine.stats() : cached?.value ?? null;
+      // In the API container the engine lives elsewhere: read the latest tick
+      // snapshot from Redis (`avi:engine:status`, TTL 90 s). A dead worker
+      // expires the key, so the gateway reports stats as null instead of a
+      // stale "healthy" front.
+      const workerStats = options.engine
+        ? options.engine.stats()
+        : options.engineStatus
+          ? await options.engineStatus.read()
+          : null;
 
       return {
         service: "avi-api" as const,
