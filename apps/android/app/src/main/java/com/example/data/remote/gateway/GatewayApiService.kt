@@ -68,6 +68,7 @@ object GatewayNetworkClient {
 
     val apiService: GatewayApiService by lazy {
         val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(GatewayAuthInterceptor(SupabaseGatewayTokenProvider))
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)

@@ -119,6 +119,7 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER || 'manual' }}
+          PROVIDER_AUTH_MODE: ${{ secrets.PROVIDER_AUTH_MODE || 'log' }}
           POLAR_API_KEY: ${{ secrets.POLAR_API_KEY }}
           POLAR_PRICE_PLUS: ${{ secrets.POLAR_PRICE_PLUS }}
           POLAR_PRICE_PRO: ${{ secrets.POLAR_PRICE_PRO }}
@@ -148,6 +149,8 @@ jobs:
           POLAR_PRICE_PLUS=$POLAR_PRICE_PLUS
           POLAR_PRICE_PRO=$POLAR_PRICE_PRO
           POLAR_WEBHOOK_SECRET=$POLAR_WEBHOOK_SECRET
+          # Provider auth/quotas (P2 Track A). Flip with PROVIDER_AUTH_MODE.
+          PROVIDER_AUTH_MODE=$PROVIDER_AUTH_MODE
           EOF
 
           ssh -i ~/.ssh/avi_deploy "$HETZNER_USER@$HETZNER_HOST" 'umask 077; cat > /opt/avi/.env.web.production' <<EOF
