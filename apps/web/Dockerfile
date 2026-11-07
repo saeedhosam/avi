@@ -18,16 +18,25 @@ ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/contracts/src packages/contracts/src
+COPY packages/contracts/tsconfig.json packages/contracts/tsconfig.json
+COPY packages/contracts/scripts packages/contracts/scripts
 COPY packages/catalog/package.json packages/catalog/package.json
+COPY packages/catalog/airports.json packages/catalog/airports.json
+COPY packages/catalog/terminal-layouts.json packages/catalog/terminal-layouts.json
+COPY packages/catalog/world_countries.json packages/catalog/world_countries.json
 COPY packages/map-style/package.json packages/map-style/package.json
 COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
 
 RUN pnpm install --frozen-lockfile --filter @avi/web...
+# `@avi/contracts` is consumed from source through the workspace symlink; build
+# its dist before the web bundle, exactly like `apps/web`'s prebuild step.
+RUN pnpm --filter @avi/contracts build
 
 COPY apps/web apps/web
 COPY packages packages
-RUN pnpm --filter @avi/web build
+RUN pnpm --filter @avi/contracts build && pnpm --filter @avi/web build
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production

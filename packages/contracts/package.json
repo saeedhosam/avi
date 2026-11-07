@@ -1,13 +1,38 @@
 {
   "name": "@avi/contracts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "OpenAPI contracts and generated client types for Avi.",
+  "description": "OpenAPI contracts and the shared console Flight contract + mapping for Avi.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./mapping": {
+      "types": "./dist/mapping.d.ts",
+      "default": "./dist/mapping.js"
+    },
+    "./openapi.json": "./openapi.json"
+  },
+  "files": [
+    "dist",
+    "openapi.json",
+    "src"
+  ],
   "scripts": {
-    "build": "node scripts/export-openapi.mjs",
-    "typecheck": "node --check scripts/export-openapi.mjs",
-    "lint": "node --check scripts/export-openapi.mjs",
+    "build": "tsc -p tsconfig.json",
+    "openapi": "node scripts/export-openapi.mjs",
+    "verify": "node scripts/export-openapi.mjs && tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/export-openapi.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

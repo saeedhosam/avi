@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "predev": "node scripts/copy-maplibre-assets.mjs",
-    "prebuild": "node scripts/copy-maplibre-assets.mjs",
+    "predev": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/contracts build",
+    "prebuild": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/contracts build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@avi/contracts": "workspace:*",
     "@supabase/supabase-js": "^2.119.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.69.0",
