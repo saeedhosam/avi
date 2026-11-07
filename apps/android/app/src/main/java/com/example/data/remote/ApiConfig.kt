@@ -69,12 +69,12 @@ object ApiConfig {
     )
 
     /**
-     * Checks whether a real, non-placeholder AeroDataBox API key is available.
+     * Legacy compatibility shim: Avi no longer holds provider keys on-device,
+     * so there is never a direct API key to validate — return true (the
+     * gateway ready-gate is the authoritative check).
      */
-    fun hasValidAeroDataBoxKey(keyOverride: String? = null): Boolean {
-        val key = (keyOverride ?: aeroDataBoxApiKey).trim()
-        return key.length >= 16 && key !in PLACEHOLDER_KEYS && !key.startsWith("DEFAULT_")
-    }
+    fun hasValidAeroDataBoxKey(keyOverride: String? = null): Boolean =
+        isGatewayConfigured
 
     /**
      * Computes the default initial DataSourceMode based on gateway availability and offline flag.

@@ -169,10 +169,10 @@ fun DataSourceStatusBanner(
                     HorizontalDivider(color = InstrumentBorder)
 
                     DiagnosticItemRow(
-                        title = "AeroDataBox Direct API",
-                        status = if (ApiConfig.hasValidAeroDataBoxKey()) "KEY CONFIGURED" else "CACHE FALLBACK",
-                        isActive = ApiConfig.hasValidAeroDataBoxKey(),
-                        detail = "Host: ${ApiConfig.aeroDataBoxApiHost}"
+                        title = "Avi Gateway",
+                        status = if (ApiConfig.isGatewayConfigured) "CONNECTED" else "SAVED DATA",
+                        isActive = ApiConfig.isGatewayConfigured,
+                        detail = "Live lookups route through the Avi gateway"
                     )
 
                     DiagnosticItemRow(
