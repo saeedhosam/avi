@@ -35,6 +35,8 @@ export interface WatchSnapshot {
   airlineCode?: string;
   status?: string;
   statusNote?: string | null;
+  /** Epoch ms when the engine first observed the LANDED state. */
+  landedAt?: number;
   delayMinutes?: number;
   delayReason?: string | null;
   terminalDeparture?: string;
@@ -126,6 +128,21 @@ export function isWatchSnapshot(value: unknown): value is WatchSnapshot {
   );
 }
 
+/**
+ * Builds the minimal snapshot the engine can schedule from when the stored
+ * payload is missing. Snapshots are purged after 7 days (provider caching
+ * terms), but the watchlist row must remain refreshable forever.
+ */
+export function snapshotFromRow(row: SupabaseWatchRow): WatchSnapshot {
+  if (isWatchSnapshot(row.snapshot)) return row.snapshot;
+  return {
+    id: row.flight_id,
+    flightNumber: row.flight_number,
+    flightDate: row.flight_date,
+    status: row.status ?? undefined,
+  };
+}
+
 function ianaOffsetMs(ianaTimeZone: string, at: number): number {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: ianaTimeZone,
@@ -191,6 +208,18 @@ export function snapshotDepartureMs(snapshot: WatchSnapshot): number | null {
   }
 }
 
+/**
+ * Midday UTC approximation for a date-only row. Used only when the snapshot
+ * was purged and no departure time/zone survived; it schedules a re-fetch
+ * rather than pretending to know the exact departure.
+ */
+function snapshotDateHintMs(snapshot: WatchSnapshot): number | null {
+  const dateIso = typeof snapshot.flightDate === "string" ? snapshot.flightDate : null;
+  if (!dateIso || !/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return null;
+  const parsed = Date.parse(`${dateIso}T12:00:00Z`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function isFiniteCoord(airport: WatchSnapshot["origin"]): boolean {
   return (
     typeof airport?.latitude === "number" &&
@@ -250,9 +279,37 @@ export function mergeSnapshot(
   };
 
   snapshot.flightNumber = snapshot.flightNumber || summary.flightNumber;
+  const operatingDate = summary.scheduledDeparture?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (!snapshot.flightDate && operatingDate) snapshot.flightDate = operatingDate;
   if (summary.airline) snapshot.airline = summary.airline;
   if (summary.airlineCode) snapshot.airlineCode = summary.airlineCode;
   snapshot.status = summary.status;
+  if (summary.status === "LANDED" && typeof snapshot.landedAt !== "number") {
+    snapshot.landedAt = nowMs;
+  }
+  // If the snapshot payload was pruned, rebuild the airport endpoints from
+  // the provider so the snapshot remains a usable Flight face for clients.
+  snapshot.origin = {
+    ...(snapshot.origin ?? {}),
+    code: summary.origin.code,
+    name: summary.origin.name,
+    city: summary.origin.city,
+    country: summary.origin.country,
+    timezone: summary.origin.timezone,
+    latitude: summary.origin.latitude,
+    longitude: summary.origin.longitude,
+  };
+  snapshot.destination = {
+    ...(snapshot.destination ?? {}),
+    code: summary.destination.code,
+    name: summary.destination.name,
+    city: summary.destination.city,
+    country: summary.destination.country,
+    timezone: summary.destination.timezone,
+    latitude: summary.destination.latitude,
+    longitude: summary.destination.longitude,
+  };
+  if (!Array.isArray(snapshot.timeline)) snapshot.timeline = [];
   if (summary.statusNote) snapshot.statusNote = summary.statusNote;
   if (Number.isFinite(summary.delayMinutes)) {
     snapshot.delayMinutes = summary.delayMinutes;
@@ -416,10 +473,15 @@ export function diffAlerts(
 
 /**
  * Deduplication key shared with recent-alert seeding from Supabase so engine
- * restarts do not replay the same change twice.
+ * restarts do not replay the same change twice. The user id is part of the
+ * key: two people watching the same flight must both receive the alert.
  */
-export function alertKey(flightNumber: string, draft: EngineAlertDraft): string {
-  return `${flightNumber}|${draft.type}|${draft.message}`;
+export function alertKey(
+  userId: string,
+  flightNumber: string,
+  draft: EngineAlertDraft,
+): string {
+  return `${userId}|${flightNumber}|${draft.type}|${draft.message}`;
 }
 
 /**
@@ -451,14 +513,32 @@ export function evaluateDue(
   }
 
   if (snapshot.status === "LANDED") {
-    // baggage/gate may still update shortly after landing.
+    // Baggage/gate may still update shortly after landing, but do not poll a
+    // landed flight forever when the provider never assigns a carousel.
+    const landedAt = typeof snapshot.landedAt === "number" ? snapshot.landedAt : null;
+    if (landedAt != null && nowMs - landedAt > MIN(2 * 60)) {
+      return { due: false, priority: 3, deltaMs: 0, nextPollMs: 0 };
+    }
     return when(MIN(5), 1, Number.NaN);
   }
 
   const departureMs = snapshotDepartureMs(snapshot);
   if (departureMs == null) {
-    // No trustworthy departure time: conservative best-effort sweep.
-    return when(MIN(20), 5, Number.NaN);
+    // The snapshot was pruned or never carried a departure time. Use the
+    // operating date to schedule a conservative recovery poll instead of
+    // polling every 20 minutes forever (or, worse, never recovering).
+    const dateHintMs = snapshotDateHintMs(snapshot);
+    if (dateHintMs == null) {
+      // No trustworthy date either: conservative best-effort sweep.
+      return when(MIN(20), 5, Number.NaN);
+    }
+    const deltaMs = dateHintMs - nowMs;
+    if (deltaMs > MIN(7 * 24 * 60)) {
+      return { due: false, priority: 9, deltaMs, nextPollMs: 0 };
+    }
+    if (deltaMs > MIN(24 * 60)) return when(MIN(6 * 60), 6, deltaMs);
+    if (deltaMs > 0) return when(MIN(60), 5, deltaMs);
+    return when(MIN(20), 5, deltaMs);
   }
 
   const deltaMs = departureMs - nowMs;
@@ -480,5 +560,8 @@ export function matchesJob(summary: FlightSummary, job: WatchJob): boolean {
     return false;
   }
   const summaryDate = summary.scheduledDeparture?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
-  return (job.flightDate ?? null) === summaryDate;
+  // Legacy rows may have no flight_date; accept a number match rather than
+  // refusing to refresh them forever.
+  if (!job.flightDate) return true;
+  return job.flightDate === summaryDate;
 }

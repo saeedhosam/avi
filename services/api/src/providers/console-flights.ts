@@ -133,6 +133,8 @@ export type ConsoleOutcome<T> = {
   data: T | null;
   status: number;
   mode: FlightDataMode;
+  /** True when the provider answered from its in-process cache (no unit spend). */
+  cached?: boolean;
 };
 
 export function hasValidConsoleAeroKey(key: string | undefined): boolean {
@@ -569,11 +571,11 @@ export class ConsoleFlightProvider {
   async lookupFlight(
     rawNumber: string,
     date?: string,
-  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[] }> {
+  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }> {
     const flightNumber = rawNumber.replace(/\s+/g, "").toUpperCase();
     const cacheKey = `lookup:${flightNumber}|${date ?? "any"}`;
-    const cached = this.flightCache.get<{ mode: FlightDataMode; status: number; flights: Flight[] }>(cacheKey);
-    if (cached) return cached;
+    const cached = this.flightCache.get<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }>(cacheKey);
+    if (cached) return { ...cached, cached: true };
 
     const path = date
       ? `/flights/number/${flightNumber}/${date}?dateLocalRole=Departure&withAircraftImage=false&withLocation=true`
@@ -596,10 +598,10 @@ export class ConsoleFlightProvider {
 
   async lookupAirportFids(
     code: string,
-  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[] }> {
+  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }> {
     const cacheKey = `fids:${code}`;
-    const cached = this.fidsCache.get<{ mode: FlightDataMode; status: number; flights: Flight[] }>(cacheKey);
-    if (cached) return cached;
+    const cached = this.fidsCache.get<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }>(cacheKey);
+    if (cached) return { ...cached, cached: true };
 
     const { data, status, mode } = await this.fetchJson<AeroFidsResponseDto>(
       `/flights/airports/iata/${code}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
@@ -621,10 +623,10 @@ export class ConsoleFlightProvider {
 
   async lookupAirportRoutes(
     code: string,
-  ): Promise<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[] }> {
+  ): Promise<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[]; cached?: boolean }> {
     const cacheKey = `routes:${code}`;
-    const cached = this.routesCache.get<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[] }>(cacheKey);
-    if (cached) return cached;
+    const cached = this.routesCache.get<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[]; cached?: boolean }>(cacheKey);
+    if (cached) return { ...cached, cached: true };
 
     const { data, status, mode } = await this.fetchJson<{
       routes?: Array<{
@@ -669,10 +671,10 @@ export class ConsoleFlightProvider {
 
   async searchAirports(
     q: string,
-  ): Promise<{ mode: FlightDataMode; status: number; airports: AirportNode[] }> {
+  ): Promise<{ mode: FlightDataMode; status: number; airports: AirportNode[]; cached?: boolean }> {
     const cacheKey = `airports-search:${q}`;
-    const cached = this.airportsCache.get<{ mode: FlightDataMode; status: number; airports: AirportNode[] }>(cacheKey);
-    if (cached) return cached;
+    const cached = this.airportsCache.get<{ mode: FlightDataMode; status: number; airports: AirportNode[]; cached?: boolean }>(cacheKey);
+    if (cached) return { ...cached, cached: true };
 
     const { data, status, mode } = await this.fetchJson<{
       items?: AeroAirportDto[];

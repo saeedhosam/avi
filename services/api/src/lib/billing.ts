@@ -26,6 +26,18 @@ export function validPlan(plan: string | null | undefined): BillingPlanTier {
   return key === "PLUS" || key === "PRO" ? (key as BillingPlanTier) : "FREE";
 }
 
+/** Reject replayed webhooks older than this, in seconds. */
+const WEBHOOK_TOLERANCE_SECONDS = 5 * 60;
+
+function timestampIsFresh(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return false;
+  // Lemon Squeezy uses seconds; tolerate a millisecond variant defensively.
+  const seconds = parsed > 1e12 ? parsed / 1000 : parsed;
+  return Math.abs(Date.now() / 1000 - seconds) <= WEBHOOK_TOLERANCE_SECONDS;
+}
+
 /**
  * LS signs webhooks with HMAC-SHA256 over `<X-Signature-Timestamp>.<body>` and
  * sends the hex digest in `X-Signature`.
@@ -37,6 +49,7 @@ export function verifyLemonSqueezySignature(
   timestampHeader: string | undefined,
 ): boolean {
   if (!secret || !signatureHeader || typeof rawBody !== "string") return false;
+  if (timestampHeader && !timestampIsFresh(timestampHeader)) return false;
   const signedPayload = timestampHeader
     ? `${timestampHeader}.${rawBody}`
     : rawBody;
@@ -204,6 +217,9 @@ export async function createPolarCheckout(
     },
     body: JSON.stringify({
       products,
+      // Stable identity link. Polar echoes this on orders/subscriptions; the
+      // webhook must never rely on a user-writable profile email.
+      external_customer_id: uid,
       metadata: { user_id: uid },
       success_url: `${webOrigin.replace(/\/+$/, "")}/?upgraded=1`,
     }),
@@ -215,20 +231,96 @@ export async function createPolarCheckout(
 }
 
 /**
- * Polar webhooks sign the raw body with HMAC-SHA256 (hex, base64 by default
- * per the `Polar-Webhook-Signature` header).
+ * Polar webhooks follow the Standard Webhooks specification.
+ *
+ * Headers: `webhook-id`, `webhook-timestamp`, `webhook-signature`.
+ * Signed content: `${id}.${timestamp}.${body}`.
+ * Signature: comma-separated `v1,<base64-hmac>` values (space-separated when
+ * multiple signatures are present).
+ *
+ * Secrets created on/after 2026-09-08 are `whsec_<base64>` where the key is
+ * the base64-decoded remainder. Older secrets use the UTF-8 bytes of the full
+ * `whsec_…` string, so we accept either key derivation.
  */
+export interface StandardWebhookHeaders {
+  id: string | undefined;
+  timestamp: string | undefined;
+  signature: string | undefined;
+}
+
+function webhookKeys(secret: string): Buffer[] {
+  const trimmed = secret.trim();
+  if (!trimmed) return [];
+  const keys: Buffer[] = [Buffer.from(trimmed, "utf8")];
+  const encoded = trimmed.startsWith("whsec_")
+    ? trimmed.slice("whsec_".length)
+    : trimmed;
+  try {
+    const decoded = Buffer.from(encoded, "base64");
+    if (decoded.length >= 16) keys.unshift(decoded);
+  } catch {
+    // Not base64; the UTF-8 key above is the legacy path.
+  }
+  return keys;
+}
+
+function safeEqualBase64(expected: string, candidate: string): boolean {
+  try {
+    const a = Buffer.from(expected, "base64");
+    const b = Buffer.from(candidate, "base64");
+    return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+export function verifyStandardWebhookSignature(
+  secret: string,
+  rawBody: string,
+  headers: StandardWebhookHeaders,
+): boolean {
+  if (
+    !secret ||
+    typeof rawBody !== "string" ||
+    !headers.id ||
+    !headers.timestamp ||
+    !headers.signature ||
+    !timestampIsFresh(headers.timestamp)
+  ) {
+    return false;
+  }
+
+  const signedContent = `${headers.id}.${headers.timestamp}.${rawBody}`;
+  const candidates = headers.signature
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const separator = part.indexOf(",");
+      if (separator < 0) return null;
+      const version = part.slice(0, separator);
+      const value = part.slice(separator + 1);
+      return version === "v1" && value ? value : null;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  if (!candidates.length) return false;
+
+  return webhookKeys(secret).some((key) => {
+    const expected = createHmac("sha256", key)
+      .update(signedContent)
+      .digest("base64");
+    return candidates.some((candidate) => safeEqualBase64(expected, candidate));
+  });
+}
+
+/** Backwards-compatible wrapper for callers that already use the name. */
 export function verifyPolarSignature(
   secret: string,
   rawBody: string,
-  signatureHeader: string | undefined,
+  headers: StandardWebhookHeaders,
 ): boolean {
-  if (!secret || !signatureHeader || typeof rawBody !== "string") return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const a = Buffer.from(expected, "utf8");
-  const b = Buffer.from(signatureHeader.trim(), "utf8");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return verifyStandardWebhookSignature(secret, rawBody, headers);
 }
 
 export interface PolarWebhookEvent {
@@ -258,22 +350,16 @@ export function planPatchFromPolarWebhook(
   const productId = data.product_id ?? "";
   const priceId = data.price_id ?? "";
 
-  const matchesTier = (ids: string | undefined): "PLUS" | "PRO" | null => {
+  const matchesTier = (
+    ids: string | undefined,
+    tier: "PLUS" | "PRO",
+  ): "PLUS" | "PRO" | null => {
     if (!ids) return null;
     const list = ids.split(",").map((id) => id.trim()).filter(Boolean);
-    if (list.includes(productId) || (priceId && list.includes(priceId))) {
-      return productId && list.includes(productId)
-        ? ids === config.POLAR_PRICE_PRO
-          ? "PRO"
-          : "PLUS"
-        : ids === config.POLAR_PRICE_PRO
-          ? "PRO"
-          : "PLUS";
-    }
-    return null;
+    const productMatch = productId ? list.includes(productId) : false;
+    const priceMatch = priceId ? list.includes(priceId) : false;
+    return productMatch || priceMatch ? tier : null;
   };
-  const variantToPlan = (tier: "PLUS" | "PRO" | null): BillingPlanTier =>
-    tier ?? "FREE";
 
   // Terminal lifecycle states downgrade regardless of product id.
   if (type === "subscription.canceled" || type === "subscription.revoked") {
@@ -290,11 +376,20 @@ export function planPatchFromPolarWebhook(
     type === "subscription.active" ||
     type === "order.created"
   ) {
+    // `subscription.updated` is also how Polar reports terminal transitions.
+    const status = (data.status ?? "").toLowerCase();
+    if (["canceled", "revoked", "unpaid", "incomplete_expired"].includes(status)) {
+      return {
+        plan: "FREE",
+        billingCustomerId: data.customer_id ?? null,
+      };
+    }
     const tier =
-      matchesTier(config.POLAR_PRICE_PRO) ?? matchesTier(config.POLAR_PRICE_PLUS);
+      matchesTier(config.POLAR_PRICE_PRO, "PRO") ??
+      matchesTier(config.POLAR_PRICE_PLUS, "PLUS");
     if (!tier) return null;
     return {
-      plan: variantToPlan(tier) as BillingPlanTier,
+      plan: tier,
       billingCustomerId: data.customer_id ?? null,
     };
   }

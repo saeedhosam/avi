@@ -13,6 +13,7 @@ import {
   isWatchSnapshot,
   matchesJob,
   mergeSnapshot,
+  snapshotFromRow,
   type WatchJob,
 } from "./snapshot.js";
 import { PushDelivery, type PushDeliveryStats } from "./push-delivery.js";
@@ -49,6 +50,7 @@ export interface EngineStats {
 export class WatchEngine {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private stopped = false;
   private lastTickAt: number | null = null;
   // Daily purge of stale flight payloads (AeroDataBox 7-day cache term).
   private lastPruneAt: number | null = null;
@@ -57,6 +59,8 @@ export class WatchEngine {
   private lastError: string | null = null;
   private readonly lastRefresh = new Map<string, number>();
   private readonly seenAlerts = new Set<string>();
+  /** Bound the in-memory dedup cache; the DB is the durable source of truth. */
+  private static readonly MAX_SEEN_ALERTS = 20_000;
   private readonly meter = new UserMeter();
   private lastPushStats: PushDeliveryStats | null = null;
   // Warn once per threshold per month (budget alerting).
@@ -86,13 +90,14 @@ export class WatchEngine {
   /** Schedules the first tick after the app is ready and stops on close. */
   register(app: FastifyInstance): void {
     app.addHook("onReady", async () => {
+      this.stopped = false;
       if (!this.provider.configured) {
         this.log.warn("watch engine disabled: AeroDataBox key missing");
         return;
       }
       try {
         const seeded = await this.supabase.recentAlertKeys();
-        for (const key of seeded) this.seenAlerts.add(key);
+        for (const key of seeded) this.rememberAlert(key);
         this.log.debug({ count: seeded.length }, "watch engine seeded recent alerts");
       } catch (error) {
         this.log.warn({ err: error }, "watch engine could not seed recent alerts");
@@ -113,13 +118,23 @@ export class WatchEngine {
   }
 
   async stop(): Promise<void> {
+    this.stopped = true;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
+  /** Adds a dedup key, evicting the oldest entries once the cache is bounded. */
+  private rememberAlert(key: string): void {
+    this.seenAlerts.add(key);
+    if (this.seenAlerts.size <= WatchEngine.MAX_SEEN_ALERTS) return;
+    const oldest = this.seenAlerts.values().next().value;
+    if (oldest) this.seenAlerts.delete(oldest);
+  }
+
   private scheduleNext(delayMs: number): void {
+    if (this.stopped) return;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.tick(), delayMs);
   }
@@ -274,7 +289,11 @@ export class WatchEngine {
       const groups = new Map<string, WatchJob[]>();
       for (const job of pending.values()) {
         const origin = job.rows
-          .map((row) => (isWatchSnapshot(row.snapshot) ? row.snapshot.origin?.code : undefined))
+          .map((row) =>
+            isWatchSnapshot(row.snapshot)
+              ? row.snapshot.origin?.code
+              : row.origin_code ?? undefined,
+          )
           .find((code) => typeof code === "string" && code.length === 3)
           ?.toUpperCase();
         if (!origin) continue;
@@ -312,6 +331,9 @@ export class WatchEngine {
           for (const { job, summary } of matchedJobs) {
             const allowed = allowedFor(job);
             refreshed += await this.applySummary(job, summary, allowed, now, perJobShare);
+            // A successful board covered this job even when nobody had a
+            // free plan slot; do not immediately re-poll it next tick.
+            this.lastRefresh.set(job.key, now);
             pending.delete(job.key);
           }
           this.log.debug(
@@ -331,6 +353,9 @@ export class WatchEngine {
         const allowed = allowedFor(job);
         const result = await this.provider.searchFlight(job.flightNumber);
         providerCalls += 1;
+        // Honor the polling ladder even when the provider has no matching
+        // flight right now; otherwise the same job retries every tick.
+        this.lastRefresh.set(job.key, now);
         if (result.meta.source === "not_configured") break;
         if (result.meta.source === "quota_fallback") continue;
         if (result.meta.source === "live") {
@@ -349,6 +374,7 @@ export class WatchEngine {
             : 0,
         );
       } catch (error) {
+        this.lastRefresh.set(job.key, now);
         this.log.warn({ err: error, flight: job.flightNumber }, "watch engine flight refresh failed");
       }
     }
@@ -372,11 +398,10 @@ export class WatchEngine {
   ): Promise<number> {
     let applied = 0;
     for (const row of allowed) {
-      if (!isWatchSnapshot(row.snapshot)) continue;
-      const previous = row.snapshot;
+      const previous = snapshotFromRow(row);
       const merged = mergeSnapshot(previous, summary, nowMs);
       const drafts = diffAlerts(previous, merged, job.flightNumber).filter(
-        (draft) => !this.seenAlerts.has(alertKey(job.flightNumber, draft)),
+        (draft) => !this.seenAlerts.has(alertKey(row.user_id, job.flightNumber, draft)),
       );
       if (drafts.length) {
         this.log.info(
@@ -405,7 +430,9 @@ export class WatchEngine {
           "watch engine: alert insert failures",
         );
       }
-      for (const draft of drafts) this.seenAlerts.add(alertKey(job.flightNumber, draft));
+      for (const draft of drafts) {
+        this.rememberAlert(alertKey(row.user_id, job.flightNumber, draft));
+      }
       this.lastRefresh.set(job.key, nowMs);
       this.meter.track(row.user_id, job.key, nowMs, unitsPerRowShare);
       applied += 1;
@@ -419,8 +446,8 @@ export class WatchEngine {
     for (const row of rows) {
       const flightNumber = row.flight_number.trim().toUpperCase();
       const key = `${flightNumber}|${row.flight_date ?? "any"}`;
-      if (!isWatchSnapshot(row.snapshot)) continue;
-      const decision = evaluateDue(row.snapshot, this.lastRefresh.get(key) ?? 0, nowMs);
+      const snapshot = snapshotFromRow(row);
+      const decision = evaluateDue(snapshot, this.lastRefresh.get(key) ?? 0, nowMs);
       if (!decision.due) continue;
       const job = jobs.get(key) ?? {
         key,

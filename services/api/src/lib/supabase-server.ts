@@ -6,6 +6,7 @@ export interface SupabaseWatchRow {
   flight_number: string;
   flight_date: string | null;
   status: string | null;
+  origin_code?: string | null;
   notes: string | null;
   snapshot: unknown;
 }
@@ -139,7 +140,10 @@ export class SupabaseServer {
     const search = new URLSearchParams({
       select: "id",
       email: `eq.${email.trim().toLowerCase()}`,
-      limit: "1",
+      order: "created_at.asc",
+      // Ask for two so an ambiguous email (more than one profile) is rejected
+      // instead of silently granting a plan to an arbitrary account.
+      limit: "2",
     });
     const response = await fetch(`${this.base()}/rest/v1/profiles?${search.toString()}`, {
       headers: this.headers("text/plain"),
@@ -147,11 +151,44 @@ export class SupabaseServer {
     });
     if (!response.ok) return null;
     const rows = (await response.json()) as Array<{ id: string }>;
+    if (!Array.isArray(rows) || rows.length !== 1) return null;
     return rows[0]?.id ?? null;
   }
 
+  /** True when this provider event has already been applied. */
+  async hasWebhookEvent(provider: string, eventId: string): Promise<boolean> {
+    if (!this.ready || !eventId) return false;
+    const search = new URLSearchParams({
+      select: "event_id",
+      provider: `eq.${provider}`,
+      event_id: `eq.${eventId}`,
+      limit: "1",
+    });
+    const response = await fetch(`${this.base()}/rest/v1/billing_events?${search.toString()}`, {
+      headers: this.headers("text/plain"),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return false;
+    const rows = (await response.json()) as unknown[];
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  /** Records a processed provider event. A concurrent duplicate is harmless. */
+  async recordWebhookEvent(provider: string, eventId: string): Promise<void> {
+    if (!this.ready || !eventId) return;
+    const response = await fetch(`${this.base()}/rest/v1/billing_events`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ provider, event_id: eventId }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok && response.status !== 409) {
+      throw new Error(`billing event insert failed with HTTP ${response.status}`);
+    }
+  }
+
   async listWatchlist(limit: number): Promise<SupabaseWatchRow[]> {
-    const url = `${this.base()}/rest/v1/watchlist_items?select=user_id,flight_id,flight_number,flight_date,status,snapshot&limit=${limit}`;
+    const url = `${this.base()}/rest/v1/watchlist_items?select=user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot&order=updated_at.asc&limit=${limit}`;
     const response = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
       throw new Error(`watchlist fetch failed with HTTP ${response.status}`);
@@ -160,29 +197,37 @@ export class SupabaseServer {
     return Array.isArray(rows) ? rows : [];
   }
 
+  /** Recent alert dedup keys, scoped per user so one watcher never blocks another. */
   async recentAlertKeys(): Promise<string[]> {
-    const url = `${this.base()}/rest/v1/flight_alerts?select=flight_number,alert_type,message&order=created_at.desc&limit=300`;
+    const url = `${this.base()}/rest/v1/flight_alerts?select=user_id,flight_number,alert_type,message&order=created_at.desc&limit=300`;
     const response = await fetch(url, { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
       throw new Error(`recent alerts fetch failed with HTTP ${response.status}`);
     }
-    const rows = (await response.json()) as Array<SupabaseAlertBody>;
-    return (Array.isArray(rows) ? rows : []).map((row) => `${row.flight_number}|${row.alert_type}|${row.message}`);
+    const rows = (await response.json()) as Array<SupabaseAlertBody & { user_id: string }>;
+    return (Array.isArray(rows) ? rows : []).map(
+      (row) => `${row.user_id}|${row.flight_number}|${row.alert_type}|${row.message}`,
+    );
   }
 
   /** Plan tiers of the given users (service-key read, bypasses RLS). */
   async listUserPlans(userIds: string[]): Promise<Map<string, string>> {
     if (!userIds.length) return new Map();
-    const list = userIds.map((id) => `"${id}"`).join(",");
-    const url = `${this.base()}/rest/v1/profiles?select=id,plan&id=in.(${list})&limit=${userIds.length}`;
-    const response = await fetch(url, { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) {
-      throw new Error(`plan fetch failed with HTTP ${response.status}`);
-    }
-    const rows = (await response.json()) as Array<{ id: string; plan: string | null }>;
     const plans = new Map<string, string>();
-    for (const row of rows) {
-      plans.set(row.id, row.plan ?? "FREE");
+    // Keep request URLs short; PostgREST/Cloudflare reject very long in.(...)
+    // lists, and the engine can see thousands of users in one tick.
+    for (let index = 0; index < userIds.length; index += 200) {
+      const chunk = userIds.slice(index, index + 200);
+      const list = chunk.map((id) => `"${id}"`).join(",");
+      const url = `${this.base()}/rest/v1/profiles?select=id,plan&id=in.(${list})&limit=${chunk.length}`;
+      const response = await fetch(url, { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) });
+      if (!response.ok) {
+        throw new Error(`plan fetch failed with HTTP ${response.status}`);
+      }
+      const rows = (await response.json()) as Array<{ id: string; plan: string | null }>;
+      for (const row of rows) {
+        plans.set(row.id, row.plan ?? "FREE");
+      }
     }
     return plans;
   }
@@ -204,7 +249,7 @@ export class SupabaseServer {
   async listSubscriptions(userIds: string[]): Promise<Map<string, WebPushRow[]>> {
     if (!userIds.length) return new Map();
     const list = userIds.map((id) => `"${id}"`).join(",");
-    const url = `${this.base()}/rest/v1/push_subscriptions?select=user_id,endpoint,p256dh,auth&platform=eq.web&id=in.(${list})&limit=2000`;
+    const url = `${this.base()}/rest/v1/push_subscriptions?select=user_id,endpoint,p256dh,auth&platform=eq.web&user_id=in.(${list})&limit=2000`;
     const response = await fetch(url, { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
       throw new Error(`push subscription fetch failed with HTTP ${response.status}`);
@@ -269,22 +314,24 @@ export class SupabaseServer {
     // abort it (the client still diffs snapshots and the push loop reads the
     // delivered_at watermark only for successfully inserted alerts).
     let alertFailures = 0;
-    for (const alert of payload.alerts) {
+    if (payload.alerts.length) {
       try {
-        await this.insertAlert(alert);
+        await this.insertAlerts(payload.alerts);
       } catch (error) {
-        alertFailures += 1;
+        alertFailures = payload.alerts.length;
         console.warn?.(`avi watch engine: alert insert failed (${String(error)})`);
       }
     }
     return { alertFailures };
   }
 
-  async insertAlert(alert: SupabaseAlertBody): Promise<void> {
+  /** Inserts a batch of alerts in one PostgREST request. */
+  async insertAlerts(alerts: SupabaseAlertBody[]): Promise<void> {
+    if (!alerts.length) return;
     const response = await fetch(`${this.base()}/rest/v1/flight_alerts`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify(alert),
+      body: JSON.stringify(alerts),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {

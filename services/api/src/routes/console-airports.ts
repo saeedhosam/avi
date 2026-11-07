@@ -1,5 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
+import type { AppConfig } from "../config.js";
+import type { UsageTracker } from "../lib/usage.js";
 import type { ConsoleFlightProvider } from "../providers/console-flights.js";
 import {
   consoleAirportSearchResponseSchema,
@@ -12,10 +14,21 @@ const IATA_PATTERN = /^[A-Z]{3}$/;
 
 interface ConsoleAirportOptions {
   consoleFlights: ConsoleFlightProvider;
+  usage: UsageTracker;
+  config: AppConfig;
 }
 
 const fidsParams = z.object({ code: z.string().trim().min(3).max(3) });
 const searchQuery = z.object({ q: z.string().trim().min(2).max(64) });
+
+const PROVIDER_RATE_LIMIT = {
+  rateLimit: { max: 30, timeWindow: "1 minute" },
+} as const;
+
+const BUDGET_EXHAUSTED = {
+  error: "unit_budget_exhausted",
+  message: "Live flight updates are paused until the monthly data budget resets.",
+};
 
 /**
  * Console-shaped airport data: FIDS boards, daily route stats, and live
@@ -34,11 +47,16 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleFidsResponseSchema,
             400: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
+        config: PROVIDER_RATE_LIMIT,
       },
       async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send(BUDGET_EXHAUSTED);
+        }
         const code = request.params.code.trim().toUpperCase();
         if (!IATA_PATTERN.test(code)) {
           return reply.code(400).send({
@@ -48,6 +66,9 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
         }
         try {
           const outcome = await options.consoleFlights.lookupAirportFids(code);
+          if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
               error: "provider_unreachable",
@@ -79,11 +100,16 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleRoutesResponseSchema,
             400: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
+        config: PROVIDER_RATE_LIMIT,
       },
       async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send(BUDGET_EXHAUSTED);
+        }
         const code = request.params.code.trim().toUpperCase();
         if (!IATA_PATTERN.test(code)) {
           return reply.code(400).send({
@@ -93,6 +119,9 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
         }
         try {
           const outcome = await options.consoleFlights.lookupAirportRoutes(code);
+          if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_ROUTE);
+          }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
               error: "provider_unreachable",
@@ -124,11 +153,16 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleAirportSearchResponseSchema,
             400: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
+        config: PROVIDER_RATE_LIMIT,
       },
       async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send(BUDGET_EXHAUSTED);
+        }
         const q = request.query.q.trim();
         if (q.length < 2) {
           return reply.code(200).send({
@@ -139,6 +173,9 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
         }
         try {
           const outcome = await options.consoleFlights.searchAirports(q);
+          if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
               error: "provider_unreachable",

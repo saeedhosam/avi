@@ -1,5 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
+import type { AppConfig } from "../config.js";
+import type { UsageTracker } from "../lib/usage.js";
 import {
   errorResponseSchema,
   flightSearchResponseSchema,
@@ -11,6 +13,8 @@ import {
 
 interface FlightOptions {
   provider: AeroDataBoxProvider;
+  usage: UsageTracker;
+  config: AppConfig;
 }
 
 const flightQuery = z.object({
@@ -33,11 +37,21 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
         response: {
           200: flightSearchResponseSchema,
           400: errorResponseSchema,
+          429: errorResponseSchema,
           502: errorResponseSchema,
         },
       },
+      config: {
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      },
     },
     async (request, reply) => {
+      if (options.usage.overBudget) {
+        return reply.code(429).send({
+          error: "unit_budget_exhausted",
+          message: "Live flight updates are paused until the monthly data budget resets.",
+        });
+      }
       const cleaned = request.query.number
         .replace(/\s+/g, "")
         .replace(/-/g, "")
@@ -52,6 +66,9 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
 
       try {
         const result = await options.provider.searchFlight(cleaned);
+        if (result.meta.source === "live") {
+          options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+        }
         reply.header(
           "Cache-Control",
           "public, max-age=30, stale-while-revalidate=120",

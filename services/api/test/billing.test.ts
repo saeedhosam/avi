@@ -44,16 +44,21 @@ describe("upgrade-visibility flag (regression — polar previously reported fals
 });
 
 describe("Lemon Squeezy webhook signature", () => {
+  const now = String(Math.floor(Date.now() / 1000));
+
   it("accepts a valid timestamped signature", () => {
     expect(
-      verifyLemonSqueezySignature(SECRET, BODY, sign(`123.${BODY}`), "123"),
+      verifyLemonSqueezySignature(SECRET, BODY, sign(`${now}.${BODY}`), now),
     ).toBe(true);
   });
 
-  it("rejects a tampered body or forged secret", () => {
+  it("rejects a tampered body, forged secret, or stale timestamp", () => {
     expect(verifyLemonSqueezySignature(SECRET, BODY, sign("999.bad"), "999")).toBe(false);
-    expect(verifyLemonSqueezySignature("other", BODY, sign(`123.${BODY}`), "123")).toBe(false);
-    expect(verifyLemonSqueezySignature(SECRET, BODY, undefined, "123")).toBe(false);
+    expect(verifyLemonSqueezySignature("other", BODY, sign(`${now}.${BODY}`), now)).toBe(false);
+    expect(verifyLemonSqueezySignature(SECRET, BODY, undefined, now)).toBe(false);
+    expect(
+      verifyLemonSqueezySignature(SECRET, BODY, sign(`123.${BODY}`), "123"),
+    ).toBe(false);
   });
 });
 
@@ -142,13 +147,14 @@ describe("billing webhook route", () => {
     expect(patches).toHaveLength(0);
 
     // Signed request maps to plan=PRO and patches the profile.
+    const now = String(Math.floor(Date.now() / 1000));
     const signed = await app.inject({
       method: "POST",
       url: "/v1/webhooks/lemon-squeezy",
       headers: {
         "content-type": "application/json",
-        "x-signature-timestamp": "123",
-        "x-signature": sign(`123.${BODY}`),
+        "x-signature-timestamp": now,
+        "x-signature": sign(`${now}.${BODY}`),
       },
       payload: BODY,
     });

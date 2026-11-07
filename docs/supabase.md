@@ -23,6 +23,8 @@ Applied migrations:
 8. `watchlist_flight_date` - date-scoped watchlist entries
 9. `plans_and_watchlist_identity` - `profiles.plan` (backend-only writes), column-level client grants, date-scoped `flight_id` backfill
 10. `push_delivery` - `flight_alerts.delivered_at` watermark for the Web Push loop
+11. `server_owned_fields` - engine owns `watchlist_items.snapshot/status` and all alert writes; clients can only mark alerts read
+12. `billing_events` - provider event-id idempotency for webhooks
 
 ## Client boundary
 
@@ -40,8 +42,10 @@ User-owned:
 
 - `profiles` (plan tier, backend-written)
 - `watchlist_items` (PK `user_id, flight_id`; `flight_id` is date-scoped:
-  `<COMPACT>-<YYYY-MM-DD>`)
-- `flight_alerts` (engine-written, `delivered_at` push watermark)
+  `<COMPACT>-<YYYY-MM-DD>`); clients own membership/notes, the engine owns
+  `snapshot` and `status`
+- `flight_alerts` (engine-written, `delivered_at` push watermark); clients may
+  only read and mark read
 - `device_tokens`
 - `push_subscriptions`
 

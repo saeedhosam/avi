@@ -371,12 +371,13 @@ export class AeroDataBoxProvider {
       return { meta: { source: "error" }, summaries: [] };
     }
 
-    const summaries = [
-      ...(Array.isArray(payload.departures) ? payload.departures : []),
-      ...(Array.isArray(payload.arrivals) ? payload.arrivals : []),
-    ]
-      .map((dto) => mapFlight((dto as unknown as AeroFlightDto), true))
-      .filter((flight): flight is FlightSummary => flight !== null);
+    const departures = (Array.isArray(payload.departures) ? payload.departures : [])
+      .map((dto) => mapFlight(dto as unknown as AeroFlightDto, true));
+    const arrivals = (Array.isArray(payload.arrivals) ? payload.arrivals : [])
+      .map((dto) => mapFlight(dto as unknown as AeroFlightDto, false));
+    const summaries = [...departures, ...arrivals].filter(
+      (flight): flight is FlightSummary => flight !== null,
+    );
 
     this.cache.set(cacheKey, summaries, 60_000);
     return { meta: { source: "live" }, summaries };

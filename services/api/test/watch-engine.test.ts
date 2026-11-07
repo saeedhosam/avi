@@ -7,6 +7,7 @@ import {
   matchesJob,
   mergeSnapshot,
   snapshotDepartureMs,
+  snapshotFromRow,
   type WatchJob,
   type WatchSnapshot,
 } from "../src/engine/snapshot.js";
@@ -210,6 +211,15 @@ describe("evaluateDue ladder", () => {
     expect(evaluateDue(settled, now - 5 * MIN, now).due).toBe(false);
   });
 
+  it("stops polling a landed flight after the baggage grace window", () => {
+    const landed = baseSnapshot({
+      status: "LANDED",
+      baggageCarousel: "Carousel TBD",
+      landedAt: now - 3 * 60 * MIN,
+    });
+    expect(evaluateDue(landed, 0, now).due).toBe(false);
+  });
+
   it("never re-polls cancelled flights", () => {
     const cancelled = baseSnapshot({ status: "CANCELLED" });
     expect(evaluateDue(cancelled, 0, now).due).toBe(false);
@@ -238,6 +248,18 @@ describe("mergeSnapshot", () => {
     expect(merged.telemetry?.currentLatitude).toBe(46);
     expect(merged.telemetry?.progressPercent).toBeGreaterThan(0);
     expect(merged.telemetry?.etaMinutesRemaining).toBeGreaterThan(0);
+  });
+
+  it("rebuilds airports and schedule when the snapshot was pruned", () => {
+    const merged = mergeSnapshot(
+      { flightNumber: "BA 117", flightDate: "2026-11-08" },
+      baseSummary(),
+      1234,
+    );
+    expect(merged.origin?.code).toBe("JFK");
+    expect(merged.destination?.code).toBe("LHR");
+    expect(merged.departureTimeScheduled).toBe("18:30");
+    expect(merged.timeline).toEqual([]);
   });
 
   it("does not fabricate a live position when none is reported", () => {
@@ -306,15 +328,20 @@ describe("alertKey + matchesJob", () => {
     deltaMs: 0,
   };
 
-  it("deduplicates on flight + type + message", () => {
+  it("deduplicates per user on user + flight + type + message", () => {
     const draft = { type: "GATE_CHANGE" as const, title: "t", message: "m" };
-    expect(alertKey("BA 117", draft)).toBe("BA 117|GATE_CHANGE|m");
+    expect(alertKey("u1", "BA 117", draft)).toBe("u1|BA 117|GATE_CHANGE|m");
+    expect(alertKey("u2", "BA 117", draft)).not.toBe(alertKey("u1", "BA 117", draft));
   });
 
   it("matches supplier summary to the job flight number and operating date", () => {
     expect(matchesJob(baseSummary(), job)).toBe(true);
     expect(matchesJob(baseSummary({ flightNumber: "BA 118" }), job)).toBe(false);
     expect(matchesJob(baseSummary({ scheduledDeparture: "2026-11-09 18:30-05:00" }), job)).toBe(false);
+  });
+
+  it("accepts legacy rows without a flight date", () => {
+    expect(matchesJob(baseSummary(), { ...job, flightDate: null })).toBe(true);
   });
 });
 
@@ -323,6 +350,42 @@ describe("isWatchSnapshot", () => {
     expect(isWatchSnapshot(baseSnapshot())).toBe(true);
     expect(isWatchSnapshot({})).toBe(false);
     expect(isWatchSnapshot(null)).toBe(false);
+  });
+});
+
+describe("pruned snapshot recovery", () => {
+  const now = Date.parse("2026-11-07T00:00:00Z");
+
+  it("reconstructs engine identity from the watchlist row", () => {
+    const snapshot = snapshotFromRow({
+      user_id: "u1",
+      flight_id: "BA117-2026-11-08",
+      flight_number: "BA 117",
+      flight_date: "2026-11-08",
+      status: "SCHEDULED",
+      notes: "",
+      snapshot: null,
+    });
+    expect(snapshot.flightNumber).toBe("BA 117");
+    expect(snapshot.flightDate).toBe("2026-11-08");
+  });
+
+  it("does not poll a date-only row more than a week before departure", () => {
+    const decision = evaluateDue(
+      { flightNumber: "BA 117", flightDate: "2026-12-01" },
+      0,
+      now,
+    );
+    expect(decision.due).toBe(false);
+  });
+
+  it("schedules a recovery poll once the operating date is near", () => {
+    const decision = evaluateDue(
+      { flightNumber: "BA 117", flightDate: "2026-11-08" },
+      0,
+      now,
+    );
+    expect(decision.due).toBe(true);
   });
 });
 

@@ -42,6 +42,7 @@ const ConfigSchema = z.object({
     .transform((value) => !["false", "0", "no"].includes(value.trim().toLowerCase())),
   WATCH_ENGINE_FIDS_MIN_GROUP: z.coerce.number().int().min(2).max(32).default(2),
   AERODATABOX_UNITS_PER_FLIGHT: z.coerce.number().int().min(1).default(2),
+  AERODATABOX_UNITS_PER_ROUTE: z.coerce.number().int().min(1).default(6),
   UNIT_BUDGET_PER_MONTH: z.coerce.number().int().min(0).default(32_000),
   // ── Billing (Track M) ─────────────────────────────────────────────
   // "manual" = plans set by SQL; "lemon_squeezy"/"polar" = MoR webhooks assign

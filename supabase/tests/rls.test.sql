@@ -1,6 +1,6 @@
 begin;
 
-select plan(6);
+select plan(8);
 
 -- RLS must be enabled on every user-owned table.
 select is(
@@ -39,6 +39,18 @@ select is(
   (select relrowsecurity from pg_class where oid = 'public.push_subscriptions'::regclass),
   true,
   'push_subscriptions has RLS enabled'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.flight_alerts', 'INSERT'),
+  false,
+  'alerts are engine-owned (clients cannot insert)'
+);
+
+select is(
+  has_column_privilege('authenticated', 'public.flight_alerts', 'message', 'UPDATE'),
+  false,
+  'clients cannot rewrite alert content'
 );
 
 select * from finish();

@@ -100,7 +100,7 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
 
       webhookOnly.post(
         "/v1/webhooks/lemon-squeezy",
-      { schema: { hide: true, response: { 200: z.void(), 401: z.object({ error: z.string() }) } } },
+      { schema: { hide: true, response: { 200: z.void(), 400: z.object({ error: z.string() }), 401: z.object({ error: z.string() }), 500: z.object({ error: z.string() }) } } },
       async (request, reply) => {
         const raw = (request as RawBodyRequest).rawBody ?? (request as { body?: unknown }).body;
         const requestBody =
@@ -123,10 +123,27 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           return reply.code(401).send({ error: "invalid_signature" });
         }
 
-        const payload = (typeof requestBody === "string" ? JSON.parse(requestBody) : request.body ?? {}) as {
+        let payload: {
           meta?: { event_name?: string; custom_data?: { user_id?: string } };
-          data?: { attributes?: { user_email?: string } };
+          data?: { id?: string | number; attributes?: { user_email?: string } };
         };
+        try {
+          payload = (typeof requestBody === "string"
+            ? JSON.parse(requestBody)
+            : request.body ?? {}) as typeof payload;
+        } catch {
+          return reply.code(400).send({ error: "invalid_payload" });
+        }
+        const eventId =
+          typeof timestamp === "string" && typeof signature === "string"
+            ? `${payload.meta?.event_name ?? "event"}:${timestamp}:${signature}`
+            : payload.data?.id != null
+              ? `${payload.meta?.event_name ?? "event"}:${payload.data.id}`
+              : null;
+        if (eventId && (await supabaseServer.hasWebhookEvent("lemon_squeezy", eventId))) {
+          request.log.info({ eventId }, "billing webhook: duplicate delivery ignored");
+          return reply.code(200).send();
+        }
         const patch = planPatchFromWebhook(payload, config);
         if (!patch) {
           return reply.code(200).send();
@@ -142,12 +159,21 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
 
         const applied = await applyPlanPatch(uid, patch);
         if (!applied) {
-          return reply.code(200).send();
+          request.log.error({ event: payload.meta?.event_name }, "billing webhook: plan write failed");
+          // Non-2xx makes Lemon Squeezy retry the delivery.
+          return reply.code(500).send({ error: "plan_update_failed" });
         }
         request.log.info(
           { uid: uid.slice(0, 8), plan: patch.plan },
           "billing webhook updated plan",
         );
+        if (eventId) {
+          try {
+            await supabaseServer.recordWebhookEvent("lemon_squeezy", eventId);
+          } catch (recordError) {
+            request.log.warn({ err: recordError, eventId }, "billing webhook: event record failed");
+          }
+        }
         return reply.code(200).send();
         },
       );
@@ -168,7 +194,7 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
 
       hooked.post(
         "/v1/webhooks/polar",
-      { schema: { hide: true, response: { 200: z.void(), 401: z.object({ error: z.string() }) } } },
+      { schema: { hide: true, response: { 200: z.void(), 400: z.object({ error: z.string() }), 401: z.object({ error: z.string() }), 500: z.object({ error: z.string() }) } } },
       async (request, reply) => {
         const raw = (request as RawBodyRequest).rawBody ?? (request as { body?: unknown }).body;
         const requestBody =
@@ -181,7 +207,11 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           !verifyPolarSignature(
             config.POLAR_WEBHOOK_SECRET ?? "",
             requestBody,
-            request.headers["polar-webhook-signature"] as string | undefined,
+            {
+              id: request.headers["webhook-id"] as string | undefined,
+              timestamp: request.headers["webhook-timestamp"] as string | undefined,
+              signature: request.headers["webhook-signature"] as string | undefined,
+            },
           )
         ) {
           return reply.code(401).send({ error: "invalid_signature" });
@@ -191,6 +221,15 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
         try {
           payload = JSON.parse(requestBody) as unknown;
         } catch {
+          return reply.code(400).send({ error: "invalid_payload" });
+        }
+
+        const eventId =
+          typeof request.headers["webhook-id"] === "string"
+            ? request.headers["webhook-id"]
+            : null;
+        if (eventId && (await supabaseServer.hasWebhookEvent("polar", eventId))) {
+          request.log.info({ eventId }, "polar webhook: duplicate delivery ignored");
           return reply.code(200).send();
         }
 
@@ -216,12 +255,24 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
 
         const applied = await applyPlanPatch(uid, patch);
         if (!applied) {
-          return reply.code(200).send();
+          request.log.error(
+            { type: (payload as PolarWebhookEvent).type },
+            "polar webhook: plan write failed",
+          );
+          // Non-2xx makes Polar retry the delivery.
+          return reply.code(500).send({ error: "plan_update_failed" });
         }
         request.log.info(
           { uid: uid.slice(0, 8), plan: patch.plan, type: (payload as PolarWebhookEvent).type },
           "polar webhook updated plan",
         );
+        if (eventId) {
+          try {
+            await supabaseServer.recordWebhookEvent("polar", eventId);
+          } catch (recordError) {
+            request.log.warn({ err: recordError, eventId }, "polar webhook: event record failed");
+          }
+        }
         return reply.code(200).send();
         },
       );

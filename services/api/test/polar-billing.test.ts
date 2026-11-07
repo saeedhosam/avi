@@ -6,7 +6,25 @@ import {
 } from "../src/lib/billing.js";
 import { loadConfig } from "../src/config.js";
 
-const SECRET = "whsec_polar_test";
+// Standard Webhooks secret: whsec_<base64 key>.
+const SECRET_KEY = Buffer.from("0123456789abcdef0123456789abcdef");
+const SECRET = `whsec_${SECRET_KEY.toString("base64")}`;
+
+function signStandardWebhook(
+  body: string,
+  id = "msg_test_1",
+  timestamp = String(Math.floor(Date.now() / 1000)),
+) {
+  const signature = createHmac("sha256", SECRET_KEY)
+    .update(`${id}.${timestamp}.${body}`)
+    .digest("base64");
+  return {
+    id,
+    timestamp,
+    signature: `v1,${signature}`,
+  };
+}
+
 const BODY = JSON.stringify({
   type: "subscription.created",
   data: {
@@ -25,16 +43,36 @@ const polarConfig = loadConfig({
   POLAR_PRICE_PRO: "prd_pro_777,PRI_pro_year",
 });
 
-describe("Polar webhook signature", () => {
-  const good = createHmac("sha256", SECRET).update(BODY).digest("hex");
-
-  it("accepts valid signatures", () => {
-    expect(verifyPolarSignature(SECRET, BODY, good)).toBe(true);
+describe("Polar webhook signature (Standard Webhooks)", () => {
+  it("accepts valid webhook-id / webhook-timestamp / webhook-signature headers", () => {
+    expect(verifyPolarSignature(SECRET, BODY, signStandardWebhook(BODY))).toBe(true);
   });
 
-  it("rejects tampered payloads", () => {
-    expect(verifyPolarSignature(SECRET, BODY, "bogus")).toBe(false);
-    expect(verifyPolarSignature("other", BODY, good)).toBe(false);
+  it("rejects tampered payloads, wrong keys, and stale timestamps", () => {
+    expect(
+      verifyPolarSignature(SECRET, BODY, {
+        ...signStandardWebhook(BODY),
+        signature: "v1,AAAA",
+      }),
+    ).toBe(false);
+    expect(verifyPolarSignature("whsec_other", BODY, signStandardWebhook(BODY))).toBe(false);
+    expect(
+      verifyPolarSignature(
+        SECRET,
+        BODY,
+        signStandardWebhook(BODY, "msg_test_1", String(Math.floor(Date.now() / 1000) - 3600)),
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts multiple v1 signatures (rotation)", () => {
+    const signed = signStandardWebhook(BODY);
+    expect(
+      verifyPolarSignature(SECRET, BODY, {
+        ...signed,
+        signature: `v1,AAAA ${signed.signature}`,
+      }),
+    ).toBe(true);
   });
 });
 
@@ -149,13 +187,15 @@ describe("polar webhook route", () => {
     expect(unsigned.statusCode).toBe(401);
     expect(patches).toHaveLength(0);
 
-    const goodSig = createHmac("sha256", SECRET).update(BODY).digest("hex");
+    const signedHeaders = signStandardWebhook(BODY);
     const signed = await app.inject({
       method: "POST",
       url: "/v1/webhooks/polar",
       headers: {
         "content-type": "application/json",
-        "polar-webhook-signature": goodSig,
+        "webhook-id": signedHeaders.id,
+        "webhook-timestamp": signedHeaders.timestamp,
+        "webhook-signature": signedHeaders.signature,
       },
       payload: BODY,
     });

@@ -59,4 +59,21 @@ describe("flight routes", () => {
       meta: { source: "not_configured", cached: false },
     });
   });
+
+  it("pauses provider-backed routes when the unit budget is exhausted", async () => {
+    const exhausted = await buildApp(
+      loadConfig({
+        NODE_ENV: "test",
+        LOG_LEVEL: "silent",
+        UNIT_BUDGET_PER_MONTH: "0",
+      }),
+    );
+    const response = await exhausted.inject({
+      method: "GET",
+      url: "/v1/flights/search?number=BA117",
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().error).toBe("unit_budget_exhausted");
+    await exhausted.close();
+  });
 });

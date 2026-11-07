@@ -137,7 +137,7 @@ describe("watch engine FIDS consolidation", () => {
       if (url.includes("updated_at=lt.")) {
         return new Response(null, { status: 204 });
       }
-      if (url.includes("/rest/v1/flight_alerts?select=flight_number")) {
+      if (url.includes("/rest/v1/flight_alerts?select=user_id")) {
         return new Response(JSON.stringify([]), { status: 200 });
       }
       if (url.includes("/rest/v1/flight_alerts")) {
@@ -235,7 +235,7 @@ describe("watch engine FIDS consolidation", () => {
       if (url.includes("/rest/v1/watchlist_items?select=")) {
         return new Response(JSON.stringify(rows), { status: 200 });
       }
-      if (url.includes("/rest/v1/flight_alerts?select=flight_number")) {
+      if (url.includes("/rest/v1/flight_alerts?select=user_id")) {
         return new Response(JSON.stringify([]), { status: 200 });
       }
       if (url.includes("/rest/v1/flight_alerts")) {

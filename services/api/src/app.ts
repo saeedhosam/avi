@@ -87,9 +87,9 @@ export async function buildApp(config: AppConfig) {
 
   await app.register(healthRoutes);
   await app.register(statusRoutes, { config, provider, engine });
-  await app.register(flightRoutes, { provider });
-  await app.register(consoleFlightRoutes, { consoleFlights });
-  await app.register(consoleAirportRoutes, { consoleFlights });
+  await app.register(flightRoutes, { provider, usage, config });
+  await app.register(consoleFlightRoutes, { consoleFlights, usage, config });
+  await app.register(consoleAirportRoutes, { consoleFlights, usage, config });
   if (supabaseServer.ready) {
     await app.register(meRoutes, { supabaseServer, usage, billingProvider: config.BILLING_PROVIDER });
   }

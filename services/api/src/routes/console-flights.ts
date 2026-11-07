@@ -1,5 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
+import type { AppConfig } from "../config.js";
+import type { UsageTracker } from "../lib/usage.js";
 import { ProviderError } from "../providers/aerodatabox.js";
 import type { ConsoleFlightProvider } from "../providers/console-flights.js";
 import {
@@ -17,7 +19,13 @@ const lookupQuery = z.object({
 
 interface ConsoleFlightOptions {
   consoleFlights: ConsoleFlightProvider;
+  usage: UsageTracker;
+  config: AppConfig;
 }
+
+const PROVIDER_RATE_LIMIT = {
+  rateLimit: { max: 30, timeWindow: "1 minute" },
+} as const;
 
 /**
  * Console-shaped flight lookup — the endpoint the web app uses. Mirrors
@@ -35,11 +43,19 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
           response: {
             200: consoleSearchResponseSchema,
             400: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
+        config: PROVIDER_RATE_LIMIT,
       },
       async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send({
+            error: "unit_budget_exhausted",
+            message: "Live flight updates are paused until the monthly data budget resets.",
+          });
+        }
         const cleaned = request.query.number
           .replace(/\s+/g, "")
           .replace(/-/g, "")
@@ -61,6 +77,9 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
 
         try {
           const outcome = await options.consoleFlights.lookupFlight(cleaned, date || undefined);
+          if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          }
           // Fail honestly when the provider is down/invalid — the previous
           // web behavior hid outages as HTTP 200 with `flights: []`.
           if (outcome.mode === "ERROR" || (outcome.mode === "NOT_CONFIGURED" && outcome.status === 0)) {
