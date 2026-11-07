@@ -128,7 +128,7 @@ class AirportConnectionsRepository(context: Context) {
         stats: List<ConsoleRouteStat>
     ): List<DirectFlightConnection> {
         return stats.mapNotNull { route ->
-            val destNode = route.toDomainNode(origin) ?: return@mapNotNull null
+            val destNode = route.toDomainNode() ?: return@mapNotNull null
             if (destNode.iata.equals(origin.iata, ignoreCase = true)) return@mapNotNull null
 
             GlobalRouteCatalog.registerDynamicAirport(destNode)
@@ -1398,6 +1398,7 @@ object GlobalRouteCatalog {
         }
     }
 }
+
 private fun ConsoleAirportNode.toDomainNode(origin: AirportNode? = null): AirportNode? {
     if (iata.isBlank() || iata.length != 3) return null
     return AirportNode(

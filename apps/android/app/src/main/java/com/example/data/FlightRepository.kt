@@ -519,8 +519,6 @@ class FlightRepository(private val context: Context) {
             }
         }
     }
-        }
-    }
 
     private fun updateLiveTelemetry() {
         _flights.value = _flights.value.map { flight ->
