@@ -220,6 +220,18 @@ interface FlightDao {
     @Query("DELETE FROM tracked_flights")
     suspend fun clearAllTrackedFlights()
 
+    @Query("DELETE FROM favorite_flights")
+    suspend fun clearAllFavorites()
+
+    @Query("DELETE FROM flight_alerts")
+    suspend fun clearAllAlerts()
+
+    @Query("DELETE FROM cached_flights")
+    suspend fun clearAllCachedFlights()
+
+    @Query("DELETE FROM scheduled_notifications")
+    suspend fun clearAllScheduledNotifications()
+
     // Destination Airport Weather Forecast Cache
     @Query("SELECT * FROM destination_weather_cache WHERE airportCode = :airportCode")
     fun getDestinationWeather(airportCode: String): Flow<DestinationWeatherEntity?>

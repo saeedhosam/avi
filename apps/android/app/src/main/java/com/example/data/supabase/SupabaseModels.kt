@@ -137,6 +137,7 @@ data class CloudTimelineSnapshot(
 data class CloudFlightSnapshot(
     val id: String,
     val flightNumber: String,
+    val flightDate: String? = null,
     val airline: String = "",
     val airlineCode: String = "",
     val origin: CloudAirportSnapshot,

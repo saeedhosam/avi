@@ -2,7 +2,7 @@ package com.example.data
 
 import android.content.Context
 import android.util.Log
-import com.example.data.cloud.CloudAlert
+import com.example.BuildConfig
 import com.example.data.cloud.CloudPlanState
 import com.example.data.cloud.CloudTrackedFlight
 import com.example.data.cloud.CloudUserProfile
@@ -29,7 +29,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +42,15 @@ import java.util.Locale
 import java.util.UUID
 
 class FlightRepository(private val context: Context) {
+
+    /**
+     * Web and iOS snapshots carry fields this client may not know yet. Strict
+     * decoding used to drop every date-scoped snapshot; the server contract is
+     * additive, so unknown keys must be ignored.
+     */
+    private val cloudJson = Json {
+        ignoreUnknownKeys = true
+    }
 
     private val database = SkyTrackDatabase.getDatabase(context)
     private val flightDao = database.flightDao()
@@ -103,14 +111,6 @@ class FlightRepository(private val context: Context) {
         }
 
         setupSupabaseAuthObserver()
-
-        // Smooth geodesic interpolation for airborne flights between network polls
-        repositoryScope.launch {
-            while (true) {
-                delay(4000)
-                updateLiveTelemetry()
-            }
-        }
     }
 
     /**
@@ -314,7 +314,7 @@ class FlightRepository(private val context: Context) {
         val remoteFlights = remoteRows.mapNotNull { row ->
             row.snapshot?.let { snapshot ->
                 runCatching {
-                    Json.decodeFromJsonElement<CloudFlightSnapshot>(snapshot).toFlight()
+                    cloudJson.decodeFromJsonElement<CloudFlightSnapshot>(snapshot).toFlight()
                 }.getOrNull()
             }?.copy(
                 isFavorite = true,
@@ -326,7 +326,9 @@ class FlightRepository(private val context: Context) {
             val merged = _flights.value.toMutableList()
             remoteFlights.forEach { remote ->
                 val index = merged.indexOfFirst {
-                    it.id == remote.id || it.flightNumber.equals(remote.flightNumber, ignoreCase = true)
+                    it.flightDate == remote.flightDate &&
+                        (it.id == remote.id ||
+                            it.flightNumber.equals(remote.flightNumber, ignoreCase = true))
                 }
                 if (index >= 0) {
                     merged[index] = merged[index].copy(
@@ -536,36 +538,6 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    private fun updateLiveTelemetry() {
-        _flights.value = _flights.value.map { flight ->
-            if (flight.status == FlightStatus.DEPARTED) {
-                val currentProgress = flight.telemetry.progressPercent
-                val newProgress = if (currentProgress >= 0.99f) 0.99f else (currentProgress + 0.003f)
-                val newDistCovered = (flight.telemetry.distanceCoveredNm + 4)
-                val newDistRemaining = maxOf(0, flight.telemetry.distanceRemainingNm - 4)
-                val speedJitter = (-5..5).random()
-                val newSpeed = (flight.telemetry.groundSpeedKnots + speedJitter).coerceIn(480, 565)
-                val etaMinutes = maxOf(1, (newDistRemaining / (newSpeed / 60.0)).toInt())
-
-                val dLat = (flight.destination.latitude - flight.origin.latitude) * 0.003
-                val dLon = (flight.destination.longitude - flight.origin.longitude) * 0.003
-
-                val updatedTelemetry = flight.telemetry.copy(
-                    currentLatitude = flight.telemetry.currentLatitude + dLat,
-                    currentLongitude = flight.telemetry.currentLongitude + dLon,
-                    progressPercent = newProgress,
-                    groundSpeedKnots = newSpeed,
-                    distanceCoveredNm = newDistCovered,
-                    distanceRemainingNm = newDistRemaining,
-                    etaMinutesRemaining = etaMinutes
-                )
-                flight.copy(telemetry = updatedTelemetry)
-            } else {
-                flight
-            }
-        }
-    }
-
     /** Server plan-cap check: returns null when the add is allowed. */
     private fun planCapLimitReached(): String? {
         val limit = _planState.value.concurrentLimit
@@ -582,7 +554,9 @@ class FlightRepository(private val context: Context) {
     private fun setWatchlistState(flight: Flight, watchlisted: Boolean, notes: String = "") {
         val currentKey = flight.flightNumber
         _flights.value = _flights.value.map {
-            if (it.flightNumber.equals(currentKey, ignoreCase = true)) {
+            if (it.flightNumber.equals(currentKey, ignoreCase = true) &&
+                it.flightDate == flight.flightDate
+            ) {
                 it.copy(isFavorite = watchlisted, isTracked = watchlisted, customNotes = notes.ifBlank { it.customNotes })
             } else it
         }
@@ -634,18 +608,6 @@ class FlightRepository(private val context: Context) {
                         snapshot = flight.toCloudSnapshot().toJsonObject()
                     )
                 }
-                addAlert(
-                    FlightAlert(
-                        id = UUID.randomUUID().toString(),
-                        flightNumber = flight.flightNumber,
-                        type = AlertType.BOARDING,
-                        title = "Saved to Watchlist: ${flight.flightNumber}",
-                        message = "Live gate change, delay, and boarding-call alerts are active for ${flight.flightNumber}.",
-                        timestamp = "Just now",
-                        isRead = false
-                    ),
-                    triggerSystemPush = true
-                )
             } else {
                 unsubscribeFromFlightPush(flight.flightNumber)
                 flightDao.removeFavorite(flight.flightNumber)
@@ -665,33 +627,11 @@ class FlightRepository(private val context: Context) {
     }
 
     /** Watchlist toggle from the flight card. */
-    fun toggleFavorite(flightNumber: String, customNotes: String = "") {
-        val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) } ?: return
-        val willWatch = !flight.isWatchlisted
-        if (willWatch) {
-            planCapLimitReached()?.let { message ->
-                addAlert(
-                    FlightAlert(
-                        id = UUID.randomUUID().toString(),
-                        flightNumber = flightNumber,
-                        type = AlertType.DELAY,
-                        title = "Plan limit reached · $flightNumber",
-                        message = message,
-                        timestamp = "Just now",
-                        isRead = false
-                    ),
-                    triggerSystemPush = true
-                )
-                return
-            }
-        }
-        setWatchlistState(flight, willWatch, customNotes)
-    }
-
-    /** Date-aware watchlist toggle (used by Search / detail flows). */
-    fun toggleTrackFlight(flight: Flight, customNotes: String = "") {
-        val existing = _flights.value.find { it.flightNumber.equals(flight.flightNumber, ignoreCase = true) }
-            ?: flight
+    fun toggleFavorite(flight: Flight, customNotes: String = "") {
+        val existing = _flights.value.find {
+            it.flightNumber.equals(flight.flightNumber, ignoreCase = true) &&
+                it.flightDate == flight.flightDate
+        } ?: flight
         val willWatch = !existing.isWatchlisted
         if (willWatch) {
             planCapLimitReached()?.let { message ->
@@ -713,21 +653,55 @@ class FlightRepository(private val context: Context) {
         setWatchlistState(existing, willWatch, customNotes)
     }
 
-    fun updateFlightNotes(flightNumber: String, notes: String) {
+    /** Date-aware watchlist toggle (used by Search / detail flows). */
+    fun toggleTrackFlight(flight: Flight, customNotes: String = "") {
+        val existing = _flights.value.find {
+            it.flightNumber.equals(flight.flightNumber, ignoreCase = true) &&
+                it.flightDate == flight.flightDate
+        } ?: flight
+        val willWatch = !existing.isWatchlisted
+        if (willWatch) {
+            planCapLimitReached()?.let { message ->
+                addAlert(
+                    FlightAlert(
+                        id = UUID.randomUUID().toString(),
+                        flightNumber = flight.flightNumber,
+                        type = AlertType.DELAY,
+                        title = "Plan limit reached · ${flight.flightNumber}",
+                        message = message,
+                        timestamp = "Just now",
+                        isRead = false
+                    ),
+                    triggerSystemPush = true
+                )
+                return
+            }
+        }
+        setWatchlistState(existing, willWatch, customNotes)
+    }
+
+    fun updateFlightNotes(flightNumber: String, notes: String, flightDate: String? = null) {
         _flights.value = _flights.value.map {
-            if (it.flightNumber.equals(flightNumber, ignoreCase = true)) {
+            if (it.flightNumber.equals(flightNumber, ignoreCase = true) &&
+                (flightDate == null || it.flightDate == flightDate)
+            ) {
                 it.copy(customNotes = notes)
             } else it
         }
         repositoryScope.launch {
-            flightDao.addFavorite(
-                FavoriteFlightEntity(
-                    flightNumber = flightNumber,
-                    customNotes = notes
+            val flight = _flights.value.find {
+                it.flightNumber.equals(flightNumber, ignoreCase = true) &&
+                    (flightDate == null || it.flightDate == flightDate)
+            }
+            if (flight != null) {
+                flightDao.addFavorite(
+                    FavoriteFlightEntity(
+                        flightNumber = flightNumber,
+                        customNotes = notes
+                    )
                 )
-            )
+            }
             val userId = cloudRepository.currentUserId()
-            val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
             if (userId != null && flight != null) {
                 cloudRepository.saveWatchlistItem(
                     CloudTrackedFlight(
@@ -748,10 +722,15 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    fun deleteWatchlistItem(flightNumber: String) {
-        val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) }
+    fun deleteWatchlistItem(flightNumber: String, flightDate: String? = null) {
+        val flight = _flights.value.find {
+            it.flightNumber.equals(flightNumber, ignoreCase = true) &&
+                (flightDate == null || it.flightDate == flightDate)
+        }
         _flights.value = _flights.value.map {
-            if (it.flightNumber.equals(flightNumber, ignoreCase = true)) {
+            if (it.flightNumber.equals(flightNumber, ignoreCase = true) &&
+                (flightDate == null || it.flightDate == flightDate)
+            ) {
                 it.copy(isFavorite = false, isTracked = false)
             } else it
         }
@@ -823,20 +802,8 @@ class FlightRepository(private val context: Context) {
                     isRead = alert.isRead
                 )
             )
-            val userId = cloudRepository.currentUserId()
-            if (userId != null) {
-                cloudRepository.saveAlert(
-                    CloudAlert(
-                        id = alert.id,
-                        userId = userId ?: "",
-                        flightNumber = alert.flightNumber,
-                        alertType = alert.type.name,
-                        title = alert.title,
-                        message = alert.message,
-                        isRead = alert.isRead
-                    )
-                )
-            }
+            // Cloud alerts are engine-owned. Writing client-generated alerts
+            // here duplicated them and made them eligible for a second push.
         }
 
         if (triggerSystemPush) {
@@ -872,8 +839,9 @@ class FlightRepository(private val context: Context) {
         }
     }
 
-    // Diagnostic Trigger: Test real-time alert notification pipeline
+    // Diagnostic Trigger: test real-time alert notification pipeline (debug only)
     fun simulateRealtimeEvent(flightNumber: String, eventType: AlertType) {
+        if (!BuildConfig.DEBUG) return
         val flight = _flights.value.find { it.flightNumber.equals(flightNumber, ignoreCase = true) } ?: return
 
         when (eventType) {
@@ -1042,6 +1010,27 @@ class FlightRepository(private val context: Context) {
 
     fun updateAccount(account: UserAccount) {
         _userAccount.value = account
+    }
+
+    /**
+     * Signs out of Supabase and removes the user's local cache from this
+     * device so a shared phone does not expose the previous account's
+     * watchlist, notes, or alerts.
+     */
+    fun signOut() {
+        repositoryScope.launch {
+            runCatching { cloudRepository.signOut() }
+            flightDao.clearAllFavorites()
+            flightDao.clearAllTrackedFlights()
+            flightDao.clearAllAlerts()
+            flightDao.clearAllCachedFlights()
+            flightDao.clearAllScheduledNotifications()
+            flightDao.clearRecentSearches()
+            _flights.value = emptyList()
+            _alerts.value = emptyList()
+            _planState.value = CloudPlanState()
+            setGuestAccount()
+        }
     }
 
     fun toggleOfflineMode() {

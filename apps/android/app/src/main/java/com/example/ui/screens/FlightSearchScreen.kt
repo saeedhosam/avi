@@ -843,7 +843,7 @@ fun FlightSearchScreen(
                             viewModel.recordRecentSearch(flight)
                             onFlightSelected(flight)
                         },
-                        onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) }
+                        onToggleFavorite = { viewModel.toggleFavorite(flight) }
                     )
                 }
             }

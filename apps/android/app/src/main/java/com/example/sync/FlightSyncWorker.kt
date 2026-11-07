@@ -124,13 +124,6 @@ class FlightSyncWorker(
                     }
                 }
 
-                // Update telemetry progress for airborne flights
-                val progress = if (flight.status == FlightStatus.DEPARTED) {
-                    (flight.telemetry.progressPercent + 0.02f).coerceAtMost(0.99f)
-                } else {
-                    flight.telemetry.progressPercent
-                }
-
                 CachedFlightEntity(
                     id = flight.id,
                     flightNumber = flight.flightNumber,
@@ -161,7 +154,7 @@ class FlightSyncWorker(
                     altitudeFeet = flight.telemetry.altitudeFeet,
                     groundSpeedKnots = flight.telemetry.groundSpeedKnots,
                     headingDegrees = flight.telemetry.headingDegrees,
-                    progressPercent = progress,
+                    progressPercent = flight.telemetry.progressPercent,
                     isFavorite = isFav,
                     customNotes = note,
                     cachedTimestamp = System.currentTimeMillis()

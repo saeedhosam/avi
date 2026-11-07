@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.AlertType
 import com.example.model.Flight
 import com.example.ui.components.FlightCard
 import com.example.ui.theme.*
@@ -140,10 +139,10 @@ fun FavoritesScreen(
                         FlightCard(
                             flight = flight,
                             onClick = { onFlightSelected(flight) },
-                            onToggleFavorite = { viewModel.toggleFavorite(flight.flightNumber) }
+                            onToggleFavorite = { viewModel.toggleFavorite(flight) }
                         )
 
-                        // Scrollable single-line quick trigger simulation bar under each favorite card
+                        // Quick actions under each favorite card
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -152,38 +151,6 @@ fun FavoritesScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Test Alerts:",
-                                color = TextSubtle,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            SuggestionChip(
-                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.GATE_CHANGE) },
-                                label = { Text("Gate", fontSize = 10.sp, maxLines = 1) },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = InstrumentSurface,
-                                    labelColor = RadarCyan
-                                )
-                            )
-                            SuggestionChip(
-                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.DELAY) },
-                                label = { Text("Delay", fontSize = 10.sp, maxLines = 1) },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = InstrumentSurface,
-                                    labelColor = StatusDelayed
-                                )
-                            )
-                            SuggestionChip(
-                                onClick = { viewModel.simulateAlert(flight.flightNumber, AlertType.BOARDING) },
-                                label = { Text("Boarding", fontSize = 10.sp, maxLines = 1) },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = InstrumentSurface,
-                                    labelColor = StatusBoarding
-                                )
-                            )
                             SuggestionChip(
                                 onClick = { flightToShare = flight },
                                 label = { Text("Share", fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1) },

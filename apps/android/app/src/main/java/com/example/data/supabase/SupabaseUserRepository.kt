@@ -8,7 +8,6 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.json.JsonObject
-import java.util.UUID
 
 class SupabaseUserRepository {
 
@@ -103,25 +102,6 @@ class SupabaseUserRepository {
                 filter { eq("user_id", uid) }
             }
             .decodeList<WatchlistItemRow>()
-    }
-
-    suspend fun saveAlert(alert: CloudAlert): Result<String> = runCatching {
-        val uid = requireUserId()
-        val alertId = alert.id.ifBlank { UUID.randomUUID().toString() }
-        SupabaseClientProvider.client.from("flight_alerts").upsert(
-            AlertUpsert(
-                id = alertId,
-                userId = uid,
-                flightNumber = alert.flightNumber.take(20),
-                alertType = alert.alertType,
-                title = alert.title.take(200),
-                message = alert.message.take(1000),
-                isRead = alert.isRead
-            )
-        ) {
-            onConflict = "id"
-        }
-        alertId
     }
 
     suspend fun markAlertRead(alertId: String): Result<Unit> = runCatching {

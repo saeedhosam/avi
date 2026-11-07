@@ -217,12 +217,12 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         _selectedFlightId.value = id
     }
 
-    fun toggleFavorite(flightNumber: String, customNotes: String = "") {
-        repository.toggleFavorite(flightNumber, customNotes)
+    fun toggleFavorite(flight: Flight, customNotes: String = "") {
+        repository.toggleFavorite(flight, customNotes)
     }
 
-    fun updateNotes(flightNumber: String, notes: String) {
-        repository.updateFlightNotes(flightNumber, notes)
+    fun updateNotes(flightNumber: String, notes: String, flightDate: String? = null) {
+        repository.updateFlightNotes(flightNumber, notes, flightDate)
     }
 
     fun recordRecentSearch(flight: Flight) {
@@ -299,19 +299,6 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val res = com.example.util.GoogleAuthManager.signInWithGoogle(activity)
             if (res.isSuccess) {
-                val userName = res.getOrNull() ?: "Google Aviator"
-                repository.addAlert(
-                    FlightAlert(
-                        id = java.util.UUID.randomUUID().toString(),
-                        flightNumber = "ACCOUNT",
-                        type = AlertType.BOARDING,
-                        title = "Google Sign-In Connected",
-                        message = "Welcome aboard, $userName. Your tracked flights and alerts are now backed by Supabase.",
-                        timestamp = "Just now",
-                        isRead = false
-                    ),
-                    triggerSystemPush = true
-                )
                 onResult(true, null)
             } else {
                 val errorMsg = res.exceptionOrNull()?.message ?: "Google Sign-In cancelled or failed"
@@ -321,26 +308,12 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun signInWithOAuth(provider: String = "Google Aviation SSO") {
-        viewModelScope.launch {
-            repository.addAlert(
-                FlightAlert(
-                    id = java.util.UUID.randomUUID().toString(),
-                    flightNumber = "ACCOUNT",
-                    type = AlertType.BOARDING,
-                    title = "OAuth Login Prompt",
-                    message = "Please tap 'Sign in with Google' to authenticate with Supabase.",
-                    timestamp = "Just now",
-                    isRead = false
-                ),
-                triggerSystemPush = false
-            )
-        }
+        // The account dialog initiates Credential Manager directly; alerts are
+        // now server-owned, so there is nothing to write here.
     }
 
     fun signOut() {
-        viewModelScope.launch {
-            com.example.util.GoogleAuthManager.signOut()
-        }
+        repository.signOut()
     }
 
     fun setThemeMode(mode: ThemeMode) {

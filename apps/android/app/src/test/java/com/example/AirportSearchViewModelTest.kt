@@ -25,7 +25,10 @@ class AirportSearchViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        repository = RealtimeAirportRepository(testDispatcher)
+        repository = RealtimeAirportRepository(
+            ioDispatcher = testDispatcher,
+            enableLiveNetwork = false,
+        )
         viewModel = AirportSearchViewModel(repository, simulateNetworkDelay = false)
     }
 

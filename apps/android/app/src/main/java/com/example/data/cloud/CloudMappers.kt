@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonObject
 
 fun CloudFlightSnapshot.toFlight(): Flight = Flight(
     id = id,
+    flightDate = flightDate,
     flightNumber = flightNumber,
     airline = airline,
     airlineCode = airlineCode,
@@ -79,6 +80,7 @@ fun CloudFlightSnapshot.toFlight(): Flight = Flight(
 fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
     id = id,
     flightNumber = flightNumber,
+    flightDate = flightDate,
     airline = airline,
     airlineCode = airlineCode,
     origin = CloudAirportSnapshot(

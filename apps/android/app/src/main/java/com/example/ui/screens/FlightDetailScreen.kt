@@ -138,7 +138,7 @@ fun FlightDetailScreen(
 
                     // Unified watchlist button
                     IconButton(
-                        onClick = { viewModel.toggleFavorite(flight.flightNumber) },
+                        onClick = { viewModel.toggleFavorite(flight) },
                         modifier = Modifier.testTag("flight_detail_watchlist_btn")
                     ) {
                         Icon(
@@ -435,7 +435,7 @@ fun FlightDetailScreen(
                             if (flight.isFavorite) RadarCyan.copy(alpha = 0.6f) else InstrumentBorder,
                             RoundedCornerShape(14.dp)
                         )
-                        .clickable { viewModel.toggleFavorite(flight.flightNumber) }
+                        .clickable { viewModel.toggleFavorite(flight) }
                         .testTag("flight_detail_watchlist_card"),
                     color = if (flight.isFavorite) RadarCyan.copy(alpha = 0.12f) else InstrumentSurface
                 ) {
@@ -481,7 +481,7 @@ fun FlightDetailScreen(
 
                         Switch(
                             checked = flight.isFavorite,
-                            onCheckedChange = { viewModel.toggleFavorite(flight.flightNumber) },
+                            onCheckedChange = { viewModel.toggleFavorite(flight) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = DeepSpace,
                                 checkedTrackColor = RadarCyan,
@@ -629,7 +629,7 @@ fun FlightDetailScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.updateNotes(flight.flightNumber, customNoteText)
+                        viewModel.updateNotes(flight.flightNumber, customNoteText, flight.flightDate)
                         showNoteDialog = false
                     }
                 ) {

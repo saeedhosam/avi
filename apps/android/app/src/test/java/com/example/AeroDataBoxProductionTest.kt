@@ -136,10 +136,10 @@ class AeroDataBoxProductionTest {
     }
 
     @Test
-    fun `ApiConfig rejects default placeholder keys and accepts real AeroDataBox keys`() {
-        assertFalse(ApiConfig.hasValidAeroDataBoxKey(""))
-        assertFalse(ApiConfig.hasValidAeroDataBoxKey("DEFAULT_AERODATABOX_KEY"))
-        assertFalse(ApiConfig.hasValidAeroDataBoxKey("YOUR_AERODATABOX_KEY"))
-        assertTrue(ApiConfig.hasValidAeroDataBoxKey("a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"))
+    fun `ApiConfig reports gateway readiness instead of on-device provider keys`() {
+        // Android no longer holds a provider key; the gateway is authoritative.
+        assertTrue(ApiConfig.isGatewayConfigured)
+        assertTrue(ApiConfig.hasValidAeroDataBoxKey(""))
+        assertTrue(ApiConfig.hasValidAeroDataBoxKey("DEFAULT_AERODATABOX_KEY"))
     }
 }
