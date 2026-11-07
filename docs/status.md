@@ -1,6 +1,23 @@
 # Avi status
 
-Updated: 2026-11-05
+Updated: 2026-11-07
+
+## Corrective pass (2026-11-07)
+
+- Polar webhooks now verify the Standard Webhooks headers/signature and use
+  `external_customer_id` for identity; plan writes retry on failure.
+- Web Push subscriptions are queried by `user_id` (the previous query used the
+  subscription id, so nothing was ever delivered).
+- Alert dedup is per user, so every watcher of a flight receives changes.
+- Purged snapshots are recoverable from `flight_number`/`flight_date`; no
+  long-lead watchlist entry is permanently stranded.
+- Web merges engine snapshots into existing flights and reconciles removals.
+- Android decodes additive snapshots (`ignoreUnknownKeys`) and keeps
+  `flightDate`; fabricated telemetry and synthetic cloud alerts were removed.
+- The web no longer falls back to a second provider key in production.
+- Server-owned fields are protected: clients cannot rewrite snapshots/status or
+  insert alerts; they can still edit notes and mark alerts read.
+- Provider-backed routes are rate-limited and share the monthly unit budget.
 
 ## Working now
 

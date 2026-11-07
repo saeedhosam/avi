@@ -31,7 +31,9 @@ Everything split between "code" and "your side" for going live at
    products (Plus $4.99/mo, Pro $9.99/mo, optionally yearly prices), set the
    webhook to `https://api.codestep.org/v1/webhooks/polar` (copy its secret;
    events: order.created, subscription.created/updated/active/canceled/revoked),
-   and create an API key. Then add these secrets:
+   and create an API key. Polar signs with Standard Webhooks
+   (`webhook-id`/`webhook-timestamp`/`webhook-signature`); use the full
+   `whsec_…` value as `POLAR_WEBHOOK_SECRET`. Then add these secrets:
    - `BILLING_PROVIDER=polar`
    - `POLAR_API_KEY`, `POLAR_WEBHOOK_SECRET`
    - `POLAR_PRICE_PLUS`, `POLAR_PRICE_PRO`

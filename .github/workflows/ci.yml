@@ -66,4 +66,7 @@ jobs:
       - name: Assemble debug
         working-directory: apps/android
         run: gradle :app:assembleDebug --no-daemon
+      - name: Unit tests
+        working-directory: apps/android
+        run: gradle :app:testDebugUnitTest --no-daemon
 
