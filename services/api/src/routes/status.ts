@@ -53,7 +53,10 @@ const statusResponse = z.object({
 type StatusPayload = z.infer<typeof statusResponse>;
 
 /** Best-effort worker stats; cached briefly so the gateway never hammers it. */
-async function fetchRemoteEngineStats(config: AppConfig): Promise<EngineStats | null> {
+async function fetchRemoteEngineStats(
+  log: { info: (msg: string) => void },
+  config: AppConfig,
+): Promise<EngineStats | null> {
   const base = config.ENGINE_API_BASE_URL?.trim().replace(/\/+$/, "");
   if (!base) return null;
   try {
@@ -62,10 +65,15 @@ async function fetchRemoteEngineStats(config: AppConfig): Promise<EngineStats | 
       cache: "no-store",
       signal: AbortSignal.timeout(2_000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      log.info(`engine stats probe failed: HTTP ${response.status}`);
+      return null;
+    }
     const payload = (await response.json()) as Partial<StatusPayload>;
+    log.info(`engine stats probe ok: ${payload.watchEngine ? "stats" : "null"}`);
     return payload.watchEngine ?? null;
-  } catch {
+  } catch (error) {
+    log.info(`engine stats probe error: ${String(error)}`);
     return null;
   }
 }
@@ -86,7 +94,10 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
     },
     async () => {
       if (!cached || Date.now() - cached.at > 5_000) {
-        cached = { value: await fetchRemoteEngineStats(options.config), at: Date.now() };
+        cached = {
+          value: await fetchRemoteEngineStats(app.log, options.config),
+          at: Date.now(),
+        };
       }
       const workerStats = options.engine ? options.engine.stats() : cached?.value ?? null;
 
