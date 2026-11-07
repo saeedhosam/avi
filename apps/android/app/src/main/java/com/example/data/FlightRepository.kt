@@ -114,7 +114,7 @@ class FlightRepository(private val context: Context) {
     }
 
     /**
-     * Queries the live AeroDataBox API for a flight number (e.g., "AA100", "BA 178")
+     * Queries the gateway for a flight number (e.g., "AA100", "BA 178")
      * when a valid API key is present and the app is online. Results are merged into
      * the Room Single Source of Truth cache and diffed for real-time status alerts.
      */
@@ -144,7 +144,7 @@ class FlightRepository(private val context: Context) {
                     emptyList()
                 }
                 response.isSuccessful -> {
-                    _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                    _dataSourceMode.value = DataSourceMode.LIVE_DATA
                     val mappedFlights = response.body()?.flights.orEmpty().mapNotNull { it.toDomainFlight() }
                     if (mappedFlights.isNotEmpty()) {
                         mergeAndCacheLiveFlights(mappedFlights)
@@ -162,7 +162,7 @@ class FlightRepository(private val context: Context) {
     }
 
     /**
-     * Queries the live AeroDataBox Airport FIDS endpoint (`/flights/airports/iata/{code}`)
+     * Queries the gateway airport FIDS endpoint (`/v1/airports/{code}/flights`)
      * for departures and arrivals at the selected airport hub.
      */
     suspend fun fetchLiveAirportBoard(airportCode: String): List<Flight> = withContext(Dispatchers.IO) {
@@ -188,7 +188,7 @@ class FlightRepository(private val context: Context) {
                     emptyList()
                 }
                 response.isSuccessful -> {
-                    _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                    _dataSourceMode.value = DataSourceMode.LIVE_DATA
                     val mappedFlights = response.body()?.flights.orEmpty().mapNotNull { it.toDomainFlight() }
                     if (mappedFlights.isNotEmpty()) {
                         mergeAndCacheLiveFlights(mappedFlights)

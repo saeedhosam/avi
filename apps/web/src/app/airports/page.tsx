@@ -192,7 +192,6 @@ export default function AirportsPage() {
     void loadBoard();
   }, [loadBoard]);
 
-  // Live airport search via AeroDataBox; falls back to the reference list when empty.
   useEffect(() => {
     const query = explorerQuery.trim();
     if (query.length < 2) {
@@ -634,7 +633,7 @@ export default function AirportsPage() {
               <div className="flex items-center gap-1.5">
                 <span className="flex items-center gap-1.5 rounded-lg border border-landed/35 bg-landed/10 px-2 py-1.5 text-[9px] font-bold text-landed">
                   <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                  LIVE OPEN-METEO
+                  LIVE WEATHER
                 </span>
                 <span className="text-[9px] text-subtle">
                   {searchLoading ? "Searching…" : `${explorerResults.length} airports`}

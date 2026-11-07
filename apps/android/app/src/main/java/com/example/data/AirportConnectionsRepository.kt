@@ -99,7 +99,7 @@ class AirportConnectionsRepository(context: Context) {
                     buildSummary(originNode, merged)
                 }
                 response.isSuccessful && !response.body()?.routes.isNullOrEmpty() -> {
-                    _routeDataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                    _routeDataSourceMode.value = DataSourceMode.LIVE_DATA
                     val liveRoutes = mapLiveRoutes(originNode, response.body()!!.routes.orEmpty())
                     if (liveRoutes.isNotEmpty()) {
                         cacheRoutesInRoom(liveRoutes)

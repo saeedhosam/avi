@@ -80,7 +80,7 @@ function toAccount(user: User): UserAccount {
       (user.user_metadata?.avatar_url as string | undefined) ?? null,
     isSignedIn: true,
     isOfflineMode: false,
-    lastSyncTime: "Cloud Sync Active (Supabase)",
+    lastSyncTime: "Cloud Sync Active",
     uid: user.id,
     provider: "Google",
   };

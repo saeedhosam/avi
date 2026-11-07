@@ -21,7 +21,7 @@ interface GatewayApiService {
 
     /**
      * Live flight lookup by number; optional ISO operating date for date-scoped
-     * results. Response mode mirrors the web: LIVE_AERODATABOX, QUOTA_FALLBACK,
+     * results. Response mode mirrors the web: LIVE_DATA, QUOTA_FALLBACK,
      * NOT_CONFIGURED, or ERROR.
      */
     @retrofit2.http.GET("v1/flights/lookup")

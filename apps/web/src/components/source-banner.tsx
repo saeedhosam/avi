@@ -112,16 +112,6 @@ export function SourceBanner({ className }: { className?: string }) {
               Data sources
             </p>
             <p className="text-[9px] leading-relaxed text-subtle">
-              Flight data by{" "}
-              <a
-                href="https://www.aerodatabox.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2 hover:text-accent"
-              >
-                AeroDataBox
-              </a>
-              .{" "}
               <a
                 href="https://open-meteo.com/"
                 target="_blank"

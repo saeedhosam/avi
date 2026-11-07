@@ -122,7 +122,7 @@ export function DestinationWeatherCard({
                 : "border-landed/30 bg-landed/10 text-landed",
             )}
           >
-            {forecast.isEstimated ? "ESTIMATED · NOT LIVE" : "LIVE OPEN-METEO"}
+            {forecast.isEstimated ? "ESTIMATED · NOT LIVE" : "LIVE WEATHER"}
           </span>
           <span
             className="rounded-md border px-1.5 py-1 text-[8px] font-bold"
@@ -428,7 +428,7 @@ export function AirportWeatherCard({
               failed ? "bg-delayed" : "animate-pulse-dot bg-landed",
             )}
           />
-          {loading ? "FETCHING LIVE WEATHER" : failed ? "WEATHER UNAVAILABLE" : "LIVE OPEN-METEO"}
+          {loading ? "FETCHING LIVE WEATHER" : failed ? "WEATHER UNAVAILABLE" : "LIVE WEATHER"}
         </span>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">

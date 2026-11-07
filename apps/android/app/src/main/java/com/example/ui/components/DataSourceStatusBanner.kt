@@ -34,14 +34,14 @@ fun DataSourceStatusBanner(
     var showDetailsDialog by remember { mutableStateOf(false) }
 
     val accentColor: Color = when (mode) {
-        DataSourceMode.LIVE_AERODATABOX -> StatusLanded
+        DataSourceMode.LIVE_DATA -> StatusLanded
         DataSourceMode.OFFLINE_ROOM_CACHE -> RadarCyan
         DataSourceMode.QUOTA_FALLBACK -> StatusDelayed
         DataSourceMode.DEMO_CACHE_NO_KEY -> StatusDelayed
     }
 
     val compactStatusSummary = when (mode) {
-        DataSourceMode.LIVE_AERODATABOX -> "Live Flights, FIDS & Weather"
+        DataSourceMode.LIVE_DATA -> "Live Flights, FIDS & Weather"
         DataSourceMode.OFFLINE_ROOM_CACHE -> "Offline SQLite Cache Active"
         DataSourceMode.QUOTA_FALLBACK -> "Room Cache + Live Weather"
         DataSourceMode.DEMO_CACHE_NO_KEY -> "Cached Flights + Live Weather"

@@ -507,7 +507,7 @@ class RealtimeAirportRepository(
             }
 
             if (searchResponse.isSuccessful && searchResponse.body()?.airports?.isNotEmpty() == true) {
-                _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
+                _dataSourceMode.value = DataSourceMode.LIVE_DATA
                 val mapped = searchResponse.body()!!.airports.orEmpty().mapNotNull { node ->
                     val base = allAirports.find { it.code.equals(node.iata, ignoreCase = true) }
                     val info = node.toRealtimeInfo(base)

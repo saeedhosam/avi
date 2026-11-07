@@ -11,7 +11,7 @@ enum class DataSourceMode(
     val subtitle: String,
     val isLiveAviation: Boolean
 ) {
-    LIVE_AERODATABOX(
+    LIVE_DATA(
         badgeLabel = "LIVE DATA + METEO",
         title = "Live flight data & Open-Meteo connected",
         subtitle = "Streaming real-time global flights, airport boards, delay indexes, and live destination weather through the Avi gateway.",
@@ -69,23 +69,6 @@ object ApiConfig {
     )
 
     /**
-     * Legacy direct-provider config. The Android app no longer calls
-     * AeroDataBox directly (all traffic flows through the Avi gateway), so
-     * these default to blank rather than reading removed BuildConfig fields.
-     */
-    val aeroDataBoxApiKey: String
-        get() = ""
-
-    val aeroDataBoxApiHost: String
-        get() = "api.aerodatabox.com"
-
-    val usesRapidApiGateway: Boolean
-        get() = false
-
-    val aeroDataBoxBaseUrl: String
-        get() = "https://api.aerodatabox.com/"
-
-    /**
      * Checks whether a real, non-placeholder AeroDataBox API key is available.
      */
     fun hasValidAeroDataBoxKey(keyOverride: String? = null): Boolean {
@@ -99,7 +82,7 @@ object ApiConfig {
     fun resolveInitialMode(isOffline: Boolean): DataSourceMode {
         return when {
             isOffline -> DataSourceMode.OFFLINE_ROOM_CACHE
-            isGatewayConfigured -> DataSourceMode.LIVE_AERODATABOX
+            isGatewayConfigured -> DataSourceMode.LIVE_DATA
             else -> DataSourceMode.DEMO_CACHE_NO_KEY
         }
     }
