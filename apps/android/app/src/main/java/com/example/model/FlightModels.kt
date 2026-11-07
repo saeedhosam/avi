@@ -46,6 +46,10 @@ data class AircraftInfo(
     val seatLayout: String = "3-Class (Business, Premium, Economy)"
 )
 
+// Single unified watchlist concept: any favorite is tracked too, so both
+// legacy flags mirror one membership (web's `isWatchlisted`).
+val Flight.isWatchlisted: Boolean get() = isTracked || isFavorite
+
 data class Waypoint(
     val name: String,
     val latitude: Double,

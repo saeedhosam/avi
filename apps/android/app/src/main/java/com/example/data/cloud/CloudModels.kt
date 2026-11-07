@@ -43,3 +43,11 @@ data class CloudAlert(
     val isRead: Boolean = false,
     val timestamp: String = ""
 )
+
+/** Plan tier + concurrent-tracked limit, mirroring the gateway's engine limits. */
+data class CloudPlanState(
+    val plan: String = "FREE",
+    val concurrentLimit: Int = 3
+) {
+    val isFree: Boolean get() = plan.toUpperCase() == "FREE"
+}

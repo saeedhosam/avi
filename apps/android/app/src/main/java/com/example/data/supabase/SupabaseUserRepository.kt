@@ -79,6 +79,22 @@ class SupabaseUserRepository {
         Unit
     }
 
+    /** Reads the user's plan tier from profiles (backend-managed column). */
+    suspend fun fetchPlan(): Result<CloudPlanState> = runCatching {
+        val uid = requireUserId()
+        val row = SupabaseClientProvider.client.from("profiles")
+            .select {
+                filter { eq("id", uid) }
+            }
+            .decodeSingle<ProfileRow>()
+        val limit = when (row.plan.uppercase()) {
+            "PRO" -> 50
+            "PLUS" -> 15
+            else -> 3
+        }
+        CloudPlanState(plan = row.plan.uppercase(), concurrentLimit = limit)
+    }
+
     suspend fun fetchWatchlistItems(): Result<List<WatchlistItemRow>> = runCatching {
         val uid = requireUserId()
         SupabaseClientProvider.client.from("watchlist_items")

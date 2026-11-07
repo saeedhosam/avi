@@ -12,9 +12,9 @@ enum class DataSourceMode(
     val isLiveAviation: Boolean
 ) {
     LIVE_AERODATABOX(
-        badgeLabel = "LIVE AERODATABOX + METEO",
-        title = "Live AeroDataBox & Open-Meteo Connected",
-        subtitle = "Streaming real-time global flights, airport FIDS boards, delay indexes, and live destination weather.",
+        badgeLabel = "LIVE DATA + METEO",
+        title = "Live flight data & Open-Meteo connected",
+        subtitle = "Streaming real-time global flights, airport boards, delay indexes, and live destination weather through the Avi gateway.",
         isLiveAviation = true
     ),
     OFFLINE_ROOM_CACHE(
@@ -25,14 +25,14 @@ enum class DataSourceMode(
     ),
     QUOTA_FALLBACK(
         badgeLabel = "RATE LIMIT · CACHE ACTIVE",
-        title = "AeroDataBox Quota Reached (HTTP 429)",
-        subtitle = "Serving cached flights from Room SQLite + live Open-Meteo destination weather until the AeroDataBox quota resets.",
+        title = "Live updates paused (quota)",
+        subtitle = "Serving saved flights from the local cache + live Open-Meteo destination weather until the live-data quota resets.",
         isLiveAviation = false
     ),
     DEMO_CACHE_NO_KEY(
-        badgeLabel = "ROOM CACHE + LIVE WEATHER",
-        title = "Room Cache + Live Open-Meteo Weather",
-        subtitle = "Add AERODATABOX_API_KEY in the AI Studio Secrets panel to enable live AeroDataBox flight & FIDS queries.",
+        badgeLabel = "SAVED DATA + LIVE WEATHER",
+        title = "Saved flights + live Open-Meteo weather",
+        subtitle = "Live flight lookups route through the Avi gateway and are temporarily unavailable — saved flights and live weather still work.",
         isLiveAviation = false
     )
 }

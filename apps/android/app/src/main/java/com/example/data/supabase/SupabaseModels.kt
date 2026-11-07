@@ -11,7 +11,8 @@ data class ProfileRow(
     @SerialName("email") val email: String = "",
     @SerialName("photo_url") val photoUrl: String? = null,
     @SerialName("home_airport") val homeAirport: String? = null,
-    @SerialName("theme_preference") val themePreference: String = "SYSTEM"
+    @SerialName("theme_preference") val themePreference: String = "SYSTEM",
+    @SerialName("plan") val plan: String = "FREE"
 )
 
 @Serializable

@@ -198,7 +198,7 @@ fun DataSourceStatusBanner(
                             color = StatusDelayed.copy(alpha = 0.1f)
                         ) {
                             Text(
-                                text = "Tip: Open the Secrets panel in AI Studio and add AERODATABOX_API_KEY from your AeroDataBox dashboard to stream live global flight numbers and airport FIDS boards.",
+                                text = "Live lookups route through the Avi gateway and pause when the shared live-data budget is exhausted — saved flights and live weather keep working.",
                                 color = TextWhite,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(10.dp)

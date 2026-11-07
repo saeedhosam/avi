@@ -38,6 +38,7 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
     val dataSourceMode: StateFlow<DataSourceMode> = repository.dataSourceMode
+    val planState: StateFlow<com.example.data.cloud.CloudPlanState> = repository.planState
     val isLiveLoading: StateFlow<Boolean> = repository.isLiveLoading
 
     private val _searchFilters = MutableStateFlow(FlightSearchFilters())
