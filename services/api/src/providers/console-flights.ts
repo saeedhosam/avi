@@ -152,6 +152,9 @@ export class ConsoleFlightProvider {
       if (response.status === 429) {
         return { data: null, status: 429, mode: "QUOTA_FALLBACK" };
       }
+      if (response.status === 400 || response.status === 404) {
+        return { data: null, status: response.status, mode: "LIVE_AERODATABOX" };
+      }
       if (!response.ok) {
         return { data: null, status: response.status, mode: "ERROR" };
       }

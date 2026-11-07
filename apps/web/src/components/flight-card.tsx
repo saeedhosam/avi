@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { flightKey, useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
-import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
+import { STATUS_META, cn, flightDateLabel, normalizeFlightNumber } from "@/lib/utils";
 import { StatusBadge } from "./ui";
 
 export function FlightCard({
@@ -26,7 +26,17 @@ export function FlightCard({
   const { toggleWatchlist, addRecent, flights } = useApp();
   const isWatchlisted = useMemo(() => {
     const key = flightKey(flight);
-    const inStore = flights.find((f) => flightKey(f) === key);
+    const targetNumber = normalizeFlightNumber(flight.flightNumber).toLowerCase();
+    const inStore =
+      flights.find((f) => flightKey(f) === key) ??
+      flights.find(
+        (f) =>
+          normalizeFlightNumber(f.flightNumber).toLowerCase() === targetNumber &&
+          f.isWatchlisted,
+      ) ??
+      flights.find(
+        (f) => normalizeFlightNumber(f.flightNumber).toLowerCase() === targetNumber,
+      );
     if (inStore !== undefined) return Boolean(inStore.isWatchlisted);
     return Boolean(flight.isWatchlisted);
   }, [flights, flight]);
@@ -101,9 +111,10 @@ export function FlightCard({
               )}
             >
               <Bookmark
+                fill={isWatchlisted ? "currentColor" : "none"}
                 className={cn(
                   "size-3 transition-colors",
-                  isWatchlisted ? "fill-accent text-accent" : "text-muted",
+                  isWatchlisted ? "fill-current text-accent" : "text-muted",
                 )}
               />
               {isWatchlisted ? "Watchlisted" : "Watchlist"}

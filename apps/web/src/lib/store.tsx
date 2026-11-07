@@ -516,7 +516,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!records) return;
       const cloudByNumber = new Map(
         records.map((record) => [
-          `${String(record.flightNumber).replace(/\s+/g, "").toLowerCase()}|${record.flightDate ?? "any"}`,
+          `${normalizeFlightNumber(record.flightNumber).toLowerCase()}|${record.flightDate ?? "any"}`,
+          record,
+        ]),
+      );
+      const cloudByFlightNumber = new Map(
+        records.map((record) => [
+          normalizeFlightNumber(record.flightNumber).toLowerCase(),
           record,
         ]),
       );
@@ -536,9 +542,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           continue;
         }
 
-        const key = `${String(record.flightNumber).replace(/\s+/g, "").toLowerCase()}|${record.flightDate ?? "any"}`;
+        const key = `${normalizeFlightNumber(record.flightNumber).toLowerCase()}|${record.flightDate ?? "any"}`;
+        const normalizedNum = normalizeFlightNumber(record.flightNumber).toLowerCase();
         const alreadyCached = flightsRef.current.some(
-          (flight) => flightKey(flight) === key,
+          (flight) =>
+            flightKey(flight) === key ||
+            normalizeFlightNumber(flight.flightNumber).toLowerCase() === normalizedNum,
         );
         if (alreadyCached || liveLookups >= 8) continue;
 
@@ -548,7 +557,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const url = new URL("/api/flights/search", window.location.origin);
           url.searchParams.set(
             "flight",
-            String(record.flightNumber).replace(/\s+/g, ""),
+            normalizeFlightNumber(record.flightNumber),
           );
           if (record.flightDate) url.searchParams.set("date", record.flightDate);
           const response = await authFetch(url, { cache: "no-store" });
@@ -572,7 +581,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // and never reaches this authoritative pass.
       upsertFlights(
         flightsRef.current.map((flight) => {
-          const record = cloudByNumber.get(flightKey(flight));
+          const key = flightKey(flight);
+          const num = normalizeFlightNumber(flight.flightNumber).toLowerCase();
+          const record =
+            cloudByNumber.get(key) ??
+            cloudByNumber.get(`${num}|any`) ??
+            cloudByFlightNumber.get(num);
           if (!record) {
             return flight.isWatchlisted
               ? { ...flight, isWatchlisted: false }
@@ -844,14 +858,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleWatchlist = useCallback(
     (flight: Flight, notes = "") => {
       const targetKey = flightKey(flight);
+      const targetNumber = normalizeFlightNumber(flight.flightNumber).toLowerCase();
       let current = flightsRef.current.find(
         (item) => flightKey(item) === targetKey,
       );
       if (!current) {
         current = flightsRef.current.find(
           (item) =>
-            normalizeFlightNumber(item.flightNumber).toLowerCase() ===
-            normalizeFlightNumber(flight.flightNumber).toLowerCase(),
+            normalizeFlightNumber(item.flightNumber).toLowerCase() === targetNumber,
         );
       }
       if (!current) {
@@ -874,20 +888,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const willWatch = !current.isWatchlisted;
       const currentKey = flightKey(current);
-      const updated = flightsRef.current.map((item) =>
-        flightKey(item) === currentKey || flightKey(item) === targetKey
-          ? {
-              ...item,
-              isWatchlisted: willWatch,
-              customNotes: notes || item.customNotes,
-            }
-          : item,
-      );
+      let foundTarget = false;
+      const updated = flightsRef.current.map((item) => {
+        const itemKey = flightKey(item);
+        const itemNumber = normalizeFlightNumber(item.flightNumber).toLowerCase();
+        if (itemKey === targetKey) {
+          foundTarget = true;
+          return {
+            ...item,
+            isWatchlisted: willWatch,
+            customNotes: notes || item.customNotes,
+          };
+        }
+        if (itemKey === currentKey || itemNumber === targetNumber) {
+          return {
+            ...item,
+            isWatchlisted: willWatch,
+            customNotes: notes || item.customNotes,
+          };
+        }
+        return item;
+      });
+      if (!foundTarget) {
+        updated.unshift({
+          ...flight,
+          isWatchlisted: willWatch,
+          customNotes: notes || flight.customNotes,
+        });
+      }
       flightsRef.current = updated;
       setFlights(updated);
-      const nextFlight = updated.find(
-        (item) => flightKey(item) === currentKey || flightKey(item) === targetKey,
-      );
+      const nextFlight =
+        updated.find(
+          (item) => flightKey(item) === targetKey || flightKey(item) === currentKey,
+        ) ?? updated[0];
       if (nextFlight && account.uid) {
         if (nextFlight.isWatchlisted) {
           void saveWatchlistItemCloud(account.uid, nextFlight);

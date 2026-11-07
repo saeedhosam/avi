@@ -24,7 +24,7 @@ import { useApp } from "@/lib/store";
 import { authFetch } from "@/lib/authed-fetch";
 import { fetchDestinationForecast } from "@/lib/weather";
 import type { DestinationArrivalForecast, Flight } from "@/lib/types";
-import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
+import { STATUS_META, cn, flightDateLabel, normalizeFlightNumber } from "@/lib/utils";
 import { FlightMapPreview } from "@/components/flight-map-preview";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { DestinationWeatherCard, AirportWeatherCard } from "@/components/weather-cards";
@@ -58,10 +58,11 @@ export default function FlightDetailPage() {
 
   const dateParam = searchParams.get("date") ?? "";
   const flight = useMemo(() => {
-    const id = decodeURIComponent(params.id ?? "");
+    const rawId = decodeURIComponent(params.id ?? "").trim();
+    const cleanId = rawId.replace(/\s+/g, "").toLowerCase();
     const numberMatch = (item: Flight) =>
-      item.id.toLowerCase() === id.toLowerCase() ||
-      item.flightNumber.replace(/\s+/g, "").toLowerCase() === id.toLowerCase();
+      item.id.replace(/\s+/g, "").toLowerCase() === cleanId ||
+      normalizeFlightNumber(item.flightNumber).toLowerCase() === cleanId;
     const dateMatch = (item: Flight) =>
       !dateParam || (item.flightDate ?? "") === dateParam;
     return (
@@ -238,9 +239,10 @@ export default function FlightDetailPage() {
           <ActionButton
             icon={
               <Bookmark
+                fill={flight.isWatchlisted ? "currentColor" : "none"}
                 className={cn(
                   "size-3.5 transition-colors",
-                  flight.isWatchlisted ? "fill-accent text-accent" : "text-muted",
+                  flight.isWatchlisted ? "fill-current text-accent" : "text-muted",
                 )}
               />
             }
@@ -439,7 +441,10 @@ export default function FlightDetailPage() {
         <aside className="space-y-3">
           <Panel className="p-3.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-start gap-2.5">
+              <div
+                className="flex items-start gap-2.5 cursor-pointer select-none"
+                onClick={() => toggleWatchlist(flight)}
+              >
                 <div
                   className={cn(
                     "mt-0.5 rounded-lg border p-1.5 transition-colors",
@@ -449,9 +454,10 @@ export default function FlightDetailPage() {
                   )}
                 >
                   <Bookmark
+                    fill={flight.isWatchlisted ? "currentColor" : "none"}
                     className={cn(
                       "size-4 transition-colors",
-                      flight.isWatchlisted && "fill-accent text-accent",
+                      flight.isWatchlisted ? "fill-current text-accent" : "text-muted",
                     )}
                   />
                 </div>

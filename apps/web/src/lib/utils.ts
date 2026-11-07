@@ -301,32 +301,43 @@ export function parseFlexibleDate(raw: string): string | null {
     .replace(/[,;]+/g, " ")
     .replace(/\s+/g, " ");
   if (!text) return null;
-  const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const currentYear = now.getFullYear();
 
-  // Day + month name with an optional year: 17-Mar, 17 March 2027.
+  const resolveInferredYear = (month: number, day: number): number => {
+    // If the candidate date in the current calendar year is already in the past
+    // by more than 7 days (grace period for recent flights), infer next year.
+    const candidateThisYear = new Date(currentYear, month - 1, day);
+    const diffDays =
+      (candidateThisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays < -7) {
+      return currentYear + 1;
+    }
+    return currentYear;
+  };
+
+  // Day + month name with an optional year: 17-Mar, 17 March 2027, 31JAN.
   let match = text.match(
     /^(\d{1,2})[\s./-]*([A-Za-z]{3,})(?:[\s./-]+(\d{1,4}))?$/,
   );
   if (match) {
     const month = monthFromName(match[2]);
     if (!month) return null;
-    const year = match[3]
-      ? resolveYearToken(match[3])
-      : currentYear;
-    return year === null ? null : isoFromParts(year, month, Number(match[1]));
+    const day = Number(match[1]);
+    const year = match[3] ? resolveYearToken(match[3]) : resolveInferredYear(month, day);
+    return year === null ? null : isoFromParts(year, month, day);
   }
 
-  // Month name + day with an optional year: Mar 17, March 17 2027.
+  // Month name + day with an optional year: Mar 17, March 17 2027, JAN31.
   match = text.match(
     /^([A-Za-z]{3,})[\s./-]*(\d{1,2})(?:[\s./-]+(\d{1,4}))?$/,
   );
   if (match) {
     const month = monthFromName(match[1]);
     if (!month) return null;
-    const year = match[3]
-      ? resolveYearToken(match[3])
-      : currentYear;
-    return year === null ? null : isoFromParts(year, month, Number(match[2]));
+    const day = Number(match[2]);
+    const year = match[3] ? resolveYearToken(match[3]) : resolveInferredYear(month, day);
+    return year === null ? null : isoFromParts(year, month, day);
   }
 
   // ISO / year-first: 2026-03-17, 2026.3.17.
@@ -344,12 +355,24 @@ export function parseFlexibleDate(raw: string): string | null {
   if (match) {
     const first = Number(match[1]);
     const second = Number(match[2]);
-    const year = match[3] ? resolveYearToken(match[3]) : currentYear;
+    let day: number;
+    let month: number;
+    if (first > 12 && second <= 12) {
+      day = first;
+      month = second;
+    } else if (first <= 12 && second > 12) {
+      day = second;
+      month = first;
+    } else if (first <= 12 && second <= 12) {
+      // Ambiguous: default to day=first, month=second (DD/MM).
+      day = first;
+      month = second;
+    } else {
+      return null;
+    }
+    const year = match[3] ? resolveYearToken(match[3]) : resolveInferredYear(month, day);
     if (year === null) return null;
-    if (first > 12 && second <= 12) return isoFromParts(year, second, first);
-    if (first <= 12 && second > 12) return isoFromParts(year, first, second);
-    if (first <= 12 && second <= 12) return isoFromParts(year, second, first);
-    return null;
+    return isoFromParts(year, month, day);
   }
 
   return null;

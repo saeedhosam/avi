@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  Bookmark,
   Compass,
   Layers,
   Map as MapIcon,
@@ -108,6 +109,12 @@ export default function FlightMapPage() {
             <p className="label-caps text-accent">Live flight map</p>
             <h2 className="flex items-center gap-2 text-base font-bold text-ink lg:text-lg">
               {flight.flightNumber}
+              {flight.isWatchlisted && (
+                <Bookmark
+                  fill="currentColor"
+                  className="size-3.5 shrink-0 fill-current text-accent"
+                />
+              )}
               <span className="text-[11px] font-medium text-muted">
                 {flight.origin.code} → {flight.destination.code}
               </span>

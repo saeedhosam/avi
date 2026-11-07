@@ -246,9 +246,20 @@ export default function SearchPage() {
   const resolvedResults = useMemo(() => {
     if (!results.length) return [];
     const flightMap = new Map(flights.map((f) => [flightKey(f), f]));
+    const numberMap = new Map(
+      flights.map((f) => [normalizeFlightNumber(f.flightNumber).toLowerCase(), f]),
+    );
     return results.map((flight) => {
-      const stored = flightMap.get(flightKey(flight));
-      return stored ? { ...flight, ...stored } : flight;
+      const stored =
+        flightMap.get(flightKey(flight)) ??
+        numberMap.get(normalizeFlightNumber(flight.flightNumber).toLowerCase());
+      return stored
+        ? {
+            ...flight,
+            ...stored,
+            isWatchlisted: Boolean(stored.isWatchlisted),
+          }
+        : flight;
     });
   }, [results, flights]);
 
@@ -633,6 +644,17 @@ export default function SearchPage() {
                             backgroundColor: STATUS_META[recent.status].color,
                           }}
                         />
+                        {flights.some(
+                          (f) =>
+                            f.isWatchlisted &&
+                            normalizeFlightNumber(f.flightNumber).toLowerCase() ===
+                              normalizeFlightNumber(recent.flightNumber).toLowerCase(),
+                        ) && (
+                          <Bookmark
+                            fill="currentColor"
+                            className="size-2.5 fill-current text-accent shrink-0"
+                          />
+                        )}
                       </p>
                       <p className="mt-0.5 truncate text-[9px] text-subtle">
                         {recent.originCode} → {recent.destCode}

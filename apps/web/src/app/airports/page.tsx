@@ -13,6 +13,7 @@ import {
   Loader2,
   MapPin,
   PlaneLanding,
+  Bookmark,
   PlaneTakeoff,
   RefreshCw,
   Search,
@@ -30,7 +31,7 @@ import type {
   Flight,
   RealtimeAirportWeather,
 } from "@/lib/types";
-import { REGION_META, cn } from "@/lib/utils";
+import { REGION_META, cn, normalizeFlightNumber } from "@/lib/utils";
 import { SourceBanner } from "@/components/source-banner";
 import {
   Button,
@@ -66,6 +67,7 @@ const BOARD_AIRPORT_CODES = [
 export default function AirportsPage() {
   const router = useRouter();
   const {
+    flights,
     aeroConfigured,
     offlineMode,
     upsertFlights,
@@ -478,14 +480,27 @@ export default function AirportsPage() {
                   />
                 ) : (
                   <div className="divide-y divide-line/50">
-                    {visibleBoardFlights.map((flight) => (
-                      <BoardRow
-                        key={`${flight.id}-${direction}`}
-                        flight={flight}
-                        direction={direction}
-                        onClick={() => router.push(`/flight/${encodeURIComponent(flight.id)}`)}
-                      />
-                    ))}
+                    {visibleBoardFlights.map((flight) => {
+                      const isWatchlisted =
+                        Boolean(flight.isWatchlisted) ||
+                        flights.some(
+                          (f) =>
+                            f.isWatchlisted &&
+                            normalizeFlightNumber(f.flightNumber).toLowerCase() ===
+                              normalizeFlightNumber(flight.flightNumber).toLowerCase(),
+                        );
+                      return (
+                        <BoardRow
+                          key={`${flight.id}-${direction}`}
+                          flight={flight}
+                          direction={direction}
+                          isWatchlisted={isWatchlisted}
+                          onClick={() =>
+                            router.push(`/flight/${encodeURIComponent(flight.id)}`)
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -727,10 +742,12 @@ function BoardRow({
   flight,
   direction,
   onClick,
+  isWatchlisted,
 }: {
   flight: Flight;
   direction: Direction;
   onClick: () => void;
+  isWatchlisted?: boolean;
 }) {
   const other = direction === "DEPARTURES" ? flight.destination : flight.origin;
   const time =
@@ -749,9 +766,17 @@ function BoardRow({
     >
       <div className="min-w-0">
         <p className="text-[13px] font-bold text-accent tabular">{time}</p>
-        <p className="mt-0.5 truncate font-mono text-[10px] font-semibold text-ink">
-          {flight.flightNumber}
-        </p>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          <p className="truncate font-mono text-[10px] font-semibold text-ink">
+            {flight.flightNumber}
+          </p>
+          {isWatchlisted && (
+            <Bookmark
+              fill="currentColor"
+              className="size-2.5 shrink-0 fill-current text-accent"
+            />
+          )}
+        </div>
         <p className="truncate text-[8px] text-subtle">{flight.airline}</p>
       </div>
       <div className="min-w-0">
