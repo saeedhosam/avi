@@ -1399,6 +1399,22 @@ object GlobalRouteCatalog {
     }
 }
 
+private fun ConsoleRouteStat.toDomainNode(origin: AirportNode? = null): AirportNode? {
+    val dest = ConsoleAirportNode(
+        iata = destination,
+        icao = icao ?: "",
+        name = destinationName ?: destination,
+        city = city ?: destination,
+        country = country ?: "",
+        region = "",
+        latitude = latitude,
+        longitude = longitude,
+        timezone = timezone ?: "UTC",
+        hubAirlines = emptyList()
+    )
+    return dest.toDomainNode()
+}
+
 private fun ConsoleAirportNode.toDomainNode(origin: AirportNode? = null): AirportNode? {
     if (iata.isBlank() || iata.length != 3) return null
     return AirportNode(

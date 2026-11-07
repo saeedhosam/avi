@@ -255,10 +255,3 @@ private fun ConsoleTelemetryDto?.toDomainTelemetry(): FlightTelemetry = FlightTe
     etaMinutesRemaining = this?.etaMinutesRemaining ?: 0,
     waypoints = emptyList()
 )
-
-,
-    latitude = latitude,
-    longitude = longitude,
-    timezone = timezone,
-    hubAirlines = hubAirlines
-)
