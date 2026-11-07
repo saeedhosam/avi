@@ -60,6 +60,12 @@ The schema contains:
 
 Do not put the Supabase secret key in any client. The web uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; the API uses `SUPABASE_SECRET_KEY` server-side only.
 
+## Provider identity & per-user quotas
+
+Provider-backed routes carry the caller's Supabase access token so the gateway
+can apply per-user spend limits. Design and rollout:
+[`docs/provider-quota.md`](docs/provider-quota.md).
+
 ## Server
 
 The Hetzner server is documented in [`docs/server.md`](docs/server.md). The short version:

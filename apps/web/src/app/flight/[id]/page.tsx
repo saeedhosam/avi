@@ -22,6 +22,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { authFetch } from "@/lib/authed-fetch";
 import { fetchDestinationForecast } from "@/lib/weather";
 import type { DestinationArrivalForecast, Flight } from "@/lib/types";
 import { STATUS_META, cn, flightDateLabel } from "@/lib/utils";
@@ -102,7 +103,7 @@ export default function FlightDetailPage() {
       window.location.origin,
     );
     if (dateParam) url.searchParams.set("date", dateParam);
-    fetch(url, {
+    authFetch(url, {
       cache: "no-store",
     })
       .then((response) => response.json())

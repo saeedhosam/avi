@@ -18,6 +18,7 @@ import type {
   UserAccount,
 } from "./types";
 import type { DataSourceMode } from "./data-source";
+import { authFetch } from "./authed-fetch";
 import { getSupabase } from "./supabase";
 import { normalizeFlightNumber, uid } from "./utils";
 import {
@@ -550,7 +551,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             String(record.flightNumber).replace(/\s+/g, ""),
           );
           if (record.flightDate) url.searchParams.set("date", record.flightDate);
-          const response = await fetch(url, { cache: "no-store" });
+          const response = await authFetch(url, { cache: "no-store" });
           const data = (await response.json()) as { flights?: Flight[] };
           // Only flights on the saved operating date count for this entry.
           fetched.push(
@@ -628,7 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               flight.flightNumber.replace(/\s+/g, ""),
             );
             if (flight.flightDate) url.searchParams.set("date", flight.flightDate);
-            const response = await fetch(url, { cache: "no-store" });
+            const response = await authFetch(url, { cache: "no-store" });
             const data = (await response.json()) as {
               mode: string;
               flights?: Flight[];

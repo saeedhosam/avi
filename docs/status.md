@@ -4,6 +4,9 @@ Updated: 2026-11-07
 
 ## Corrective pass (2026-11-07)
 
+- Provider routes now carry Supabase identity + per-user quotas; design and
+  rollout in `docs/provider-quota.md` (still `PROVIDER_AUTH_MODE=log` until
+  the log window is clean).
 - Polar webhooks now verify the Standard Webhooks headers/signature and use
   `external_customer_id` for identity; plan writes retry on failure.
 - Web Push subscriptions are queried by `user_id` (the previous query used the

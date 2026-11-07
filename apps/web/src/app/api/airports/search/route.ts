@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     mode: string;
     status: number;
     airports: AirportNode[];
-  }>(`/v1/airports/search?q=${encodeURIComponent(q)}`);
+  }>(`/v1/airports/search?q=${encodeURIComponent(q)}`, request.headers.get("authorization"));
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
   }

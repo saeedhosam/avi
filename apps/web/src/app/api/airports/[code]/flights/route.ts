@@ -8,7 +8,7 @@ import { gatewayConfigured, gatewayFetchJson } from "@/lib/gateway";
 import type { Flight } from "@/lib/types";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ code: string }> },
 ) {
   const { code: rawCode } = await context.params;
@@ -25,7 +25,7 @@ export async function GET(
     mode: string;
     status?: number;
     flights: Flight[];
-  }>(`/v1/airports/${code}/flights`);
+  }>(`/v1/airports/${code}/flights`, request.headers.get("authorization"));
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
   }

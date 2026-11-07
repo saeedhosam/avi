@@ -24,6 +24,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { authFetch } from "@/lib/authed-fetch";
 import { useApp } from "@/lib/store";
 import type { Flight, FlightStatus } from "@/lib/types";
 import {
@@ -170,7 +171,7 @@ export default function SearchPage() {
       setResults([]);
       try {
         if (activeSearch.mode === "FLIGHT_NUMBER") {
-          const response = await fetch(
+          const response = await authFetch(
             `/api/flights/search?flight=${encodeURIComponent(activeSearch.number)}&date=${encodeURIComponent(activeSearch.date)}`,
             { signal: controller.signal, cache: "no-store" },
           );
@@ -192,7 +193,7 @@ export default function SearchPage() {
           if (incoming.length) upsertFlights(incoming);
           else setError("No live flights found for this number and date.");
         } else {
-          const response = await fetch(
+          const response = await authFetch(
             `/api/airports/${activeSearch.origin}/flights`,
             { signal: controller.signal, cache: "no-store" },
           );

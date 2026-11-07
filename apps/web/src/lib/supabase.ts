@@ -105,6 +105,13 @@ export function observeSupabaseAuth(
   if (!supabase) return () => {};
 
   const emit = (user: User | null, event: SupabaseAuthEvent) => {
+    // Anonymous sessions exist purely to give the gateway a token for guest
+    // quota. They are not accounts: the UI keeps showing the guest state and
+    // nothing is written to Supabase on their behalf.
+    if (user && (user as User & { is_anonymous?: boolean }).is_anonymous) {
+      callback(null, null, event);
+      return;
+    }
     if (!user) {
       callback(null, null, event);
       return;

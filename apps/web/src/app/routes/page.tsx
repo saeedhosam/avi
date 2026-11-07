@@ -23,6 +23,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { authFetch } from "@/lib/authed-fetch";
 import {
   findAirportNode,
   inferRegionFromCoords,
@@ -279,7 +280,7 @@ export default function RoutesPage() {
       setSelectedDest(null);
       setAirlineCode(null);
       try {
-        const response = await fetch(`/api/airports/${code}/routes`, {
+        const response = await authFetch(`/api/airports/${code}/routes`, {
           cache: "no-store",
         });
         const data = (await response.json()) as {

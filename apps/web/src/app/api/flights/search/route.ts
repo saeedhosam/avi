@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const gatewayResult = await gatewayFetchJson<{
     mode: string;
     flights: Flight[];
-  }>(datePath);
+  }>(datePath, request.headers.get("authorization"));
   if (gatewayResult) {
     if (
       gatewayResult.mode === "LIVE_AERODATABOX" ||

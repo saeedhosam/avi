@@ -19,6 +19,7 @@ import {
   Wind,
   X,
 } from "lucide-react";
+import { authFetch } from "@/lib/authed-fetch";
 import { useApp } from "@/lib/store";
 import {
   findAirportNode,
@@ -118,7 +119,7 @@ export default function AirportsPage() {
   const loadWeather = useCallback(async () => {
     try {
       const codes = routeAirports.map((item) => item.iata).join(",");
-      const response = await fetch(`/api/weather/airports?codes=${codes}`, {
+      const response = await authFetch(`/api/weather/airports?codes=${codes}`, {
         cache: "no-store",
       });
       const data = (await response.json()) as {
@@ -146,7 +147,7 @@ export default function AirportsPage() {
     setBoardError(null);
     setBoardFlights([]);
     try {
-      const response = await fetch(`/api/airports/${airportCode}/flights`, {
+      const response = await authFetch(`/api/airports/${airportCode}/flights`, {
         cache: "no-store",
       });
       const data = (await response.json()) as {
@@ -209,7 +210,7 @@ export default function AirportsPage() {
       setSearchLoading(true);
       setSearchError(null);
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `/api/airports/search?q=${encodeURIComponent(query)}`,
           { signal: controller.signal, cache: "no-store" },
         );

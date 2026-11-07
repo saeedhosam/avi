@@ -11,13 +11,20 @@ const gatewayBase = () =>
   process.env.AVI_API_BASE_URL?.trim().replace(/\/+$/, "");
 
 /** True when the gateway answered (any status) — null means unreachable. */
-export async function gatewayFetchJson<T>(path: string): Promise<T | null> {
+export async function gatewayFetchJson<T>(
+  path: string,
+  token?: string | null,
+): Promise<T | null> {
   const base = gatewayBase();
   if (!base) return null;
   try {
     const response = await fetch(`${base}${path}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
     if (!response.ok) {
       // Gateway-level failures (bad deploy, down instance) fall back; a

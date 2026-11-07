@@ -18,7 +18,7 @@ interface AeroRouteStat {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ code: string }> },
 ) {
   const { code: rawCode } = await context.params;
@@ -46,7 +46,7 @@ export async function GET(
       dailyFlights: number;
       operators: Array<{ code: string; name: string }>;
     }>;
-  }>(`/v1/airports/${code}/routes`);
+  }>(`/v1/airports/${code}/routes`, request.headers.get("authorization"));
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
   }
