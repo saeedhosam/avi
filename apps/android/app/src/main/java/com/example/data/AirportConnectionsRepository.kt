@@ -17,27 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-class AirportConnectionsRepository
-
-private fun ConsoleAirportNode.toDomainNode(origin: AirportNode? = null): AirportNode? {
-    if (iata.isBlank() || iata.length != 3) return null
-    return AirportNode(
-        iata = iata.uppercase(),
-        icao = icao,
-        name = name,
-        city = city,
-        country = country,
-        region = try {
-            RouteRegion.valueOf(region.uppercase())
-        } catch (_: Exception) {
-            RouteRegion.EUROPE
-        },
-        latitude = latitude,
-        longitude = longitude,
-        timezone = timezone,
-        hubAirlines = hubAirlines
-    )
-}(context: Context) {
+class AirportConnectionsRepository(context: Context) {
 
     private val flightDao = SkyTrackDatabase.getDatabase(context).flightDao()
 
@@ -1417,4 +1397,23 @@ object GlobalRouteCatalog {
             else -> RouteRegion.EUROPE
         }
     }
+}
+private fun ConsoleAirportNode.toDomainNode(origin: AirportNode? = null): AirportNode? {
+    if (iata.isBlank() || iata.length != 3) return null
+    return AirportNode(
+        iata = iata.uppercase(),
+        icao = icao,
+        name = name,
+        city = city,
+        country = country,
+        region = try {
+            RouteRegion.valueOf(region.uppercase())
+        } catch (_: Exception) {
+            RouteRegion.EUROPE
+        },
+        latitude = latitude,
+        longitude = longitude,
+        timezone = timezone,
+        hubAirlines = hubAirlines
+    )
 }
