@@ -48,14 +48,13 @@ class SupabaseUserRepository {
         snapshot: JsonObject? = null
     ): Result<String> = runCatching {
         val uid = requireUserId()
-        val flightId = flight.id.ifBlank {
-            flight.flightNumber.replace(" ", "").uppercase()
-        }
+        val flightId = flight.watchRowId()
         SupabaseClientProvider.client.from("watchlist_items").upsert(
             WatchlistItemUpsert(
                 userId = uid,
                 flightId = flightId,
                 flightNumber = flight.flightNumber.take(20),
+                flightDate = flight.flightDate,
                 airline = flight.airline.take(100),
                 originCode = flight.originCode.take(10),
                 destCode = flight.destCode.take(10),

@@ -1,11 +1,11 @@
 package com.example.data.remote.weather
 
-import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
 import com.example.model.*
 import com.squareup.moshi.Json
 import okhttp3.OkHttpClient
 import retrofit2.Response
 import retrofit2.Retrofit
+import com.example.data.remote.gateway.GatewayNetworkClient
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
@@ -77,7 +77,7 @@ object OpenMeteoNetworkClient {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(client)
-            .addConverterFactory(MoshiConverterFactory.create(AeroDataBoxNetworkClient.moshi))
+            .addConverterFactory(MoshiConverterFactory.create(GatewayNetworkClient.moshi))
             .build()
             .create(OpenMeteoApiService::class.java)
     }

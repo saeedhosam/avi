@@ -6,9 +6,9 @@ import com.example.data.local.CachedAirportRouteEntity
 import com.example.data.local.SkyTrackDatabase
 import com.example.data.remote.ApiConfig
 import com.example.data.remote.DataSourceMode
-import com.example.data.remote.aerodatabox.AeroAirportDto
-import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
-import com.example.data.remote.aerodatabox.AeroRouteStatDto
+import com.example.data.remote.gateway.GatewayNetworkClient
+import com.example.data.remote.gateway.ConsoleRouteStat
+import com.example.data.remote.gateway.ConsoleAirportNode
 import com.example.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +17,27 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-class AirportConnectionsRepository(context: Context) {
+class AirportConnectionsRepository
+
+private fun ConsoleAirportNode.toDomainNode(origin: AirportNode? = null): AirportNode? {
+    if (iata.isBlank() || iata.length != 3) return null
+    return AirportNode(
+        iata = iata.uppercase(),
+        icao = icao,
+        name = name,
+        city = city,
+        country = country,
+        region = try {
+            RouteRegion.valueOf(region.uppercase())
+        } catch (_: Exception) {
+            RouteRegion.EUROPE
+        },
+        latitude = latitude,
+        longitude = longitude,
+        timezone = timezone,
+        hubAirlines = hubAirlines
+    )
+}(context: Context) {
 
     private val flightDao = SkyTrackDatabase.getDatabase(context).flightDao()
 
@@ -38,15 +58,15 @@ class AirportConnectionsRepository(context: Context) {
     suspend fun searchAirports(query: String): List<AirportNode> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         val localMatches = GlobalRouteCatalog.searchAirports(trimmed)
-        if (trimmed.length < 2 || !ApiConfig.hasValidAeroDataBoxKey()) {
+        if (trimmed.length < 2 || !ApiConfig.isGatewayConfigured) {
             return@withContext localMatches
         }
 
         try {
-            val response = AeroDataBoxNetworkClient.apiService.searchAirportsByTerm(trimmed, limit = 10)
-            if (response.isSuccessful && !response.body()?.items.isNullOrEmpty()) {
-                val remoteNodes = response.body()!!.items.orEmpty().mapNotNull { dto ->
-                    mapDtoToAirportNode(dto)
+            val response = GatewayNetworkClient.apiService.searchAirports(trimmed)
+            if (response.isSuccessful && !response.body()?.airports.isNullOrEmpty()) {
+                val remoteNodes = response.body()!!.airports.orEmpty().mapNotNull { node ->
+                    node.toDomainNode()
                 }
                 remoteNodes.forEach { GlobalRouteCatalog.registerDynamicAirport(it) }
                 val combined = (localMatches + remoteNodes).distinctBy { it.iata }
@@ -81,7 +101,7 @@ class AirportConnectionsRepository(context: Context) {
             return@withContext buildSummary(originNode, merged)
         }
 
-        if (!ApiConfig.hasValidAeroDataBoxKey()) {
+        if (!ApiConfig.isGatewayConfigured) {
             _routeDataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
             val cachedEntities = flightDao.getCachedRoutesForOrigin(code)
             val merged = mergeCachedIntoCatalog(originNode, catalogConnections, cachedEntities)
@@ -90,7 +110,7 @@ class AirportConnectionsRepository(context: Context) {
 
         _isLoadingRoutes.value = true
         try {
-            val response = AeroDataBoxNetworkClient.apiService.getAirportDailyRoutes(code)
+            val response = GatewayNetworkClient.apiService.getAirportRoutes(code)
             when {
                 response.code() == 429 -> {
                     _routeDataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
@@ -125,11 +145,10 @@ class AirportConnectionsRepository(context: Context) {
 
     private fun mapLiveRoutes(
         origin: AirportNode,
-        dtos: List<AeroRouteStatDto>
+        stats: List<ConsoleRouteStat>
     ): List<DirectFlightConnection> {
-        return dtos.mapNotNull { dto ->
-            val destDto = dto.destination ?: return@mapNotNull null
-            val destNode = mapDtoToAirportNode(destDto) ?: return@mapNotNull null
+        return stats.mapNotNull { route ->
+            val destNode = route.toDomainNode(origin) ?: return@mapNotNull null
             if (destNode.iata.equals(origin.iata, ignoreCase = true)) return@mapNotNull null
 
             GlobalRouteCatalog.registerDynamicAirport(destNode)
@@ -139,19 +158,18 @@ class AirportConnectionsRepository(context: Context) {
             )
             val distNm = GeodesicRouteCalculator.kmToNm(distKm)
             val durationMin = GeodesicRouteCalculator.estimateDurationMinutes(distKm)
-            val dailyFlights = (dto.averageDailyFlights ?: 2.0).toInt().coerceAtLeast(1)
+            val dailyFlights = route.dailyFlights.coerceAtLeast(1)
 
-            val operators = dto.operators.orEmpty().mapIndexedNotNull { idx, op ->
-                val airlineCode = op.iata?.takeIf { it.isNotBlank() }?.uppercase(Locale.ROOT)
-                    ?: op.name?.take(2)?.uppercase(Locale.ROOT)
+            val operators = route.operators.orEmpty().mapIndexedNotNull { idx, op ->
+                val airlineCode = op.code.takeIf { it.isNotBlank() }?.uppercase(Locale.ROOT)
                     ?: return@mapIndexedNotNull null
-                val airlineName = op.name?.takeIf { it.isNotBlank() } ?: "$airlineCode Airlines"
+                val airlineName = op.name.takeIf { it.isNotBlank() } ?: "$airlineCode Airlines"
                 val baseFlightNum = 100 + ((origin.iata.hashCode() + destNode.iata.hashCode() + idx * 37) and 0x1FF)
                 OperatingCarrierRoute(
                     airlineCode = airlineCode,
                     airlineName = airlineName,
                     flightNumbers = listOf("$airlineCode $baseFlightNum", "$airlineCode ${baseFlightNum + 1}"),
-                    dailyFrequencies = (dailyFlights / (dto.operators?.size?.coerceAtLeast(1) ?: 1)).coerceAtLeast(1),
+                    dailyFrequencies = (dailyFlights / (route.operators.size.coerceAtLeast(1))).coerceAtLeast(1),
                     aircraftTypes = listOf(if (distKm > 3500) "Boeing 787-9" else "Airbus A320neo")
                 )
             }.ifEmpty {
@@ -283,30 +301,6 @@ class AirportConnectionsRepository(context: Context) {
         return mergeLiveAndCatalog(catalog, cachedMapped)
     }
 
-    private fun mapDtoToAirportNode(dto: AeroAirportDto): AirportNode? {
-        val iata = dto.iata?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.length == 3 } ?: return null
-        GlobalRouteCatalog.findAirportOrNull(iata)?.let { return it }
-
-        val lat = dto.location?.lat ?: return null
-        val lon = dto.location.lon ?: return null
-        val city = dto.municipalityName?.takeIf { it.isNotBlank() }
-            ?: dto.shortName?.takeIf { it.isNotBlank() }
-            ?: iata
-        val name = dto.name?.takeIf { it.isNotBlank() } ?: "$city International Airport"
-        val country = dto.countryCode?.uppercase(Locale.ROOT) ?: "International"
-
-        return AirportNode(
-            iata = iata,
-            icao = dto.icao ?: "I$iata",
-            name = name,
-            city = city,
-            country = country,
-            region = GlobalRouteCatalog.inferRegionFromCoords(lat, lon),
-            latitude = lat,
-            longitude = lon,
-            timezone = dto.timeZone ?: "UTC"
-        )
-    }
 
     suspend fun loadAllRoutes(): AirportRouteNetworkSummary = withContext(Dispatchers.IO) {
         _isLoadingRoutes.value = false

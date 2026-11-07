@@ -5,15 +5,14 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.example.data.MockFlightData
 import com.example.data.local.CachedFlightEntity
 import com.example.data.local.FlightAlertEntity
 import com.example.data.local.SkyTrackDatabase
 import com.example.data.remote.ApiConfig
-import com.example.data.remote.aerodatabox.AeroDataBoxMapper
-import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
-import com.example.data.remote.aerodatabox.FlightStateDiffer
 import com.example.model.Flight
+import com.example.data.remote.aerodatabox.FlightStateDiffer
+import com.example.data.remote.gateway.GatewayNetworkClient
+import com.example.data.remote.gateway.toDomainFlight
 import com.example.model.FlightStatus
 import com.example.notifications.FlightNotificationManager
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +23,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Production Background WorkManager Worker responsible for syncing live AeroDataBox flight telemetry,
+ * Production Background WorkManager Worker responsible for syncing live flight telemetry,
  * gate changes, and delay statuses into the local Room database whenever connectivity
  * is restored or periodic background sync occurs.
  *
@@ -54,26 +53,26 @@ class FlightSyncWorker(
             val previousCached = dao.getAllCachedFlights().firstOrNull() ?: emptyList()
             val previousFlightMap = previousCached.associateBy { it.flightNumber.replace(" ", "").lowercase(Locale.ROOT) }
 
-            val hasLiveKey = ApiConfig.hasValidAeroDataBoxKey()
+            val hasLiveKey = ApiConfig.isGatewayConfigured
             val liveUpdatedFlights = mutableMapOf<String, Flight>()
             var syncSourceLabel = "SUCCESS (Room Cache Refreshed)"
 
-            // 2. If AeroDataBox API key is configured, query live status for tracked & favorite flights
+            // 2. Query live status for tracked & favorite flights via the gateway
             if (hasLiveKey) {
                 val priorityFlightNumbers = (tracked.map { it.flightNumber } + favorites.map { it.flightNumber })
                     .distinctBy { it.replace(" ", "").lowercase(Locale.ROOT) }
                     .take(6) // Protect API quota during background worker runs
 
                 for (flightNum in priorityFlightNumbers) {
-                    val compactCode = flightNum.replace(" ", "")
+                    val compactCode = flightNum.replace(" ", "").uppercase(Locale.ROOT)
                     runCatching {
-                        val response = AeroDataBoxNetworkClient.apiService.getFlightByNumber(compactCode)
-                        if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                            val mapped = AeroDataBoxMapper.mapDtoToFlight(response.body()!!.first())
+                        val response = GatewayNetworkClient.apiService.lookupFlight(compactCode)
+                        if (response.isSuccessful && !response.body()?.flights.isNullOrEmpty()) {
+                            val mapped = response.body()!!.flights.firstOrNull()?.toDomainFlight()
                             if (mapped != null) {
                                 val key = mapped.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
                                 liveUpdatedFlights[key] = mapped
-                                syncSourceLabel = "SUCCESS (Live AeroDataBox Sync)"
+                                syncSourceLabel = "SUCCESS (Live Gateway Sync)"
                             }
                         } else if (response.code() == 429) {
                             syncSourceLabel = "SUCCESS (Quota Fallback · Room Cache)"
@@ -82,14 +81,9 @@ class FlightSyncWorker(
                 }
             }
 
-            // 3. Merge live updated flights with baseline flights and run state diffing for tracked flights
-            val baseFlights = MockFlightData.initialFlights
-            val mergedFlights = baseFlights.map { baseFlight ->
-                val key = baseFlight.flightNumber.replace(" ", "").lowercase(Locale.ROOT)
-                liveUpdatedFlights[key] ?: baseFlight
-            } + liveUpdatedFlights.values.filter { live ->
-                baseFlights.none { it.flightNumber.replace(" ", "").equals(live.flightNumber.replace(" ", ""), ignoreCase = true) }
-            }
+            // 3. Diff live flights against the Room cache for tracked flights.
+            // Mock baseline data is no longer seeded — cache is the only truth.
+            val mergedFlights = liveUpdatedFlights.values.toList()
 
             val entities = mergedFlights.map { flight ->
                 val key = flight.flightNumber.replace(" ", "").lowercase(Locale.ROOT)

@@ -8,11 +8,12 @@ import com.example.data.cloud.CloudUserProfile
 import com.example.data.cloud.toCloudSnapshot
 import com.example.data.cloud.toFlight
 import com.example.data.cloud.toJsonObject
+import com.example.data.MockFlightData
 import com.example.data.local.*
 import com.example.data.remote.ApiConfig
 import com.example.data.remote.DataSourceMode
-import com.example.data.remote.aerodatabox.AeroDataBoxMapper
-import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
+import com.example.data.remote.gateway.GatewayNetworkClient
+import com.example.data.remote.gateway.toDomainFlight
 import com.example.data.remote.aerodatabox.FlightStateDiffer
 import com.example.model.*
 import com.example.data.supabase.CloudFlightSnapshot
@@ -49,10 +50,10 @@ class FlightRepository(private val context: Context) {
     val weatherService = com.example.data.weather.DestinationWeatherService(context)
     val cloudRepository = SupabaseUserRepository()
 
-    private val _flights = MutableStateFlow<List<Flight>>(MockFlightData.initialFlights)
+    private val _flights = MutableStateFlow<List<Flight>>(emptyList())
     val flights: StateFlow<List<Flight>> = _flights.asStateFlow()
 
-    private val _alerts = MutableStateFlow<List<FlightAlert>>(MockFlightData.sampleAlerts)
+    private val _alerts = MutableStateFlow<List<FlightAlert>>(emptyList())
     val alerts: StateFlow<List<FlightAlert>> = _alerts.asStateFlow()
 
     private val _dataSourceMode = MutableStateFlow(
@@ -87,7 +88,6 @@ class FlightRepository(private val context: Context) {
         com.example.sync.FlightSyncManager.registerConnectivityRestoredMonitor(context)
 
         repositoryScope.launch {
-            cacheAllFlights(_flights.value)
             loadRoomFavorites()
             observeRoomAlerts()
             observeTrackedFlights()
@@ -122,24 +122,22 @@ class FlightRepository(private val context: Context) {
             return@withContext emptyList()
         }
 
-        if (!ApiConfig.hasValidAeroDataBoxKey()) {
+        if (!ApiConfig.isGatewayConfigured) {
             _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
             return@withContext emptyList()
         }
 
         _isLiveLoading.value = true
         try {
-            val response = AeroDataBoxNetworkClient.apiService.getFlightByNumber(cleaned.uppercase(Locale.ROOT))
+            val response = GatewayNetworkClient.apiService.lookupFlight(cleaned.uppercase(Locale.ROOT))
             when {
                 response.code() == 429 -> {
                     _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
                     emptyList()
                 }
-                response.isSuccessful && !response.body().isNullOrEmpty() -> {
+                response.isSuccessful -> {
                     _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
-                    val mappedFlights = response.body()!!.mapNotNull { dto ->
-                        AeroDataBoxMapper.mapDtoToFlight(dto)
-                    }
+                    val mappedFlights = response.body()?.flights.orEmpty().mapNotNull { it.toDomainFlight() }
                     if (mappedFlights.isNotEmpty()) {
                         mergeAndCacheLiveFlights(mappedFlights)
                     }
@@ -148,7 +146,7 @@ class FlightRepository(private val context: Context) {
                 else -> emptyList()
             }
         } catch (e: Exception) {
-            Log.d("FlightRepository", "AeroDataBox flight lookup fallback for $cleaned: ${e.message}")
+            Log.d("FlightRepository", "Gateway flight lookup fallback for $cleaned: ${e.message}")
             emptyList()
         } finally {
             _isLiveLoading.value = false
@@ -168,22 +166,22 @@ class FlightRepository(private val context: Context) {
             return@withContext emptyList()
         }
 
-        if (!ApiConfig.hasValidAeroDataBoxKey()) {
+        if (!ApiConfig.isGatewayConfigured) {
             _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
             return@withContext emptyList()
         }
 
         _isLiveLoading.value = true
         try {
-            val response = AeroDataBoxNetworkClient.apiService.getAirportFlights(code)
+            val response = GatewayNetworkClient.apiService.getAirportFlights(code)
             when {
                 response.code() == 429 -> {
                     _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
                     emptyList()
                 }
-                response.isSuccessful && response.body() != null -> {
+                response.isSuccessful -> {
                     _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
-                    val mappedFlights = AeroDataBoxMapper.mapFidsToFlights(code, response.body()!!)
+                    val mappedFlights = response.body()?.flights.orEmpty().mapNotNull { it.toDomainFlight() }
                     if (mappedFlights.isNotEmpty()) {
                         mergeAndCacheLiveFlights(mappedFlights)
                     }
@@ -192,7 +190,7 @@ class FlightRepository(private val context: Context) {
                 else -> emptyList()
             }
         } catch (e: Exception) {
-            Log.d("FlightRepository", "AeroDataBox FIDS lookup fallback for $code: ${e.message}")
+            Log.d("FlightRepository", "Gateway FIDS lookup fallback for $code: ${e.message}")
             emptyList()
         } finally {
             _isLiveLoading.value = false
@@ -443,35 +441,43 @@ class FlightRepository(private val context: Context) {
     private suspend fun observeRoomCachedFlights() {
         flightDao.getAllCachedFlights().collect { cachedList ->
             if (cachedList.isNotEmpty()) {
-                val currentFlights = _flights.value
                 val updated = cachedList.map { entity ->
-                    val existing = currentFlights.find { it.flightNumber.equals(entity.flightNumber, ignoreCase = true) }
-                        ?: MockFlightData.initialFlights.find { it.flightNumber.equals(entity.flightNumber, ignoreCase = true) }
-
-                    val originAirport = MockFlightData.getAirport(entity.originCode).let { base ->
-                        if (base.code.equals(entity.originCode, ignoreCase = true)) base
-                        else base.copy(code = entity.originCode, city = entity.originCity, name = entity.originName)
-                    }
-                    val destAirport = MockFlightData.getAirport(entity.destCode).let { base ->
-                        if (base.code.equals(entity.destCode, ignoreCase = true)) base
-                        else base.copy(code = entity.destCode, city = entity.destCity, name = entity.destName)
-                    }
-
                     val parsedStatus = try {
                         FlightStatus.valueOf(entity.status)
                     } catch (_: Exception) {
-                        existing?.status ?: FlightStatus.SCHEDULED
+                        FlightStatus.SCHEDULED
                     }
 
-                    val template = existing ?: currentFlights.first()
+                    // Home airports fall back to neutral coordinates when no
+                    // cached reference exists (mock data is never reloaded).
+                    val baseOrigin = MockFlightData.getAirport(entity.originCode)
+                    val baseDest = MockFlightData.getAirport(entity.destCode)
 
-                    template.copy(
+                    Flight(
                         id = entity.id,
                         flightNumber = entity.flightNumber,
                         airline = entity.airline,
                         airlineCode = entity.airlineCode,
-                        origin = originAirport,
-                        destination = destAirport,
+                        origin = Airport(
+                            code = entity.originCode,
+                            name = entity.originName,
+                            city = entity.originCity,
+                            country = baseOrigin.country,
+                            timezone = baseOrigin.timezone,
+                            latitude = baseOrigin.latitude,
+                            longitude = baseOrigin.longitude,
+                            weather = baseOrigin.weather
+                        ),
+                        destination = Airport(
+                            code = entity.destCode,
+                            name = entity.destName,
+                            city = entity.destCity,
+                            country = baseDest.country,
+                            timezone = baseDest.timezone,
+                            latitude = baseDest.latitude,
+                            longitude = baseDest.longitude,
+                            weather = baseDest.weather
+                        ),
                         departureTimeScheduled = entity.departureTimeScheduled,
                         departureTimeEstimated = entity.departureTimeEstimated,
                         arrivalTimeScheduled = entity.arrivalTimeScheduled,
@@ -486,22 +492,33 @@ class FlightRepository(private val context: Context) {
                         terminalArrival = entity.terminalArrival,
                         gateArrival = entity.gateArrival,
                         baggageCarousel = entity.baggageCarousel,
-                        aircraft = template.aircraft.copy(
+                        aircraft = AircraftInfo(
                             model = entity.aircraftModel,
                             registration = entity.aircraftRegistration
                         ),
-                        telemetry = template.telemetry.copy(
+                        telemetry = FlightTelemetry(
+                            currentLatitude = baseOrigin.latitude,
+                            currentLongitude = baseOrigin.longitude,
                             altitudeFeet = entity.altitudeFeet,
                             groundSpeedKnots = entity.groundSpeedKnots,
                             headingDegrees = entity.headingDegrees,
-                            progressPercent = entity.progressPercent
+                            verticalSpeedFpm = 0,
+                            mach = 0.0,
+                            progressPercent = entity.progressPercent,
+                            distanceCoveredNm = 0,
+                            distanceRemainingNm = 0,
+                            etaMinutesRemaining = 0,
+                            waypoints = emptyList()
                         ),
-                        isFavorite = entity.isFavorite || (existing?.isFavorite == true),
-                        customNotes = entity.customNotes.ifBlank { existing?.customNotes ?: "" }
+                        timeline = emptyList(),
+                        isFavorite = entity.isFavorite,
+                        customNotes = entity.customNotes
                     )
                 }
                 _flights.value = updated
             }
+        }
+    }
         }
     }
 
@@ -1078,7 +1095,7 @@ class FlightRepository(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         _userAccount.value = _userAccount.value.copy(lastSyncTime = "Synced at $timeStr")
         repositoryScope.launch {
-            if (!_userAccount.value.isOfflineMode && ApiConfig.hasValidAeroDataBoxKey()) {
+            if (!_userAccount.value.isOfflineMode && ApiConfig.isGatewayConfigured) {
                 val trackedNumbers = _flights.value.filter { it.isTracked || it.isFavorite }.map { it.flightNumber }.take(5)
                 trackedNumbers.forEach { num -> fetchLiveFlightByNumber(num) }
             }

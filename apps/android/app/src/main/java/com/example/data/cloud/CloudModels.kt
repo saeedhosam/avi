@@ -14,13 +14,24 @@ data class CloudTrackedFlight(
     val id: String = "",
     val userId: String = "",
     val flightNumber: String = "",
+    val flightDate: String? = null,
     val airline: String = "",
     val originCode: String = "",
     val destCode: String = "",
     val status: String = "SCHEDULED",
     val customNotes: String = "",
     val isFavorite: Boolean = false
-)
+) {
+    /**
+     * Date-scoped watchlist identity matching the web client:
+     * `"<COMPACT>-<YYYY-MM-DD>"` so the same flight number on two operating
+     * dates occupies two independent rows (web migration 20261106000200).
+     */
+    fun watchRowId(): String {
+        val compact = (id.ifBlank { flightNumber }).replace(" ", "").uppercase()
+        return flightDate?.takeIf { it.isNotBlank() }?.let { "$compact-$it" } ?: compact
+    }
+}
 
 data class CloudAlert(
     val id: String = "",

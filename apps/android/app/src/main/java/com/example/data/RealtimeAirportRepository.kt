@@ -2,9 +2,8 @@ package com.example.data
 
 import com.example.data.remote.ApiConfig
 import com.example.data.remote.DataSourceMode
-import com.example.data.remote.aerodatabox.AeroDataBoxApiService
-import com.example.data.remote.aerodatabox.AeroDataBoxMapper
-import com.example.data.remote.aerodatabox.AeroDataBoxNetworkClient
+import com.example.data.remote.gateway.GatewayNetworkClient
+import com.example.data.remote.gateway.ConsoleAirportNode
 import com.example.data.remote.weather.OpenMeteoApiService
 import com.example.data.remote.weather.OpenMeteoMapper
 import com.example.data.remote.weather.OpenMeteoNetworkClient
@@ -21,9 +20,8 @@ import kotlinx.coroutines.withContext
 
 class RealtimeAirportRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val aeroApi: AeroDataBoxApiService? = null,
     private val openMeteoApi: OpenMeteoApiService? = null,
-    private val enableLiveNetwork: Boolean = ApiConfig.hasValidAeroDataBoxKey()
+    private val enableLiveNetwork: Boolean = ApiConfig.isGatewayConfigured
 ) {
 
     private val _dataSourceMode = MutableStateFlow(
@@ -500,36 +498,27 @@ class RealtimeAirportRepository(
 
     private suspend fun fetchLiveAirportsOrFallback(query: String): List<RealtimeAirportInfo> {
         return try {
-            val client = aeroApi ?: AeroDataBoxNetworkClient.apiService
             val weatherClient = openMeteoApi ?: OpenMeteoNetworkClient.apiService
 
-            val searchResponse = client.searchAirportsByTerm(query = query, limit = 8)
+            val searchResponse = GatewayNetworkClient.apiService.searchAirports(query = query)
             if (searchResponse.code() == 429) {
                 _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
                 return allAirports
             }
 
-            if (searchResponse.isSuccessful && searchResponse.body()?.items?.isNotEmpty() == true) {
+            if (searchResponse.isSuccessful && searchResponse.body()?.airports?.isNotEmpty() == true) {
                 _dataSourceMode.value = DataSourceMode.LIVE_AERODATABOX
-                val dtoItems = searchResponse.body()!!.items.orEmpty()
-                val mapped = dtoItems.mapNotNull { dto ->
-                    val code = dto.iata?.uppercase()
-                    val base = allAirports.find { it.code.equals(code, ignoreCase = true) }
-                    val delayDto = if (!code.isNullOrBlank() && dtoItems.size <= 3) {
-                        runCatching { client.getAirportDelays(code).body() }.getOrNull()
-                    } else null
-
-                    val info = AeroDataBoxMapper.mapAirportToRealtimeInfo(dto, delayDto, base)
-                    if (info != null && dtoItems.size <= 3) {
+                val mapped = searchResponse.body()!!.airports.orEmpty().mapNotNull { node ->
+                    val base = allAirports.find { it.code.equals(node.iata, ignoreCase = true) }
+                    val info = node.toRealtimeInfo(base)
+                    if (info != null) {
                         val liveWeather = runCatching {
                             val wRes = weatherClient.getForecast(info.latitude, info.longitude)
                             wRes.body()?.let { OpenMeteoMapper.mapToRealtimeAirportWeather(info.icao, it) }
                         }.getOrNull()
                         if (liveWeather != null) info.copy(weather = liveWeather) else info
-                    } else {
-                        info
-                    }
-                }
+                    } else null
+                }.filterNotNull()
                 if (mapped.isNotEmpty()) {
                     val existingCodes = mapped.map { it.code }.toSet()
                     mapped + allAirports.filter { it.code !in existingCodes }
@@ -542,6 +531,47 @@ class RealtimeAirportRepository(
         } catch (_: Exception) {
             allAirports
         }
+    }
+
+    /** Maps a console airport node to the realtime info shape (no delay feed). */
+    private fun ConsoleAirportNode.toRealtimeInfo(
+        base: RealtimeAirportInfo?
+    ): RealtimeAirportInfo? {
+        if (iata.isBlank() || latitude == 0.0) return null
+        val fallback = base ?: allAirports.firstOrNull()
+        val template = fallback ?: return null
+        return RealtimeAirportInfo(
+            code = iata,
+            icao = icao.ifBlank { "K$iata" },
+            name = name.ifBlank { iata },
+            city = city,
+            country = country,
+            region = template.region,
+            timezone = timezone,
+            latitude = latitude,
+            longitude = longitude,
+            elevationFeet = 0,
+            operationalStatus = "Normal Operations",
+            isDelayed = false,
+            delayMinutes = 0,
+            onTimePercentage = 0,
+            activeDeparturesCount = 0,
+            activeArrivalsCount = 0,
+            activeRunways = emptyList(),
+            terminalCount = 0,
+            weather = RealtimeAirportWeather(
+                tempC = 0,
+                tempF = 32,
+                condition = "",
+                wind = "",
+                visibility = "",
+                humidity = 0,
+                pressureInHg = 30.0,
+                metarRaw = "",
+                flightCategory = FlightCategory.VFR
+            ),
+            hubAirlines = hubAirlines
+        )
     }
 
     suspend fun getAirportByCode(code: String): RealtimeAirportInfo? = withContext(ioDispatcher) {

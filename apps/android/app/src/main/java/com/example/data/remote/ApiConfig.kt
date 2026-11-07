@@ -42,6 +42,23 @@ enum class DataSourceMode(
  */
 object ApiConfig {
 
+    /** Gateway base URL. The Android client does not hold provider keys — all
+     *  AeroDataBox traffic flows through the Avi gateway, which owns the key
+     *  and returns console-shaped Flight objects. */
+    val aviGatewayBaseUrl: String
+        get() {
+            val raw = try {
+                BuildConfig.AVI_API_BASE_URL.trim()
+            } catch (_: Throwable) {
+                ""
+            }
+            val host = raw.replace("https://", "").replace("http://", "").trimEnd('/')
+            return if (host.isBlank() || host == "null") "https://api.codestep.org/" else "https://$host/"
+        }
+
+    val isGatewayConfigured: Boolean
+        get() = aviGatewayBaseUrl.startsWith("https://")
+
     private val PLACEHOLDER_KEYS = setOf(
         "",
         "null",
@@ -97,12 +114,12 @@ object ApiConfig {
     }
 
     /**
-     * Computes the default initial DataSourceMode based on key availability and offline flag.
+     * Computes the default initial DataSourceMode based on gateway availability and offline flag.
      */
     fun resolveInitialMode(isOffline: Boolean): DataSourceMode {
         return when {
             isOffline -> DataSourceMode.OFFLINE_ROOM_CACHE
-            hasValidAeroDataBoxKey() -> DataSourceMode.LIVE_AERODATABOX
+            isGatewayConfigured -> DataSourceMode.LIVE_AERODATABOX
             else -> DataSourceMode.DEMO_CACHE_NO_KEY
         }
     }
