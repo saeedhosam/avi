@@ -122,11 +122,11 @@ export function geodesicDistanceKm(
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) ** 2;
-  return Math.max(80, Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))));
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
 export function kmToNm(km: number) {
-  return Math.max(45, Math.round(km * 0.539957));
+  return Math.round(km * 0.539957);
 }
 
 export function statusLabel(status: FlightStatus, delayMinutes = 0) {

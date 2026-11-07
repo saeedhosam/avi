@@ -4,7 +4,7 @@ import {
   mapAeroFids,
   type AeroFidsResponseDto,
 } from "@/lib/aerodatabox";
-import { gatewayFetchJson } from "@/lib/gateway";
+import { gatewayConfigured, gatewayFetchJson } from "@/lib/gateway";
 import type { Flight } from "@/lib/types";
 
 export async function GET(
@@ -28,6 +28,17 @@ export async function GET(
   }>(`/v1/airports/${code}/flights`);
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
+  }
+  if (gatewayConfigured()) {
+    return NextResponse.json(
+      {
+        mode: "NOT_CONFIGURED",
+        status: 0,
+        flights: [],
+        error: "Live airport board data is temporarily unavailable.",
+      },
+      { status: 503 },
+    );
   }
 
   const { data, status, mode } = await fetchAeroJson<AeroFidsResponseDto>(

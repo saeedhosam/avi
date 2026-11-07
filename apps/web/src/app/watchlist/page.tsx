@@ -98,7 +98,7 @@ export default function WatchlistPage() {
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">
               {watchlist.map((flight) => (
-                <FlightCard key={flight.id} flight={flight} />
+                <FlightCard key={`${flight.id}-${flight.flightDate ?? "any"}`} flight={flight} />
               ))}
             </div>
           )}

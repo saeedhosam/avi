@@ -1,5 +1,4 @@
 /* Avi service worker: Web Push delivery for engine-written flight alerts. */
-/* eslint-disable no-restricted-globals */
 
 const ICON_URL = "/icon.jpg";
 

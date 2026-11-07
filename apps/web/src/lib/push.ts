@@ -94,3 +94,27 @@ export async function enableWebPush(): Promise<{ ok: boolean; reason?: string }>
   }
   return { ok: true };
 }
+
+/**
+ * Removes this browser's push endpoint both server-side and in the browser.
+ * Called on sign-out so the previous user does not keep receiving alerts on a
+ * shared device.
+ */
+export async function disableWebPush(): Promise<void> {
+  if (!webPushSupported()) return;
+  const supabase = getSupabase();
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!subscription) return;
+    if (supabase) {
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("endpoint", subscription.endpoint);
+    }
+    await subscription.unsubscribe();
+  } catch (error) {
+    console.warn("push unsubscribe failed", error);
+  }
+}

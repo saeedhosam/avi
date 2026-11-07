@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchAeroJson } from "@/lib/aerodatabox";
-import { gatewayFetchJson } from "@/lib/gateway";
+import { gatewayConfigured, gatewayFetchJson } from "@/lib/gateway";
 
 
 interface AeroRouteStat {
@@ -49,6 +49,17 @@ export async function GET(
   }>(`/v1/airports/${code}/routes`);
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
+  }
+  if (gatewayConfigured()) {
+    return NextResponse.json(
+      {
+        mode: "NOT_CONFIGURED",
+        status: 0,
+        routes: [],
+        error: "Live route data is temporarily unavailable.",
+      },
+      { status: 503 },
+    );
   }
 
   const { data, status, mode } = await fetchAeroJson<{ routes?: AeroRouteStat[] }>(

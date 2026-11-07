@@ -11,22 +11,29 @@ function hasValidKey(value: string | undefined) {
 }
 
 interface GatewayStatus {
+  providers?: { aerodatabox?: "configured" | "not_configured" };
   watchEngine?: {
     enabled?: boolean;
     units?: { unitsBudget?: number; unitsUsed?: number; overBudget?: boolean };
   } | null;
 }
 
+interface GatewayProbe {
+  aeroDataBoxConfigured: boolean;
+  watchEngine: {
+    enabled: boolean;
+    unitsBudget: number | null;
+    unitsUsed: number | null;
+  } | null;
+}
+
 /**
- * Probes the Avi gateway so the web client knows whether flight status is
- * maintained by a server watch engine. Best effort: if the gateway is not
- * reachable, the client falls back to its own (slower) polling.
+ * Probes the Avi gateway so the web client knows whether live provider data is
+ * maintained by the shared backend and server watch engine. Best effort: if
+ * the gateway is not reachable, the client falls back to the local key (dev)
+ * or reports provider data unavailable (production).
  */
-async function probeWatchEngine(): Promise<{
-  enabled: boolean;
-  unitsBudget: number | null;
-  unitsUsed: number | null;
-} | null> {
+async function probeGateway(): Promise<GatewayProbe | null> {
   const base = process.env.AVI_API_BASE_URL?.trim().replace(/\/+$/, "");
   if (!base) return null;
   try {
@@ -36,11 +43,15 @@ async function probeWatchEngine(): Promise<{
     });
     if (!response.ok) return null;
     const payload = (await response.json()) as GatewayStatus;
-    if (!payload.watchEngine) return null;
     return {
-      enabled: Boolean(payload.watchEngine.enabled),
-      unitsBudget: payload.watchEngine.units?.unitsBudget ?? null,
-      unitsUsed: payload.watchEngine.units?.unitsUsed ?? null,
+      aeroDataBoxConfigured: payload.providers?.aerodatabox === "configured",
+      watchEngine: payload.watchEngine
+        ? {
+            enabled: Boolean(payload.watchEngine.enabled),
+            unitsBudget: payload.watchEngine.units?.unitsBudget ?? null,
+            unitsUsed: payload.watchEngine.units?.unitsUsed ?? null,
+          }
+        : null,
     };
   } catch {
     return null;
@@ -48,15 +59,16 @@ async function probeWatchEngine(): Promise<{
 }
 
 export async function GET() {
-  const watchEngine = await probeWatchEngine();
+  const gateway = await probeGateway();
+  const localKeyConfigured = hasValidKey(process.env.AERODATABOX_API_KEY);
   return NextResponse.json({
-    aeroDataBoxConfigured: hasValidKey(process.env.AERODATABOX_API_KEY),
+    aeroDataBoxConfigured: gateway?.aeroDataBoxConfigured ?? localKeyConfigured,
     supabaseConfigured: Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     ),
     weatherProvider: "open-meteo",
-    watchEngine,
+    watchEngine: gateway?.watchEngine ?? null,
     timestamp: new Date().toISOString(),
   });
 }

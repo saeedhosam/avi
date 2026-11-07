@@ -3,7 +3,7 @@ import {
   fetchAeroJson,
   type AeroAirportDto,
 } from "@/lib/aerodatabox";
-import { gatewayFetchJson } from "@/lib/gateway";
+import { gatewayConfigured, gatewayFetchJson } from "@/lib/gateway";
 import { inferRegionFromCoords } from "@/lib/data";
 import type { AirportNode } from "@/lib/types";
 
@@ -25,6 +25,17 @@ export async function GET(request: Request) {
   }>(`/v1/airports/search?q=${encodeURIComponent(q)}`);
   if (gatewayResult) {
     return NextResponse.json(gatewayResult);
+  }
+  if (gatewayConfigured()) {
+    return NextResponse.json(
+      {
+        mode: "NOT_CONFIGURED",
+        status: 0,
+        airports: [],
+        error: "Airport search is temporarily unavailable.",
+      },
+      { status: 503 },
+    );
   }
 
   const { data, status, mode } = await fetchAeroJson<AeroAirportSearchResponse>(

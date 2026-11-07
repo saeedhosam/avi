@@ -211,29 +211,6 @@ export async function deleteWatchlistItemCloud(uid: string, flightId: string) {
   }
 }
 
-export async function saveAlertCloud(uid: string, alert: FlightAlert) {
-  const supabase = getSupabase();
-  if (!supabase) return;
-  try {
-    await supabase.from("flight_alerts").upsert(
-      {
-        id: alert.id,
-        user_id: uid,
-        flight_number: alert.flightNumber,
-        alert_type: alert.type,
-        title: alert.title.slice(0, 200),
-        message: alert.message.slice(0, 1000),
-        is_read: alert.isRead,
-        created_at: alert.timestamp,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" },
-    );
-  } catch (error) {
-    console.warn("Supabase alert sync failed", error);
-  }
-}
-
 export async function markAlertReadCloud(uid: string, alertId: string) {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -276,9 +253,9 @@ export async function fetchCloudAlerts(uid: string): Promise<FlightAlert[]> {
 
 export async function fetchCloudWatchlist(
   uid: string,
-): Promise<CloudWatchlistRecord[]> {
+): Promise<CloudWatchlistRecord[] | null> {
   const supabase = getSupabase();
-  if (!supabase) return [];
+  if (!supabase) return null;
   try {
     const { data, error } = await supabase
       .from("watchlist_items")
@@ -302,7 +279,7 @@ export async function fetchCloudWatchlist(
     });
   } catch (error) {
     console.warn("Supabase watchlist fetch failed", error);
-    return [];
+    return null;
   }
 }
 

@@ -39,9 +39,9 @@ Copy `.env.example` to `.env.local`:
 
 | Variable | Purpose |
 | --- | --- |
-| `AERODATABOX_API_KEY` | Server-only AeroDataBox direct API key |
-| `AERODATABOX_API_HOST` | Provider host (direct API by default) |
-| `AVI_API_BASE_URL` | Gateway base URL, probed by `/api/status` |
+| `AERODATABOX_API_KEY` | Server-only AeroDataBox key for local development only; production uses the gateway |
+| `AERODATABOX_API_HOST` | Provider host for the local direct fallback |
+| `AVI_API_BASE_URL` | Gateway base URL; required in production (disables the direct fallback) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Public Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public Supabase key (RLS-gated) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push public key |

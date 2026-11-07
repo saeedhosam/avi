@@ -4,7 +4,7 @@ import {
   mapAeroFlight,
   type AeroFlightDto,
 } from "@/lib/aerodatabox";
-import { gatewayFetchJson } from "@/lib/gateway";
+import { gatewayConfigured, gatewayFetchJson } from "@/lib/gateway";
 import type { Flight } from "@/lib/types";
 
 
@@ -68,6 +68,20 @@ export async function GET(request: Request) {
       });
     }
     return NextResponse.json(gatewayResult);
+  }
+
+  // In production the gateway is the only provider seam. Falling back to a
+  // second direct-provider key would bypass its cache, rate limits, and unit
+  // accounting. Direct lookups remain available only for local development.
+  if (gatewayConfigured()) {
+    return NextResponse.json(
+      {
+        mode: "NOT_CONFIGURED",
+        flights: [],
+        error: "Live flight data is temporarily unavailable.",
+      },
+      { status: 503 },
+    );
   }
 
   // Date-scoped lookups use the specific-date endpoint (departure date only).

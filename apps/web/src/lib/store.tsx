@@ -21,6 +21,7 @@ import type { DataSourceMode } from "./data-source";
 import { getSupabase } from "./supabase";
 import { normalizeFlightNumber, uid } from "./utils";
 import {
+  disableWebPush,
   enableWebPush as enableWebPushSubscription,
   hasWebPushSubscription,
   webPushConfigured as webPushConfiguredCheck,
@@ -32,7 +33,6 @@ import {
   fetchCloudWatchlist,
   markAlertReadCloud,
   observeSupabaseAuth,
-  saveAlertCloud,
   saveUserProfile,
   saveWatchlistItemCloud,
   signInWithGoogleSupabase,
@@ -439,10 +439,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addAlert = useCallback(
     (alert: FlightAlert, push = true) => {
       setAlerts((prev) => [alert, ...prev.filter((item) => item.id !== alert.id)]);
-      setAccount((current) => {
-        if (current.uid) void saveAlertCloud(current.uid, alert);
-        return current;
-      });
+      // Alerts are server-owned. Engine-written rows arrive through Realtime;
+      // writing client-generated alerts here would duplicate them and make
+      // them eligible for push delivery a second time.
       if (push) {
         notify(alert.title, "alert");
         if (
@@ -476,10 +475,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const key = flightKey(flight);
         const existing = map.get(key);
         if (existing) {
+          const preserveLocal = source !== "cloud";
           const merged: Flight = {
             ...flight,
-            isWatchlisted: existing.isWatchlisted,
-            customNotes: existing.customNotes,
+            isWatchlisted: preserveLocal
+              ? existing.isWatchlisted
+              : (flight.isWatchlisted ?? existing.isWatchlisted),
+            customNotes: preserveLocal
+              ? existing.customNotes
+              : (flight.customNotes || existing.customNotes),
             // Keep the freshest live location if one source has it.
             telemetry: {
               ...flight.telemetry,
@@ -508,23 +512,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const mergeCloudWatchlist = useCallback(
     async (uid: string) => {
       const records = await fetchCloudWatchlist(uid);
-      if (!records.length) return;
+      if (!records) return;
       const cloudByNumber = new Map(
         records.map((record) => [
           `${String(record.flightNumber).replace(/\s+/g, "").toLowerCase()}|${record.flightDate ?? "any"}`,
           record,
         ]),
       );
-      const missing = [...cloudByNumber.keys()].filter(
-        (key) => !flightsRef.current.some((flight) => flightKey(flight) === key),
-      );
       const fetched: Flight[] = [];
-      for (const key of missing.slice(0, 8)) {
-        const record = cloudByNumber.get(key);
-        if (!record) continue;
+      let liveLookups = 0;
+
+      for (const record of records) {
         // The server watch engine keeps `snapshot` fresh; hydrating from it
-        // costs zero provider units. Only a missing snapshot falls back to a
-        // live lookup.
+        // costs zero provider units and is the only way cross-device status
+        // updates reach an already-cached flight.
         if (record.snapshot) {
           fetched.push({
             ...record.snapshot,
@@ -533,6 +534,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
           continue;
         }
+
+        const key = `${String(record.flightNumber).replace(/\s+/g, "").toLowerCase()}|${record.flightDate ?? "any"}`;
+        const alreadyCached = flightsRef.current.some(
+          (flight) => flightKey(flight) === key,
+        );
+        if (alreadyCached || liveLookups >= 8) continue;
+
+        // A pruned/missing snapshot needs one live lookup to rehydrate.
+        liveLookups += 1;
         try {
           const url = new URL("/api/flights/search", window.location.origin);
           url.searchParams.set(
@@ -553,12 +563,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // A missing cloud flight is retried on the next sync.
         }
       }
-      upsertFlights(fetched, { source: "cloud" });
-      // Re-flag anything already in the local cache that matches a cloud row.
+
+      if (fetched.length) upsertFlights(fetched, { source: "cloud" });
+
+      // Reconcile local flags with the cloud list: re-flag matches and clear
+      // entries removed on another device. A failed fetch returns null above
+      // and never reaches this authoritative pass.
       upsertFlights(
         flightsRef.current.map((flight) => {
           const record = cloudByNumber.get(flightKey(flight));
-          if (!record) return flight;
+          if (!record) {
+            return flight.isWatchlisted
+              ? { ...flight, isWatchlisted: false }
+              : flight;
+          }
           return {
             ...flight,
             isWatchlisted: true,
@@ -964,8 +982,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (supabaseEnabled && account.uid) {
+      // Stop this device from receiving the previous account's alerts.
+      await disableWebPush().catch(() => {});
       await signOutSupabase().catch(() => {});
     }
+    setWebPushSubscribed(false);
     setAccount({ ...GUEST_ACCOUNT, isOfflineMode: offlineMode });
     notify("Signed out. Your saved data stays on this device.", "info");
   }, [account.uid, notify, offlineMode]);

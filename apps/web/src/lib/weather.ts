@@ -386,7 +386,7 @@ export async function fetchDestinationForecast(
       code: airport.code,
       name: airport.name,
       city: airport.city,
-      aircraft: airport.country,
+      country: airport.country,
       arrival: arrivalTime,
       tempC: String(airport.weather.tempC),
       tempF: String(airport.weather.tempF),
