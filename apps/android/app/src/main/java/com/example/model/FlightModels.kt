@@ -81,6 +81,7 @@ data class Flight(
     val flightNumber: String, // e.g. "AA 100"
     val airline: String, // e.g. "American Airlines"
     val airlineCode: String, // e.g. "AA"
+    val flightDate: String? = null, // ISO YYYY-MM-DD operating date (departure-airport local)
     val origin: Airport,
     val destination: Airport,
     val departureTimeScheduled: String,

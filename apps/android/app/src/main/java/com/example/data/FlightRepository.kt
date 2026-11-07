@@ -494,7 +494,11 @@ class FlightRepository(private val context: Context) {
                         baggageCarousel = entity.baggageCarousel,
                         aircraft = AircraftInfo(
                             model = entity.aircraftModel,
-                            registration = entity.aircraftRegistration
+                            registration = entity.aircraftRegistration,
+                            age = "Not reported",
+                            wifiAvailable = false,
+                            powerOutlets = false,
+                            seatLayout = "Not reported by the live feed"
                         ),
                         telemetry = FlightTelemetry(
                             currentLatitude = baseOrigin.latitude,

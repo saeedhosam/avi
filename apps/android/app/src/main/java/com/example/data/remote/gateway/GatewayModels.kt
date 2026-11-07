@@ -7,8 +7,6 @@ import com.example.model.Flight
 import com.example.model.FlightStatus
 import com.example.model.FlightTelemetry
 import com.example.model.FlightTimelineEvent
-import com.example.model.RouteRegion
-import com.example.model.AirportNode
 import com.example.model.OperatingCarrierRoute
 import com.example.model.DirectFlightConnection
 import com.example.model.HaulCategory
@@ -258,13 +256,7 @@ private fun ConsoleTelemetryDto?.toDomainTelemetry(): FlightTelemetry = FlightTe
     waypoints = emptyList()
 )
 
-fun ConsoleAirportNode.toDomainNode(): AirportNode = AirportNode(
-    iata = iata,
-    icao = icao,
-    name = name,
-    city = city,
-    country = country,
-    region = region.ifBlank { RouteRegion.EUROPE.name },
+,
     latitude = latitude,
     longitude = longitude,
     timezone = timezone,

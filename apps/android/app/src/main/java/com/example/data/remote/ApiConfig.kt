@@ -69,41 +69,21 @@ object ApiConfig {
     )
 
     /**
-     * Returns the configured AeroDataBox API key from BuildConfig.
+     * Legacy direct-provider config. The Android app no longer calls
+     * AeroDataBox directly (all traffic flows through the Avi gateway), so
+     * these default to blank rather than reading removed BuildConfig fields.
      */
     val aeroDataBoxApiKey: String
-        get() = try {
-            BuildConfig.AERODATABOX_API_KEY.trim()
-        } catch (_: Throwable) {
-            ""
-        }
+        get() = ""
 
-    /**
-     * Returns the configured AeroDataBox gateway host from BuildConfig.
-     */
     val aeroDataBoxApiHost: String
-        get() = try {
-            val host = BuildConfig.AERODATABOX_API_HOST.trim()
-            if (host.isBlank() || host == "null") "api.aerodatabox.com" else host
-        } catch (_: Throwable) {
-            "api.aerodatabox.com"
-        }
+        get() = "api.aerodatabox.com"
 
-    /**
-     * RapidAPI remains supported as an optional gateway override for rollback,
-     * but direct AeroDataBox access is the default.
-     */
     val usesRapidApiGateway: Boolean
-        get() = aeroDataBoxApiHost.contains("rapidapi.com")
+        get() = false
 
-    /**
-     * Returns the base HTTPS URL for AeroDataBox API requests.
-     */
     val aeroDataBoxBaseUrl: String
-        get() {
-            val host = aeroDataBoxApiHost.removePrefix("https://").removePrefix("http://").trimEnd('/')
-            return "https://$host/"
-        }
+        get() = "https://api.aerodatabox.com/"
 
     /**
      * Checks whether a real, non-placeholder AeroDataBox API key is available.
