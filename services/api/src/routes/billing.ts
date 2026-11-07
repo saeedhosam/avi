@@ -194,7 +194,12 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
 
       hooked.post(
         "/v1/webhooks/polar",
-      { schema: { hide: true, response: { 200: z.void(), 400: z.object({ error: z.string() }), 401: z.object({ error: z.string() }), 500: z.object({ error: z.string() }) } } },
+        {
+          schema: {
+            hide: true,
+            response: { 200: z.void(), 400: z.object({ error: z.string() }), 401: z.object({ error: z.string() }), 500: z.object({ error: z.string() }) },
+          },
+        },
       async (request, reply) => {
         const raw = (request as RawBodyRequest).rawBody ?? (request as { body?: unknown }).body;
         const requestBody =

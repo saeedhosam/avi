@@ -73,9 +73,26 @@ in `enforce` mode.
 3. When demand changes, adjust `PROVIDER_QUOTA_LIMITS`
    (`services/api/src/lib/user-quota.ts`).
 
+## Engine split (P2 Track B)
+
+The watch engine moved out of the gateway into a dedicated container. The
+poll ladder lives in Postgres (`watchlist_items.next_poll_at`), and dedup is
+enforced by a unique index on `flight_alerts`. That makes restarts and
+future scale-out safe.
+
+- `avi-api`: HTTP gateway, `WATCH_ENGINE_ENABLED=false`; proxies engine stats
+  from `ENGINE_API_BASE_URL=http://engine:8090` for `/v1/status`.
+- `avi-engine`: worker image from the same codebase
+  (`node dist/engine/worker.js`), `WATCH_ENGINE_ENABLED=true` by default.
+- No new service dependency: single-writer via compose, plus advisory lock is
+  added only if you scale `avi-engine` beyond one replica.
+- See `docs/engine.md` for the split and the grading rules.
+
 ## Later
 
 - Move quota counters to Redis-backed sliding windows (currently fixed
   hour/day buckets) if abuse patterns show they are too coarse.
 - Add admin tooling to grant one-off quota extensions.
+- Add a Postgres advisory lock as soon as `avi-engine` scales above one
+  replica.
 

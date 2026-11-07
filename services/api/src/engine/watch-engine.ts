@@ -1,22 +1,21 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import type { FlightSummary } from "../domain/flight.js";
+import type { WatchSnapshot } from "./snapshot.js";
 import { UsageTracker, UserMeter } from "../lib/usage.js";
 import type { SupabaseWatchRow } from "../lib/supabase-server.js";
 import { SupabaseServer } from "../lib/supabase-server.js";
 import type { AeroDataBoxProvider } from "../providers/aerodatabox.js";
 import { concurrencyLimitFor } from "./plans.js";
 import {
-  alertKey,
   diffAlerts,
-  evaluateDue,
   isWatchSnapshot,
   matchesJob,
   mergeSnapshot,
+  scheduleNextPoll,
   snapshotFromRow,
   type WatchJob,
-} from "./snapshot.js";
-import { PushDelivery, type PushDeliveryStats } from "./push-delivery.js";
+} from "./snapshot.js";import { PushDelivery, type PushDeliveryStats } from "./push-delivery.js";
 
 export interface EngineStats {
   enabled: boolean;
@@ -46,6 +45,11 @@ export interface EngineStats {
  * because every user's snapshot is refreshed from a single provider response.
  * Change alerts are written server-side so Realtime delivers them with no
  * browser open.
+ *
+ * State lives in Postgres, not in this process: `watchlist_items.next_poll_at`
+ * is the poll ladder, and `flight_alerts` dedupes on a unique index. The
+ * engine is restart- and concurrency-safe; an engine container provides the
+ * single writer via a PostgREST advisory lock.
  */
 export class WatchEngine {
   private timer: NodeJS.Timeout | null = null;
@@ -57,10 +61,6 @@ export class WatchEngine {
   private lastSwept = 0;
   private backlog = 0;
   private lastError: string | null = null;
-  private readonly lastRefresh = new Map<string, number>();
-  private readonly seenAlerts = new Set<string>();
-  /** Bound the in-memory dedup cache; the DB is the durable source of truth. */
-  private static readonly MAX_SEEN_ALERTS = 20_000;
   private readonly meter = new UserMeter();
   private lastPushStats: PushDeliveryStats | null = null;
   // Warn once per threshold per month (budget alerting).
@@ -95,13 +95,6 @@ export class WatchEngine {
         this.log.warn("watch engine disabled: AeroDataBox key missing");
         return;
       }
-      try {
-        const seeded = await this.supabase.recentAlertKeys();
-        for (const key of seeded) this.rememberAlert(key);
-        this.log.debug({ count: seeded.length }, "watch engine seeded recent alerts");
-      } catch (error) {
-        this.log.warn({ err: error }, "watch engine could not seed recent alerts");
-      }
       this.scheduleNext(this.config.WATCH_ENGINE_STARTUP_DELAY_MS);
       this.log.info(
         {
@@ -123,14 +116,6 @@ export class WatchEngine {
       clearTimeout(this.timer);
       this.timer = null;
     }
-  }
-
-  /** Adds a dedup key, evicting the oldest entries once the cache is bounded. */
-  private rememberAlert(key: string): void {
-    this.seenAlerts.add(key);
-    if (this.seenAlerts.size <= WatchEngine.MAX_SEEN_ALERTS) return;
-    const oldest = this.seenAlerts.values().next().value;
-    if (oldest) this.seenAlerts.delete(oldest);
   }
 
   private scheduleNext(delayMs: number): void {
@@ -237,10 +222,12 @@ export class WatchEngine {
       this.lastSwept = 0;
       return;
     }
-    const now = Date.now();
-    const jobs = this.collectDue(rows, now);
-    this.backlog = jobs.length;
 
+    // Every row Postgres handed back is due now; group them by flight + date
+    // so one provider call covers the shared lookups. Rows are ordered by
+    // next_poll_at, so operational windows still win the tick.
+    const jobs = this.collectJobs(rows);
+    this.backlog = jobs.length;
     // Plan enforcement (P1 Track A): a refresh only goes out for users who
     // have a live slot available on their plan. Users at their limit keep
     // their row in the deduped group but are skipped, so watching stays
@@ -255,7 +242,7 @@ export class WatchEngine {
           job.key,
           concurrencyLimitFor(plans.get(row.user_id)),
           this.config.WATCH_ENGINE_ACTIVE_WINDOW_MS,
-          now,
+          Date.now(),
         ),
       );
     const allowedFor = (job: WatchJob) => {
@@ -269,8 +256,8 @@ export class WatchEngine {
       return allowed;
     };
 
-    const pending = new Map(jobs.map((job) => [job.key, job]));
     let providerCalls = 0;
+    let pendingJobs = 0;
     let refreshed = 0;
     const overCallBudget = () => {
       if (this.usage.overBudget) {
@@ -285,9 +272,12 @@ export class WatchEngine {
 
     // FIDS-by-airport pre-pass (G6): one board call refreshes every watched
     // flight departing that airport, replacing N × 2-unit per-flight calls.
+    const fidsCovered = new Set<WatchJob>();
     if (this.config.WATCH_ENGINE_FIDS_ENABLED && this.provider.lookupFids) {
       const groups = new Map<string, WatchJob[]>();
-      for (const job of pending.values()) {
+      for (const job of jobs) {
+        // Only group jobs whose rows still have a snapshot-origin. Rows
+        // without one fall into the per-flight pass.
         const origin = job.rows
           .map((row) =>
             isWatchSnapshot(row.snapshot)
@@ -302,113 +292,141 @@ export class WatchEngine {
         groups.set(origin, group);
       }
       for (const [origin, group] of groups) {
-        if (overCallBudget()) break;
+        if (overCallBudget()) {
+          pendingJobs += group.length;
+          continue;
+        }
         if (group.length < this.config.WATCH_ENGINE_FIDS_MIN_GROUP) continue;
+        const pending = group.slice(0);
         try {
           const board = await this.provider.lookupFids(origin);
           providerCalls += 1;
           if (board.meta.source === "live") {
             this.usage.add(this.config.AERODATABOX_UNITS_PER_FLIGHT);
           }
-          if (!board.summaries.length) continue;
-          const matchedJobs = group
-            .map((job) => ({
-              job,
-              summary: board.summaries.find(
-                (flight) => flight.origin.code === origin && matchesJob(flight, job),
-              ),
-            }))
-            .filter((entry): entry is { job: WatchJob; summary: FlightSummary } =>
-              Boolean(entry.summary),
-            );
-          if (!matchedJobs.length) continue;
-          // The board charges 2 units for the whole group; the share each job
-          // attributes to its watchers splits that across the matched jobs.
-          const perJobShare =
-            board.meta.source === "live"
-              ? this.config.AERODATABOX_UNITS_PER_FLIGHT / matchedJobs.length
-              : 0;
-          for (const { job, summary } of matchedJobs) {
-            const allowed = allowedFor(job);
-            refreshed += await this.applySummary(job, summary, allowed, now, perJobShare);
-            // A successful board covered this job even when nobody had a
-            // free plan slot; do not immediately re-poll it next tick.
-            this.lastRefresh.set(job.key, now);
-            pending.delete(job.key);
+          if (board.summaries.length) {
+            const matchedJobs = pending
+              .map((job) => ({
+                job,
+                summary: board.summaries.find(
+                  (flight) => flight.origin.code === origin && matchesJob(flight, job),
+                ),
+              }))
+              .filter((entry): entry is { job: WatchJob; summary: FlightSummary } =>
+                Boolean(entry.summary),
+              );
+            if (matchedJobs.length) {
+              // The board charges 2 units for the whole group; the share each
+              // job attributes to its watchers splits that across the matched
+              // jobs' watcher set.
+              const perJobShare =
+                board.meta.source === "live"
+                  ? this.config.AERODATABOX_UNITS_PER_FLIGHT / matchedJobs.length
+                  : 0;
+              for (const { job, summary } of matchedJobs) {
+                const allowed = allowedFor(job);
+                refreshed += await this.applySummary(job, summary, allowed, perJobShare);
+                pending.splice(pending.indexOf(job), 1);
+              }
+            }
           }
+          // Anything not matched still needs its next poll schedule persist
+          // (misses must progress on the ladder too).
+          await this.persistSchedule(
+            pending.flatMap((job) => job.rows),
+          );
+          // Jobs handled by the board never re-enter the per-flight pass.
+          for (const job of group) fidsCovered.add(job);
           this.log.debug(
-            { origin, jobs: matchedJobs.length },
+            { origin, jobs: pending.length },
             "watch engine refreshed via airport board",
           );
         } catch (error) {
+          pendingJobs += pending.length;
           this.log.warn({ err: error, origin }, "watch engine board refresh failed");
         }
       }
     }
 
     // Per-flight pass for everything the boards did not cover.
-    for (const job of pending.values()) {
-      if (overCallBudget()) break;
+    for (const job of jobs) {
+      if (fidsCovered.has(job)) continue;
+      if (overCallBudget()) {
+        pendingJobs += 1;
+        continue;
+      }
       try {
         const allowed = allowedFor(job);
         const result = await this.provider.searchFlight(job.flightNumber);
         providerCalls += 1;
-        // Honor the polling ladder even when the provider has no matching
-        // flight right now; otherwise the same job retries every tick.
-        this.lastRefresh.set(job.key, now);
-        if (result.meta.source === "not_configured") break;
-        if (result.meta.source === "quota_fallback") continue;
+        if (result.meta.source === "not_configured") {
+          await this.persistSchedule(job.rows);
+          pendingJobs += 1;
+          continue;
+        }
+        if (result.meta.source === "quota_fallback") {
+          await this.persistSchedule(job.rows);
+          pendingJobs += 1;
+          continue;
+        }
         if (result.meta.source === "live") {
           this.usage.add(this.config.AERODATABOX_UNITS_PER_FLIGHT);
         }
-        if (!result.flights.length) continue;
+        if (!result.flights.length) {
+          await this.persistSchedule(job.rows);
+          continue;
+        }
         const summary = result.flights.find((flight) => matchesJob(flight, job));
-        if (!summary) continue;
+        if (!summary) {
+          await this.persistSchedule(job.rows);
+          continue;
+        }
         refreshed += await this.applySummary(
           job,
           summary,
           allowed,
-          now,
           result.meta.source === "live"
-            ? this.config.AERODATABOX_UNITS_PER_FLIGHT / Math.max(1, allowed.length)
+            ? this.config.AERODATABOX_UNITS_PER_FLIGHT / Math.max(1, allowed.length || 1)
             : 0,
         );
       } catch (error) {
-        this.lastRefresh.set(job.key, now);
+        pendingJobs += 1;
+        try {
+          await this.persistSchedule(job.rows);
+        } catch (scheduleError) {
+          this.log.warn({ err: scheduleError, flight: job.flightNumber }, "watch engine poll schedule patch failed");
+        }
         this.log.warn({ err: error, flight: job.flightNumber }, "watch engine flight refresh failed");
       }
     }
     this.lastSwept = refreshed;
-    if (this.lastRefresh.size > 10_000) {
-      const oldest = this.lastRefresh.keys().next().value;
-      if (oldest) this.lastRefresh.delete(oldest);
-    }
+    this.backlog = Math.max(0, jobs.length - refreshed) + pendingJobs;
   }
 
   /**
    * Writes a refreshed summary into every allowed watcher's snapshot, emits
-   * change alerts, and meters the shared cost. Returns rows applied.
+   * change alerts (the DB dedupes replays), meters shared cost, and advances
+   * the persisted poll ladder. Returns rows applied.
    */
   private async applySummary(
     job: WatchJob,
     summary: FlightSummary,
     allowed: SupabaseWatchRow[],
-    nowMs: number,
     unitsPerRowShare: number,
   ): Promise<number> {
+    const nowMs = Date.now();
     let applied = 0;
     for (const row of allowed) {
       const previous = snapshotFromRow(row);
       const merged = mergeSnapshot(previous, summary, nowMs);
-      const drafts = diffAlerts(previous, merged, job.flightNumber).filter(
-        (draft) => !this.seenAlerts.has(alertKey(row.user_id, job.flightNumber, draft)),
-      );
+      const drafts = diffAlerts(previous, merged, job.flightNumber);
       if (drafts.length) {
         this.log.info(
           { flight: job.flightNumber, types: drafts.map((draft) => draft.type) },
           "watch engine detected flight changes",
         );
       }
+      const schedule = scheduleNextPoll(merged, nowMs);
       const write = await this.supabase.write(
         { user_id: row.user_id, flight_id: row.flight_id },
         {
@@ -422,6 +440,8 @@ export class WatchEngine {
             message: draft.message,
             is_read: false,
           })),
+          nextPollAt: schedule.atMs,
+          pollPriority: schedule.priority,
         },
       );
       if (write.alertFailures) {
@@ -430,39 +450,71 @@ export class WatchEngine {
           "watch engine: alert insert failures",
         );
       }
-      for (const draft of drafts) {
-        this.rememberAlert(alertKey(row.user_id, job.flightNumber, draft));
-      }
-      this.lastRefresh.set(job.key, nowMs);
       this.meter.track(row.user_id, job.key, nowMs, unitsPerRowShare);
       applied += 1;
     }
+
+    // Rows in the same job but outside their plan limit still need to advance
+    // the ladder; otherwise they spin every tick and starve other flights.
+    await this.persistSchedule(job.rows.filter((row) => !allowed.includes(row)));
     return applied;
   }
 
-  /** Groups watchlist rows by flight number + date, keeping the ones due now. */
-  private collectDue(rows: SupabaseWatchRow[], nowMs: number): WatchJob[] {
+  /**
+   * Persists the next poll instant for rows the last pass did not refresh
+   * (provider returned nothing, job was out of plan capacity, or the pass
+   * failed). Ladder input is the stored snapshot, so misses still move.
+   */
+  private async persistSchedule(rows: SupabaseWatchRow[]): Promise<void> {
+    if (!rows.length) return;
+    const nowMs = Date.now();
+    const updates = await Promise.all(
+      rows.map(async (row) => {
+        const schedule = scheduleNextPoll(snapshotFromRow(row), nowMs);
+        return this.supabase
+          .patchPollSchedule(
+            { user_id: row.user_id, flight_id: row.flight_id },
+            schedule.atMs,
+            schedule.priority,
+          )
+          .catch((error) => {
+            this.log.warn(
+              { err: error, flight: row.flight_number },
+              "watch engine poll schedule patch failed",
+            );
+          });
+      }),
+    );
+    void updates;
+  }
+
+  /**
+   * Groups due rows by `${compactFlightNumber}|${flightDate}`; the engine
+   * shares one provider lookup per job. Priority bands and the tick order
+   * come from Postgres (`order by next_poll_at`), so a restart does not
+   * reshuffle the budget.
+   */
+  private collectJobs(rows: SupabaseWatchRow[]): WatchJob[] {
     const jobs = new Map<string, WatchJob>();
     for (const row of rows) {
       const flightNumber = row.flight_number.trim().toUpperCase();
       const key = `${flightNumber}|${row.flight_date ?? "any"}`;
-      const snapshot = snapshotFromRow(row);
-      const decision = evaluateDue(snapshot, this.lastRefresh.get(key) ?? 0, nowMs);
-      if (!decision.due) continue;
       const job = jobs.get(key) ?? {
         key,
         flightNumber,
-        flightDate: row.flight_date,
+        flightDate: row.flight_date ?? null,
         rows: [],
-        priority: decision.priority,
-        deltaMs: decision.deltaMs,
+        priority: row.poll_priority ?? 5,
+        deltaMs: 0,
       };
       job.rows.push(row);
-      if (decision.priority < job.priority) job.priority = decision.priority;
+      if (typeof row.poll_priority === "number" && row.poll_priority < job.priority) {
+        job.priority = row.poll_priority;
+      }
       jobs.set(key, job);
     }
-    return [...jobs.values()].sort(
-      (first, second) => first.priority - second.priority || first.deltaMs - second.deltaMs,
-    );
+    // Queue order is whatever Postgres handed back (`next_poll_at asc`), so
+    // operational windows still win the tick.
+    return [...jobs.values()];
   }
 }

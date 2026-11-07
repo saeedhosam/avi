@@ -88,13 +88,6 @@ export interface WatchJob {
   deltaMs: number;
 }
 
-export interface DueDecision {
-  due: boolean;
-  priority: number;
-  deltaMs: number;
-  nextPollMs: number;
-}
-
 const MIN = (minutes: number) => minutes * 60_000;
 
 /** Flight-number matcher without surrounding whitespace. */
@@ -484,77 +477,6 @@ export function alertKey(
   return `${userId}|${flightNumber}|${draft.type}|${draft.message}`;
 }
 
-/**
- * Polling ladder: units belong to the flight-day, not the calendar. Far-out
- * entries are effectively free; the operational window gets tight cadence.
- */
-export function evaluateDue(
-  snapshot: WatchSnapshot,
-  lastRefreshMs: number,
-  nowMs: number,
-): DueDecision {
-  const ageMs = nowMs - lastRefreshMs;
-  const when = (nextPollMs: number, priority: number, deltaMs: number): DueDecision => ({
-    due: ageMs >= nextPollMs,
-    priority,
-    deltaMs,
-    nextPollMs,
-  });
-
-  const isSettled =
-    snapshot.status === "CANCELLED" ||
-    (snapshot.status === "LANDED" &&
-      Boolean(snapshot.baggageCarousel) &&
-      snapshot.baggageCarousel !== "Carousel TBD");
-  if (isSettled) {
-    // Terminal state: the client snapshot is already final when it was saved,
-    // so the engine never spends units polling settled flights.
-    return { due: false, priority: 3, deltaMs: 0, nextPollMs: 0 };
-  }
-
-  if (snapshot.status === "LANDED") {
-    // Baggage/gate may still update shortly after landing, but do not poll a
-    // landed flight forever when the provider never assigns a carousel.
-    const landedAt = typeof snapshot.landedAt === "number" ? snapshot.landedAt : null;
-    if (landedAt != null && nowMs - landedAt > MIN(2 * 60)) {
-      return { due: false, priority: 3, deltaMs: 0, nextPollMs: 0 };
-    }
-    return when(MIN(5), 1, Number.NaN);
-  }
-
-  const departureMs = snapshotDepartureMs(snapshot);
-  if (departureMs == null) {
-    // The snapshot was pruned or never carried a departure time. Use the
-    // operating date to schedule a conservative recovery poll instead of
-    // polling every 20 minutes forever (or, worse, never recovering).
-    const dateHintMs = snapshotDateHintMs(snapshot);
-    if (dateHintMs == null) {
-      // No trustworthy date either: conservative best-effort sweep.
-      return when(MIN(20), 5, Number.NaN);
-    }
-    const deltaMs = dateHintMs - nowMs;
-    if (deltaMs > MIN(7 * 24 * 60)) {
-      return { due: false, priority: 9, deltaMs, nextPollMs: 0 };
-    }
-    if (deltaMs > MIN(24 * 60)) return when(MIN(6 * 60), 6, deltaMs);
-    if (deltaMs > 0) return when(MIN(60), 5, deltaMs);
-    return when(MIN(20), 5, deltaMs);
-  }
-
-  const deltaMs = departureMs - nowMs;
-  if (deltaMs > MIN(7 * 24 * 60)) {
-    // Far-future watchlist entries cost nothing until the trip window opens.
-    return { due: false, priority: 9, deltaMs, nextPollMs: 0 };
-  }
-  if (deltaMs > MIN(24 * 60)) return when(MIN(6 * 60), 6, deltaMs);
-  if (deltaMs > MIN(3 * 60)) return when(MIN(60), 5, deltaMs);
-  if (deltaMs > MIN(30)) return when(MIN(10), 4, deltaMs);
-  if (deltaMs > MIN(10)) return when(MIN(5), 3, deltaMs);
-  if (deltaMs > 0) return when(MIN(2), 2, deltaMs);
-  if (deltaMs > -MIN(3 * 60)) return when(MIN(3), 1, deltaMs);
-  return when(MIN(15), 2, deltaMs);
-}
-
 export function matchesJob(summary: FlightSummary, job: WatchJob): boolean {
   if (compactFlightNumber(summary.flightNumber) !== compactFlightNumber(job.flightNumber)) {
     return false;
@@ -564,4 +486,75 @@ export function matchesJob(summary: FlightSummary, job: WatchJob): boolean {
   // refusing to refresh them forever.
   if (!job.flightDate) return true;
   return job.flightDate === summaryDate;
+}
+
+export interface NextPollSchedule {
+  /** ISO instant of the next engine poll; null = settled, no further polls. */
+  atMs: number | null;
+  /** Priority band (1 = operational window, 9 = far-future/free). */
+  priority: number;
+}
+
+/**
+ * Absolute-time poll ladder. Rather than returning "poll in X minutes", this
+ * returns the epoch instant when the *next* poll should fire, so the engine
+ * state can live in Postgres and survive restarts.
+ *
+ * The ladder keeps a stable unit budget: far-future entries cost nothing until
+ * their operational window opens, and only operational windows get tight
+ * cadence.
+ */
+export function scheduleNextPoll(snapshot: WatchSnapshot, nowMs: number): NextPollSchedule {
+  const settled =
+    snapshot.status === "CANCELLED" ||
+    (snapshot.status === "LANDED" &&
+      Boolean(snapshot.baggageCarousel) &&
+      snapshot.baggageCarousel !== "Carousel TBD");
+  if (settled) {
+    // Terminal state: the persisted snapshot is already final when it was
+    // written, so the engine never spends units polling a settled flight.
+    return { atMs: null, priority: 3 };
+  }
+
+  if (snapshot.status === "LANDED") {
+    // Baggage/gate may still change shortly after landing, but do not poll a
+    // landed flight forever when no carousel is ever assigned.
+    const landedAt = typeof snapshot.landedAt === "number" ? snapshot.landedAt : null;
+    if (landedAt != null && nowMs - landedAt > MIN(2 * 60)) {
+      return { atMs: null, priority: 3 };
+    }
+    return { atMs: nowMs + MIN(5), priority: 1 };
+  }
+
+  const departureMs = snapshotDepartureMs(snapshot);
+  if (departureMs == null) {
+    // Snapshot was pruned or never carried a departure time. Use the operating
+    // date to schedule a conservative recovery poll instead of polling every
+    // 20 minutes forever (or, worse, never recovering).
+    const dateHintMs = snapshotDateHintMs(snapshot);
+    if (dateHintMs == null) {
+      // No trustworthy date either: conservative best-effort sweep.
+      return { atMs: nowMs + MIN(20), priority: 5 };
+    }
+    const deltaMs = dateHintMs - nowMs;
+    if (deltaMs > MIN(7 * 24 * 60)) {
+      return { atMs: dateHintMs - MIN(7 * 24 * 60), priority: 9 };
+    }
+    if (deltaMs > MIN(24 * 60)) return { atMs: nowMs + MIN(6 * 60), priority: 6 };
+    if (deltaMs > 0) return { atMs: nowMs + MIN(60), priority: 5 };
+    return { atMs: nowMs + MIN(20), priority: 5 };
+  }
+
+  const deltaMs = departureMs - nowMs;
+  if (deltaMs > MIN(7 * 24 * 60)) {
+    // Enter the tight window one week before departure.
+    return { atMs: departureMs - MIN(7 * 24 * 60), priority: 9 };
+  }
+  if (deltaMs > MIN(24 * 60)) return { atMs: nowMs + MIN(6 * 60), priority: 6 };
+  if (deltaMs > MIN(3 * 60)) return { atMs: nowMs + MIN(60), priority: 5 };
+  if (deltaMs > MIN(30)) return { atMs: nowMs + MIN(10), priority: 4 };
+  if (deltaMs > MIN(10)) return { atMs: nowMs + MIN(5), priority: 3 };
+  if (deltaMs > 0) return { atMs: nowMs + MIN(2), priority: 2 };
+  if (deltaMs > -MIN(3 * 60)) return { atMs: nowMs + MIN(3), priority: 1 };
+  return { atMs: nowMs + MIN(15), priority: 2 };
 }

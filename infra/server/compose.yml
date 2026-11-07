@@ -73,10 +73,17 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    environment:
+      # The gateway never runs the poll engine anymore: exactly one container
+      # drives watchlist refreshes (the `avi-engine` worker below).
+      WATCH_ENGINE_ENABLED: "false"
+      ENGINE_API_BASE_URL: http://engine:8090
     expose:
       - "8080"
     depends_on:
       redis:
+        condition: service_started
+      engine:
         condition: service_started
     healthcheck:
       test:
@@ -90,6 +97,37 @@ services:
       timeout: 3s
       start_period: 10s
       retries: 3
+    networks:
+      - avi
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  engine:
+    image: avi-api:local
+    container_name: avi-engine
+    restart: unless-stopped
+    command: ["node", "dist/engine/worker.js"]
+    env_file:
+      - .env.production
+    environment:
+      ENGINE_PORT: "8090"
+    expose:
+      - "8090"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8090/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+      retries: 5
     networks:
       - avi
     logging:

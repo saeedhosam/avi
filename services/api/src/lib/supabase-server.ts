@@ -8,6 +8,8 @@ export interface SupabaseWatchRow {
   status: string | null;
   origin_code?: string | null;
   notes: string | null;
+  next_poll_at?: string | null;
+  poll_priority?: number | null;
   snapshot: unknown;
 }
 
@@ -54,6 +56,10 @@ export interface WatchlistWrite {
   snapshot: unknown;
   status: string | null;
   alerts: SupabaseAlertBody[];
+  /** Epoch ms of the next engine poll; null = settled, no further polls. */
+  nextPollAt: number | null;
+  /** Engine priority band matching `next_poll_at`. */
+  pollPriority: number | null;
 }
 
 /**
@@ -241,8 +247,20 @@ export class SupabaseServer {
     }
   }
 
+  /**
+   * Rows the engine is due to poll right now. `next_poll_at is null` is an
+   * adoption case (row written before the engine state migration); it pairs
+   * the OR so both shapes arrive on the same query.
+   */
   async listWatchlist(limit: number): Promise<SupabaseWatchRow[]> {
-    const url = `${this.base()}/rest/v1/watchlist_items?select=user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot&order=updated_at.asc&limit=${limit}`;
+    const nowIso = new Date().toISOString();
+    const params = new URLSearchParams({
+      select: "user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot,next_poll_at,poll_priority",
+      or: `(next_poll_at.is.null,next_poll_at.le.${nowIso})`,
+      order: "next_poll_at.asc.nullsfirst",
+      limit: String(limit),
+    });
+    const url = `${this.base()}/rest/v1/watchlist_items?${params.toString()}`;
     const response = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
       throw new Error(`watchlist fetch failed with HTTP ${response.status}`);
@@ -251,17 +269,33 @@ export class SupabaseServer {
     return Array.isArray(rows) ? rows : [];
   }
 
-  /** Recent alert dedup keys, scoped per user so one watcher never blocks another. */
-  async recentAlertKeys(): Promise<string[]> {
-    const url = `${this.base()}/rest/v1/flight_alerts?select=user_id,flight_number,alert_type,message&order=created_at.desc&limit=300`;
-    const response = await fetch(url, { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) });
+  /**
+   * Advances the engine poll ladder for a row the last pass saw (signal only:
+   * no snapshot write). Keeps the row fair across ticks even when the provider
+   * had nothing for it.
+   */
+  async patchPollSchedule(
+    row: WatchRowPatchTarget,
+    nextPollAtMs: number | null,
+    priority: number | null,
+  ): Promise<void> {
+    const search = new URLSearchParams({
+      user_id: `eq.${row.user_id}`,
+      flight_id: `eq.${row.flight_id}`,
+    });
+    const body: Record<string, unknown> = {
+      next_poll_at: nextPollAtMs == null ? null : new Date(nextPollAtMs).toISOString(),
+      poll_priority: priority,
+    };
+    const response = await fetch(`${this.base()}/rest/v1/watchlist_items?${search.toString()}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!response.ok) {
-      throw new Error(`recent alerts fetch failed with HTTP ${response.status}`);
+      throw new Error(`watchlist poll schedule patch failed with HTTP ${response.status}`);
     }
-    const rows = (await response.json()) as Array<SupabaseAlertBody & { user_id: string }>;
-    return (Array.isArray(rows) ? rows : []).map(
-      (row) => `${row.user_id}|${row.flight_number}|${row.alert_type}|${row.message}`,
-    );
   }
 
   /** Plan tiers of the given users (service-key read, bypasses RLS). */
@@ -357,6 +391,8 @@ export class SupabaseServer {
       body: JSON.stringify({
         snapshot: payload.snapshot,
         status: payload.status ?? "",
+        next_poll_at: payload.nextPollAt == null ? null : new Date(payload.nextPollAt).toISOString(),
+        poll_priority: payload.pollPriority,
         updated_at: new Date().toISOString(),
       }),
       signal: AbortSignal.timeout(15_000),
@@ -379,12 +415,12 @@ export class SupabaseServer {
     return { alertFailures };
   }
 
-  /** Inserts a batch of alerts in one PostgREST request. */
+  /** Inserts a batch of alerts in one PostgREST request, deduping per index. */
   async insertAlerts(alerts: SupabaseAlertBody[]): Promise<void> {
     if (!alerts.length) return;
     const response = await fetch(`${this.base()}/rest/v1/flight_alerts`, {
       method: "POST",
-      headers: this.headers(),
+      headers: { ...this.headers(), Prefer: "return=minimal,resolution=ignore-duplicates" },
       body: JSON.stringify(alerts),
       signal: AbortSignal.timeout(15_000),
     });

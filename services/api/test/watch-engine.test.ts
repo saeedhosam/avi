@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   alertKey,
   diffAlerts,
-  evaluateDue,
   isWatchSnapshot,
   matchesJob,
   mergeSnapshot,
+  scheduleNextPoll,
   snapshotDepartureMs,
   snapshotFromRow,
   type WatchJob,
@@ -141,7 +141,7 @@ describe("zoned time conversion", () => {
   });
 });
 
-describe("evaluateDue ladder", () => {
+describe("poll ladder (scheduleNextPoll)", () => {
   const now = Date.parse("2026-11-08T00:00:00Z");
 
   /** Builds a snapshot departing `deltaMinutes` from `now`, expressed in the
@@ -170,45 +170,52 @@ describe("evaluateDue ladder", () => {
     });
   }
 
-  it("does not poll currently-inoperational far-future flights", () => {
-    const decision = evaluateDue(snapshotDeparting(8 * 24 * 60), 0, now);
-    expect(decision.due).toBe(false);
+  it("defers far-future flights until a week before departure", () => {
+    const schedule = scheduleNextPoll(snapshotDeparting(8 * 24 * 60), now);
+    expect(schedule.atMs).toBe(now + 8 * 24 * 60 * MIN - 7 * 24 * 60 * MIN);
+    expect(schedule.priority).toBe(9);
   });
 
   it("keeps 1-7 day runway flights at a 6h cadence", () => {
-    const decision = evaluateDue(snapshotDeparting(30 * 60), 0, now);
-    expect(decision.due).toBe(true);
-    expect(decision.nextPollMs).toBe(6 * 60 * MIN);
+    const schedule = scheduleNextPoll(snapshotDeparting(30 * 60), now);
+    expect(schedule.atMs).toBe(now + 6 * 60 * MIN);
+    expect(schedule.priority).toBe(6);
   });
 
   it("accelerates inside the operational window", () => {
-    expect(evaluateDue(snapshotDeparting(10 * 60), 0, now).nextPollMs).toBe(60 * MIN);
-    expect(evaluateDue(snapshotDeparting(2 * 60), 0, now).nextPollMs).toBe(10 * MIN);
-    expect(evaluateDue(snapshotDeparting(18), 0, now).nextPollMs).toBe(5 * MIN);
-    expect(evaluateDue(snapshotDeparting(3), 0, now).nextPollMs).toBe(2 * MIN);
+    expect(scheduleNextPoll(snapshotDeparting(10 * 60), now).atMs).toBe(now + 60 * MIN);
+    expect(scheduleNextPoll(snapshotDeparting(2 * 60), now).atMs).toBe(now + 10 * MIN);
+    expect(scheduleNextPoll(snapshotDeparting(18), now).atMs).toBe(now + 5 * MIN);
+    expect(scheduleNextPoll(snapshotDeparting(3), now).atMs).toBe(now + 2 * MIN);
   });
 
   it("polls airborne flights every 3 minutes after departure", () => {
-    const decision = evaluateDue(
+    const schedule = scheduleNextPoll(
       snapshotDeparting(-25, { status: "DEPARTED" }),
-      0,
       now + 25 * MIN,
     );
-    expect(decision.due).toBe(true);
-    expect(decision.nextPollMs).toBe(3 * MIN);
+    expect(schedule.atMs).toBe(now + 25 * MIN + 3 * MIN);
+    expect(schedule.priority).toBe(1);
   });
 
   it("polls landed flights every 5 minutes until baggage is assigned", () => {
-    const landing = baseSnapshot({ status: "LANDED", baggageCarousel: "Carousel TBD" });
-    const decision = evaluateDue(landing, 0, now);
-    expect(decision.due).toBe(true);
-    expect(decision.nextPollMs).toBe(5 * MIN);
+    const landing = baseSnapshot({ status: "LANDED", baggageCarousel: "Carousel TBD", landedAt: now });
+    const schedule = scheduleNextPoll(landing, now);
+    expect(schedule.atMs).toBe(now + 5 * MIN);
   });
 
   it("stops polling once a landed flight is fully settled", () => {
     const settled = baseSnapshot({ status: "LANDED", baggageCarousel: "Carousel 7" });
-    expect(evaluateDue(settled, 0, now).due).toBe(false);
-    expect(evaluateDue(settled, now - 5 * MIN, now).due).toBe(false);
+    expect(scheduleNextPoll(settled, now).atMs).toBeNull();
+  });
+
+  it("keeps polling a landed flight inside the baggage grace window", () => {
+    const landed = baseSnapshot({
+      status: "LANDED",
+      baggageCarousel: "Carousel TBD",
+      landedAt: now - 5 * MIN,
+    });
+    expect(scheduleNextPoll(landed, now).atMs).toBe(now + 5 * MIN);
   });
 
   it("stops polling a landed flight after the baggage grace window", () => {
@@ -217,12 +224,12 @@ describe("evaluateDue ladder", () => {
       baggageCarousel: "Carousel TBD",
       landedAt: now - 3 * 60 * MIN,
     });
-    expect(evaluateDue(landed, 0, now).due).toBe(false);
+    expect(scheduleNextPoll(landed, now).atMs).toBeNull();
   });
 
   it("never re-polls cancelled flights", () => {
     const cancelled = baseSnapshot({ status: "CANCELLED" });
-    expect(evaluateDue(cancelled, 0, now).due).toBe(false);
+    expect(scheduleNextPoll(cancelled, now).atMs).toBeNull();
   });
 });
 
@@ -371,21 +378,21 @@ describe("pruned snapshot recovery", () => {
   });
 
   it("does not poll a date-only row more than a week before departure", () => {
-    const decision = evaluateDue(
-      { flightNumber: "BA 117", flightDate: "2026-12-01" },
-      0,
+    const hint = Date.parse("2026-12-01T12:00:00Z");
+    const schedule = scheduleNextPoll(
+      { flightNumber: "BA 117", flightDate: "2026-12-01" } as WatchSnapshot,
       now,
     );
-    expect(decision.due).toBe(false);
+    expect(schedule.atMs).toBe(hint - 7 * 24 * 60 * MIN);
+    expect(schedule.priority).toBe(9);
   });
 
   it("schedules a recovery poll once the operating date is near", () => {
-    const decision = evaluateDue(
-      { flightNumber: "BA 117", flightDate: "2026-11-08" },
-      0,
+    const schedule = scheduleNextPoll(
+      { flightNumber: "BA 117", flightDate: "2026-11-08" } as WatchSnapshot,
       now,
     );
-    expect(decision.due).toBe(true);
+    expect(schedule.atMs).not.toBeNull();
   });
 });
 
@@ -524,7 +531,7 @@ describe("SupabaseServer", () => {
     expect(url).toContain('"u1"'); // PostgREST lists require quoted id values
   });
 
-  it("patches a snapshot and inserts alerts", async () => {
+  it("patches a snapshot + ladder and inserts dedupe-safe alerts", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
@@ -539,14 +546,23 @@ describe("SupabaseServer", () => {
         alerts: [
           { user_id: "u1", flight_number: "BA 117", alert_type: "GATE_CHANGE", title: "t", message: "m", is_read: false },
         ],
+        nextPollAt: 1_727_000_000_000,
+        pollPriority: 1,
       },
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [patchUrl, patchInit] = fetchMock.mock.calls[0]!;
     expect(patchUrl).toContain("/rest/v1/watchlist_items?");
     expect((patchInit as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse(String((patchInit as RequestInit).body))).toMatchObject({
+      next_poll_at: new Date(1_727_000_000_000).toISOString(),
+      poll_priority: 1,
+    });
     const [postUrl, postInit] = fetchMock.mock.calls[1]!;
     expect(postUrl).toContain("/rest/v1/flight_alerts");
     expect((postInit as RequestInit).method).toBe("POST");
+    expect((postInit as RequestInit).headers).toMatchObject({
+      Prefer: "return=minimal,resolution=ignore-duplicates",
+    });
   });
 });

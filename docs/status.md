@@ -7,6 +7,10 @@ Updated: 2026-11-07
 - Provider routes now carry Supabase identity + per-user quotas; design and
   rollout in `docs/provider-quota.md` (still `PROVIDER_AUTH_MODE=log` until
   the log window is clean).
+- Watch engine became a dedicated `avi-engine` container backed by durable
+  Postgres state (`watchlist_items.next_poll_at`, replay-safe alerts). The
+  gateway stays HTTP-only and proxies `/v1/status` to the worker for engine
+  stats.
 - Polar webhooks now verify the Standard Webhooks headers/signature and use
   `external_customer_id` for identity; plan writes retry on failure.
 - Web Push subscriptions are queried by `user_id` (the previous query used the
@@ -118,6 +122,13 @@ Updated: 2026-11-07
 4. **Indoor + AMDB** — Overpass ingestion job, curated floorplan georeferencing, routing graph, `/v1/airports/{iata}/map/*` endpoints, web/Android indoor UI.
 5. **Push** — Web Push VAPID, FCM HTTP v1, APNs, alert engine.
 6. **iOS implementation** beyond the placeholder.
+
+## Engine split (P2 Track B)
+
+Completed on 2026-11-07. See [`docs/engine.md`](docs/engine.md) and
+[`docs/provider-quota.md`](docs/provider-quota.md); the gateway was made
+HTTP-only and the `avi-engine` container now carries the poll ladder in
+Postgres with replay-safe alert writes.
 
 ## Known limitations
 

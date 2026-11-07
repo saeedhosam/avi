@@ -139,6 +139,8 @@ jobs:
           SUPABASE_URL=$SUPABASE_URL
           SUPABASE_SECRET_KEY=$SUPABASE_SECRET_KEY
           REDIS_URL=redis://redis:6379
+          # Engine stats are served by the dedicated worker container.
+          ENGINE_API_BASE_URL=http://engine:8090
           # Web Push delivery (engine); leave empty to disable until keys exist.
           VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
           VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
