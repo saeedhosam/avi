@@ -760,7 +760,13 @@ class FlightRepository(private val context: Context) {
             flightDao.removeFavorite(flightNumber)
             flightDao.deleteTrackedFlight(flightNumber)
             if (flight != null) {
-                cloudRepository.deleteWatchlistItem(flight.watchRowId())
+                cloudRepository.deleteWatchlistItem(
+                    CloudTrackedFlight(
+                        id = flight.id,
+                        flightDate = flight.flightDate,
+                        flightNumber = flight.flightNumber
+                    ).watchRowId()
+                )
             }
         }
     }
