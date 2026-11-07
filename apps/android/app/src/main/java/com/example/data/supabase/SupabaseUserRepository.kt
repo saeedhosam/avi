@@ -1,6 +1,7 @@
 package com.example.data.supabase
 
 import com.example.data.cloud.CloudAlert
+import com.example.data.cloud.CloudPlanState
 import com.example.data.cloud.CloudTrackedFlight
 import com.example.data.cloud.CloudUserProfile
 import io.github.jan.supabase.auth.auth

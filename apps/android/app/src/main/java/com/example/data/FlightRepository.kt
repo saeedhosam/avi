@@ -264,11 +264,9 @@ class FlightRepository(private val context: Context) {
                                 photoUrl = (user.userMetadata?.get("avatar_url") as? JsonPrimitive)?.content ?: ""
                             )
                         )
-                        cloudRepository.fetchPlan().onSuccess { plan ->
-                            _planState.value = plan
-                        }.onFailure {
-                            _planState.value = CloudPlanState(plan = "FREE", concurrentLimit = 3)
-                        }
+                        val planResult = cloudRepository.fetchPlan()
+                        _planState.value = planResult.getOrNull()
+                            ?: CloudPlanState(plan = "FREE", concurrentLimit = 3)
                         syncFavoritesToCloud(user.id)
                         syncCloudTrackingToLocal(user.id)
                     }
@@ -654,7 +652,13 @@ class FlightRepository(private val context: Context) {
                 flightDao.deleteTrackedFlight(flight.flightNumber)
                 val userId = cloudRepository.currentUserId()
                 if (userId != null) {
-                    cloudRepository.deleteWatchlistItem(flight.watchRowId())
+                    cloudRepository.deleteWatchlistItem(
+                        CloudTrackedFlight(
+                            id = flight.id,
+                            flightDate = flight.flightDate,
+                            flightNumber = flight.flightNumber
+                        ).watchRowId()
+                    )
                 }
             }
         }

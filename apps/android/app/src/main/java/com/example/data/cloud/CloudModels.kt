@@ -49,5 +49,5 @@ data class CloudPlanState(
     val plan: String = "FREE",
     val concurrentLimit: Int = 3
 ) {
-    val isFree: Boolean get() = plan.toUpperCase() == "FREE"
+    val isFree: Boolean get() = plan.uppercase() == "FREE"
 }
