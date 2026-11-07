@@ -46,9 +46,16 @@ export async function buildApp(config: AppConfig) {
     allowedHeaders: ["content-type", "authorization", "x-request-id"],
     maxAge: 86400,
   });
+  const isUnmeteredPath = (url: string | undefined) => {
+    // Health probes and status reads aren't abuse; the engine worker's cold
+    // start burst from the gateway otherwise trips the shared limiter.
+    const path = (url ?? "").split("?")[0];
+    return path === "" || path === "/healthz" || path === "/v1/status" || path === "/openapi.json";
+  };
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
+    allowList: (request) => isUnmeteredPath(request.raw.url),
   });
   await app.register(swagger, {
     openapi: {
