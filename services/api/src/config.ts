@@ -14,6 +14,10 @@ const ConfigSchema = z.object({
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SECRET_KEY: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  // Provider auth: every provider-backed route must carry a valid Supabase
+  // access token. "log" observes and logs; "enforce" rejects requests that
+  // lack one.
+  PROVIDER_AUTH_MODE: z.enum(["log", "enforce"]).default("log"),
   // Watch engine: server-side lifecycle polling for watchlist items.
   WATCH_ENGINE_ENABLED: z
     .string()

@@ -1,13 +1,15 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import type { SupabaseServer } from "../lib/supabase-server.js";
+import type { SupabaseAuthIdentity, SupabaseServer } from "../lib/supabase-server.js";
 import type { UsageTracker } from "../lib/usage.js";
 import { billingUpgradeEnabled } from "../lib/billing.js";
+import type { UserQuotaService } from "../lib/user-quota.js";
 import { PLAN_LIMITS, type PlanTier } from "../engine/plans.js";
 
 interface MeOptions {
   supabaseServer: SupabaseServer;
   usage: UsageTracker;
+  userQuota: UserQuotaService;
   billingProvider: "manual" | "lemon_squeezy" | "polar";
 }
 
@@ -23,6 +25,11 @@ const meResponse = z.object({
   units: z.object({
     unitsUsed: z.number(),
     unitsBudget: z.number(),
+  }),
+  providerQuota: z.object({
+    used: z.number(),
+    limit: z.number(),
+    resetsAt: z.number(),
   }),
   billing: z.object({
     provider: z.enum(["manual", "lemon_squeezy", "polar"]),
@@ -47,9 +54,9 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
 ) => {
   const { supabaseServer } = options;
 
-  const requireUser = async (authorization: string): Promise<string | null> => {
+  const requireUser = async (authorization: string): Promise<SupabaseAuthIdentity | null> => {
     const token = authorization.replace(/^Bearer\s+/i, "").trim();
-    return token.length > 20 ? supabaseServer.authUserId(token) : null;
+    return token.length > 20 ? supabaseServer.authIdentity(token) : null;
   };
 
   app.get(
@@ -68,21 +75,26 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
       if (!supabaseServer.ready) {
         return reply.code(503).send({ error: "me_unavailable" });
       }
-      const uid = await requireUser(request.headers.authorization ?? "");
-      if (!uid) {
+      const identity = await requireUser(request.headers.authorization ?? "");
+      if (!identity) {
         return reply.code(401).send({
           error: "unauthorized",
           message: "Valid Supabase access token required.",
         });
       }
-      const plan = validPlan((await supabaseServer.listUserPlans([uid])).get(uid) ?? "FREE");
-      const watchlistCount = await supabaseServer.countWatchlistRows(uid);
+      const plan = validPlan((await supabaseServer.listUserPlans([identity.id])).get(identity.id) ?? "FREE");
+      const watchlistCount = await supabaseServer.countWatchlistRows(identity.id);
       const usage = options.usage.snapshot();
+      const providerQuota = await options.userQuota.snapshot(
+        identity.id,
+        identity.isAnonymous,
+      );
       return {
         plan,
         planLimits: { concurrentTracked: PLAN_LIMITS[plan] },
         watchlistCount,
         units: { unitsUsed: usage.unitsUsed, unitsBudget: usage.unitsBudget },
+        providerQuota,
         billing: {
           provider: options.billingProvider,
           upgradeEnabled: billingUpgradeEnabled(options.billingProvider),
@@ -107,8 +119,8 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
       if (!supabaseServer.ready) {
         return reply.code(503).send({ error: "me_unavailable" });
       }
-      const uid = await requireUser(request.headers.authorization ?? "");
-      if (!uid) {
+      const identity = await requireUser(request.headers.authorization ?? "");
+      if (!identity) {
         return reply.code(401).send({
           error: "unauthorized",
           message: "Valid Supabase access token required.",
@@ -116,7 +128,7 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
       }
       // Foreign keys cascade: profile, watchlist, alerts, subscriptions are
       // removed with the auth user. The client clears its local cache itself.
-      await supabaseServer.deleteUser(uid);
+      await supabaseServer.deleteUser(identity.id);
       return reply.code(204).send();
     },
   );

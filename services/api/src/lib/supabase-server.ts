@@ -26,6 +26,16 @@ export interface WebPushRow {
   auth: string;
 }
 
+export interface SupabaseAuthIdentity {
+  id: string;
+  isAnonymous: boolean;
+}
+
+interface AuthIdentityCacheEntry {
+  identity: SupabaseAuthIdentity | null;
+  expiresAt: number;
+}
+
 export interface WatchRowPatchTarget {
   user_id: string;
   flight_id: string;
@@ -51,6 +61,11 @@ export interface WatchlistWrite {
  * Uses the Supabase secret key, which must never reach a client bundle.
  */
 export class SupabaseServer {
+  /** Longer-lived lookups avoid an auth round-trip on every provider call. */
+  private static readonly AUTH_CACHE_TTL_MS = 60_000;
+  private static readonly AUTH_CACHE_MAX = 5_000;
+  private readonly authCache = new Map<string, AuthIdentityCacheEntry>();
+
   constructor(private readonly config: AppConfig) {}
 
   get ready(): boolean {
@@ -71,9 +86,36 @@ export class SupabaseServer {
     };
   }
 
-  /** Resolves a Supabase access token to a user id (server-side validation). */
-  async authUserId(token: string): Promise<string | null> {
-    if (!this.ready) return null;
+  /**
+   * Cache-backed identity lookup for a Supabase access token. Only the token
+   * digest is used as the cache key; the token itself is never written.
+   */
+  async authIdentity(token: string): Promise<SupabaseAuthIdentity | null> {
+    if (!this.ready || !token) return null;
+    const digest = this.authCacheKey(token);
+    const now = Date.now();
+    const cached = this.authCache.get(digest);
+    if (cached && cached.expiresAt > now) {
+      if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) this.authCache.clear();
+      return cached.identity;
+    }
+    const identity = await this.fetchUserIdentity(token);
+    if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) this.authCache.clear();
+    this.authCache.set(digest, {
+      identity,
+      expiresAt: now + SupabaseServer.AUTH_CACHE_TTL_MS,
+    });
+    return identity;
+  }
+
+  /** Stable, non-derivable cache key; avoids storing the raw token anywhere. */
+  private authCacheKey(token: string): string {
+    return Buffer.from(token).toString("base64url").slice(-64);
+  }
+
+  private async fetchUserIdentity(
+    token: string,
+  ): Promise<SupabaseAuthIdentity | null> {
     const response = await fetch(`${this.base()}/auth/v1/user`, {
       headers: {
         apikey: this.config.SUPABASE_SECRET_KEY ?? "",
@@ -83,8 +125,20 @@ export class SupabaseServer {
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) return null;
-    const user = (await response.json()) as { id?: string };
-    return typeof user.id === "string" ? user.id : null;
+    const user = (await response.json()) as {
+      id?: unknown;
+      is_anonymous?: unknown;
+    };
+    if (typeof user.id !== "string") return null;
+    return {
+      id: user.id,
+      isAnonymous: user.is_anonymous === true,
+    };
+  }
+
+  /** Resolves a Supabase access token to a user id (server-side validation). */
+  async authUserId(token: string): Promise<string | null> {
+    return (await this.authIdentity(token))?.id ?? null;
   }
 
   /** Total rows in the user's watchlist (Content-Range count, no payload). */

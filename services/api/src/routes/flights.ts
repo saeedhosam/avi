@@ -2,10 +2,15 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { UsageTracker } from "../lib/usage.js";
+import type { UserQuotaService } from "../lib/user-quota.js";
 import {
   errorResponseSchema,
   flightSearchResponseSchema,
 } from "../domain/schemas.js";
+import {
+  reserveProviderQuota,
+  refundProviderQuota,
+} from "../lib/quota-request.js";
 import {
   AeroDataBoxProvider,
   ProviderError,
@@ -14,8 +19,14 @@ import {
 interface FlightOptions {
   provider: AeroDataBoxProvider;
   usage: UsageTracker;
+  userQuota: UserQuotaService;
   config: AppConfig;
 }
+
+const PROVIDER_RATE_LIMIT = {
+  rateLimit: { max: 30, timeWindow: "1 minute" },
+  providerAuth: true,
+} as const;
 
 const flightQuery = z.object({
   number: z.string().trim().min(2).max(12),
@@ -41,9 +52,7 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
           502: errorResponseSchema,
         },
       },
-      config: {
-        rateLimit: { max: 30, timeWindow: "1 minute" },
-      },
+      config: PROVIDER_RATE_LIMIT,
     },
     async (request, reply) => {
       if (options.usage.overBudget) {
@@ -64,10 +73,17 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
         });
       }
 
+      const units = options.config.AERODATABOX_UNITS_PER_FLIGHT;
+      if (!(await reserveProviderQuota(request, reply, options.userQuota, units))) {
+        return;
+      }
+
       try {
         const result = await options.provider.searchFlight(cleaned);
         if (result.meta.source === "live") {
           options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+        } else {
+          await refundProviderQuota(request, options.userQuota, units);
         }
         reply.header(
           "Cache-Control",
@@ -75,6 +91,7 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
         );
         return result;
       } catch (error) {
+        await refundProviderQuota(request, options.userQuota, units);
         if (error instanceof ProviderError) {
           request.log.warn({ err: error }, "flight provider failed");
           return reply.code(502).send({

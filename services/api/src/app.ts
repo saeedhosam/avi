@@ -12,6 +12,8 @@ import {
 import type { AppConfig } from "./config.js";
 import { SupabaseServer } from "./lib/supabase-server.js";
 import { UsageTracker } from "./lib/usage.js";
+import { UserQuotaService } from "./lib/user-quota.js";
+import { registerProviderAuth } from "./plugins/provider-auth.js";
 import { WatchEngine } from "./engine/watch-engine.js";
 import { PushDelivery } from "./engine/push-delivery.js";
 import { ConsoleFlightProvider } from "./providers/console-flights.js";
@@ -69,7 +71,20 @@ export async function buildApp(config: AppConfig) {
   const consoleFlights = new ConsoleFlightProvider(config);
   const supabaseServer = new SupabaseServer(config);
   const usage = new UsageTracker(config.UNIT_BUDGET_PER_MONTH);
+  const userQuota = new UserQuotaService(
+    config.REDIS_URL,
+    (uids) => supabaseServer.listUserPlans(uids),
+    {
+      debug: (message: string) => app.log.debug(message),
+      warn: (message: string) => app.log.warn(message),
+    },
+  );
 
+  registerProviderAuth(app, {
+    supabaseServer,
+    userQuota,
+    mode: config.PROVIDER_AUTH_MODE,
+  });
   const engine =
     config.WATCH_ENGINE_ENABLED && supabaseServer.ready && provider.configured
       ? new WatchEngine(
@@ -87,11 +102,11 @@ export async function buildApp(config: AppConfig) {
 
   await app.register(healthRoutes);
   await app.register(statusRoutes, { config, provider, engine });
-  await app.register(flightRoutes, { provider, usage, config });
-  await app.register(consoleFlightRoutes, { consoleFlights, usage, config });
-  await app.register(consoleAirportRoutes, { consoleFlights, usage, config });
+  await app.register(flightRoutes, { provider, usage, userQuota, config });
+  await app.register(consoleFlightRoutes, { consoleFlights, usage, userQuota, config });
+  await app.register(consoleAirportRoutes, { consoleFlights, usage, userQuota, config });
   if (supabaseServer.ready) {
-    await app.register(meRoutes, { supabaseServer, usage, billingProvider: config.BILLING_PROVIDER });
+    await app.register(meRoutes, { supabaseServer, usage, userQuota, billingProvider: config.BILLING_PROVIDER });
   }
   await app.register(billingRoutes, { config, supabaseServer });
 

@@ -2,12 +2,17 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { UsageTracker } from "../lib/usage.js";
+import type { UserQuotaService } from "../lib/user-quota.js";
 import { ProviderError } from "../providers/aerodatabox.js";
 import type { ConsoleFlightProvider } from "../providers/console-flights.js";
 import {
   consoleSearchResponseSchema,
   errorResponseSchema,
 } from "../domain/console-schema.js";
+import {
+  reserveProviderQuota,
+  refundProviderQuota,
+} from "../lib/quota-request.js";
 
 const FLIGHT_NUMBER_PATTERN = /^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,11 +25,13 @@ const lookupQuery = z.object({
 interface ConsoleFlightOptions {
   consoleFlights: ConsoleFlightProvider;
   usage: UsageTracker;
+  userQuota: UserQuotaService;
   config: AppConfig;
 }
 
 const PROVIDER_RATE_LIMIT = {
   rateLimit: { max: 30, timeWindow: "1 minute" },
+  providerAuth: true,
 } as const;
 
 /**
@@ -75,10 +82,20 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
           });
         }
 
+        // Per-identity quota check. Consumed before the call to prevent burst
+        // overspend; refunded below when the provider did not charge a unit.
+        const units = options.config.AERODATABOX_UNITS_PER_FLIGHT;
+        if (!(await reserveProviderQuota(request, reply, options.userQuota, units))) {
+          return;
+        }
+
         try {
           const outcome = await options.consoleFlights.lookupFlight(cleaned, date || undefined);
           if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
             options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          } else {
+            // Nothing was charged to the provider; give the caller their quota back.
+            await refundProviderQuota(request, options.userQuota, units);
           }
           // Fail honestly when the provider is down/invalid — the previous
           // web behavior hid outages as HTTP 200 with `flights: []`.
@@ -96,6 +113,7 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
           );
           return outcome;
         } catch (error) {
+          await refundProviderQuota(request, options.userQuota, units);
           if (error instanceof ProviderError) {
             request.log.warn({ err: error }, "console flight lookup failed");
             return reply.code(502).send({

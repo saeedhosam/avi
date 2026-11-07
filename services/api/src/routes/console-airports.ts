@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { UsageTracker } from "../lib/usage.js";
+import type { UserQuotaService } from "../lib/user-quota.js";
 import type { ConsoleFlightProvider } from "../providers/console-flights.js";
 import {
   consoleAirportSearchResponseSchema,
@@ -9,12 +10,17 @@ import {
   consoleRoutesResponseSchema,
   errorResponseSchema,
 } from "../domain/console-schema.js";
+import {
+  reserveProviderQuota,
+  refundProviderQuota,
+} from "../lib/quota-request.js";
 
 const IATA_PATTERN = /^[A-Z]{3}$/;
 
 interface ConsoleAirportOptions {
   consoleFlights: ConsoleFlightProvider;
   usage: UsageTracker;
+  userQuota: UserQuotaService;
   config: AppConfig;
 }
 
@@ -23,6 +29,7 @@ const searchQuery = z.object({ q: z.string().trim().min(2).max(64) });
 
 const PROVIDER_RATE_LIMIT = {
   rateLimit: { max: 30, timeWindow: "1 minute" },
+  providerAuth: true,
 } as const;
 
 const BUDGET_EXHAUSTED = {
@@ -65,9 +72,25 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           });
         }
         try {
+          if (
+            !(await reserveProviderQuota(
+              request,
+              reply,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_FLIGHT,
+            ))
+          ) {
+            return;
+          }
           const outcome = await options.consoleFlights.lookupAirportFids(code);
           if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
             options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          } else {
+            await refundProviderQuota(
+              request,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_FLIGHT,
+            );
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
@@ -81,6 +104,11 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           );
           return outcome;
         } catch (error) {
+          await refundProviderQuota(
+            request,
+            options.userQuota,
+            options.config.AERODATABOX_UNITS_PER_FLIGHT,
+          );
           request.log.warn({ err: error }, "airport board lookup failed");
           return reply.code(502).send({
             error: "provider_failure",
@@ -118,9 +146,25 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           });
         }
         try {
+          if (
+            !(await reserveProviderQuota(
+              request,
+              reply,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_ROUTE,
+            ))
+          ) {
+            return;
+          }
           const outcome = await options.consoleFlights.lookupAirportRoutes(code);
           if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
             options.usage.add(options.config.AERODATABOX_UNITS_PER_ROUTE);
+          } else {
+            await refundProviderQuota(
+              request,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_ROUTE,
+            );
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
@@ -134,6 +178,11 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           );
           return outcome;
         } catch (error) {
+          await refundProviderQuota(
+            request,
+            options.userQuota,
+            options.config.AERODATABOX_UNITS_PER_ROUTE,
+          );
           request.log.warn({ err: error }, "airport routes lookup failed");
           return reply.code(502).send({
             error: "provider_failure",
@@ -172,9 +221,25 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           });
         }
         try {
+          if (
+            !(await reserveProviderQuota(
+              request,
+              reply,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_FLIGHT,
+            ))
+          ) {
+            return;
+          }
           const outcome = await options.consoleFlights.searchAirports(q);
           if (outcome.mode === "LIVE_AERODATABOX" && !outcome.cached) {
             options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          } else {
+            await refundProviderQuota(
+              request,
+              options.userQuota,
+              options.config.AERODATABOX_UNITS_PER_FLIGHT,
+            );
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
@@ -188,6 +253,11 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           );
           return outcome;
         } catch (error) {
+          await refundProviderQuota(
+            request,
+            options.userQuota,
+            options.config.AERODATABOX_UNITS_PER_FLIGHT,
+          );
           request.log.warn({ err: error }, "airport search failed");
           return reply.code(502).send({
             error: "provider_failure",
