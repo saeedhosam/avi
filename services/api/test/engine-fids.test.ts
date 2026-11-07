@@ -134,7 +134,7 @@ describe("watch engine FIDS consolidation", () => {
       if (url.includes("/rest/v1/watchlist_items?next_poll_at")) {
         return new Response(JSON.stringify(rows), { status: 200 });
       }
-      if (url.includes("updated_at=lt.")) {
+      if (url.includes("updated_at=lte.")) {
         return new Response(null, { status: 204 });
       }
       if (url.includes("/rest/v1/flight_alerts?select=user_id")) {
@@ -205,14 +205,14 @@ describe("watch engine FIDS consolidation", () => {
     // One 2-unit board call, not 2 × 2-unit flight lookups.
     expect(stats.units.unitsUsed).toBe(2);
     // Both rows patched with a board-derived snapshot. Two due-list fetches
-    // (`next_poll_at=le.<now>` and `next_poll_at=is.null`) precede the patch.
+    // (`next_poll_at=lte.<now>` and `next_poll_at=is.null`) precede the patch.
     const patchCalls = fetchMock.mock.calls.filter(
       (call) => {
         const url = String(call[0]);
         return (
           url.includes("/rest/v1/watchlist_items?") &&
           !url.includes("select=") &&
-          !url.includes("updated_at=lt.") // snapshot purge is counted separately
+          !url.includes("updated_at=lte.") // snapshot purge is counted separately
         );
       },
     );

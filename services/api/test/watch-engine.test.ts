@@ -510,7 +510,7 @@ describe("SupabaseServer", () => {
     expect(rows[0]?.flight_number).toBe("BA 117");
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, options] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toContain("/rest/v1/watchlist_items?next_poll_at=le.");
+    expect(String(url)).toContain("/rest/v1/watchlist_items?next_poll_at=lte.");
     expect((options as RequestInit).headers).toMatchObject({
       Authorization: "Bearer sb_secret_test",
       Prefer: "return=minimal",

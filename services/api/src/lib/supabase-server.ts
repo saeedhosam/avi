@@ -251,24 +251,24 @@ export class SupabaseServer {
    * Rows the engine is due to poll right now. `next_poll_at is null` is an
    * adoption case (row written before the engine state migration). We fetch
    * both shapes with two plain requests instead of a PostgREST `or=(...)`
-   * filter, which requires yuck URL-encoding of `:` in timestamps and breaks
-   * otherwise.
+   * filter, and pre-encode the timestamp values: PostgREST rejects unescaped
+   * `:` in filter values (`unexpected "l" expecting operator`).
    */
   async listWatchlist(limit: number): Promise<SupabaseWatchRow[]> {
-    const nowIso = new Date().toISOString();
-    const params = new URLSearchParams({
-      select:
-        "user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot,next_poll_at,poll_priority",
-      order: "next_poll_at.asc.nullsfirst",
-      limit: String(limit),
-    });
+    const nowIso = encodeURIComponent(new Date().toISOString());
     const rows: SupabaseWatchRow[] = [];
     const seen = new Set<string>();
     for (const filter of [
-      `next_poll_at=le.${nowIso}`,
+      `next_poll_at=lte.${nowIso}`,
       "next_poll_at=is.null",
     ] as const) {
-      const url = `${this.base()}/rest/v1/watchlist_items?${filter}&${params.toString()}`;
+      const query = [
+        filter,
+        "select=user_id,flight_id,flight_number,flight_date,status,origin_code,snapshot,next_poll_at,poll_priority",
+        "order=next_poll_at.asc.nullsfirst",
+        `limit=${limit}`,
+      ].join("&");
+      const url = `${this.base()}/rest/v1/watchlist_items?${query}`;
       const response = await fetch(url, {
         headers: this.headers(),
         signal: AbortSignal.timeout(15_000),
@@ -457,22 +457,16 @@ export class SupabaseServer {
    */
   async pruneStaleFlightSnapshots(retentionDays: number): Promise<number> {
     if (!this.ready) return 0;
-    const cutoff = new Date(
-      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    const search = new URLSearchParams({
-      "updated_at": `lt.${cutoff}`,
-      "snapshot": "not.is.null",
-    });
-    const response = await fetch(
-      `${this.base()}/rest/v1/watchlist_items?${search.toString()}`,
-      {
-        method: "PATCH",
-        headers: this.headers(),
-        body: JSON.stringify({ snapshot: null }),
-        signal: AbortSignal.timeout(60_000),
-      },
+    const cutoff = encodeURIComponent(
+      new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString(),
     );
+    const url = `${this.base()}/rest/v1/watchlist_items?updated_at=lte.${cutoff}&snapshot=not.is.null`;
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify({ snapshot: null }),
+      signal: AbortSignal.timeout(60_000),
+    });
     if (!response.ok) {
       throw new Error(`stale snapshot prune failed with HTTP ${response.status}`);
     }
