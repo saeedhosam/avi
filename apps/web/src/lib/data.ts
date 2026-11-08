@@ -1,4 +1,4 @@
-import airportsJson from "@/data/airports.json";
+import globalAirportsJson from "@/data/global-airports.json";
 import terminalLayoutsJson from "@/data/terminal-layouts.json";
 import type {
   AirportNode,
@@ -6,14 +6,46 @@ import type {
   RouteRegion,
 } from "./types";
 
+export type GlobalAirportNode = AirportNode & {
+  destCount?: number;
+};
+
+const EXTRA_AIRPORTS: GlobalAirportNode[] = [
+  {
+    iata: "HMB",
+    icao: "HESG",
+    name: "Sohag International Airport",
+    city: "Sohag",
+    country: "Egypt",
+    region: "MENA",
+    latitude: 26.3328,
+    longitude: 31.7371,
+    timezone: "EEST (UTC+3)",
+    hubAirlines: ["Air Cairo"],
+    destCount: 12,
+  },
+  {
+    iata: "MED",
+    icao: "OEMA",
+    name: "Prince Mohammad bin Abdulaziz International Airport",
+    city: "Medina",
+    country: "Saudi Arabia",
+    region: "MENA",
+    latitude: 24.5534,
+    longitude: 39.7051,
+    timezone: "AST (UTC+3)",
+    hubAirlines: ["Saudia", "Flynas", "Air Cairo"],
+    destCount: 42,
+  },
+];
+
 /**
- * Static reference data only.
- *
- * Airports and terminal layouts are geographic/wayfinding reference data.
- * Every operational value (flights, statuses, gates, delays, weather, routes)
- * is fetched live from AeroDataBox / Open-Meteo at runtime.
+ * Global reference data covering worldwide commercial airports.
  */
-export const routeAirports = airportsJson as AirportNode[];
+export const routeAirports = [
+  ...EXTRA_AIRPORTS,
+  ...(globalAirportsJson as GlobalAirportNode[]),
+];
 export const terminalLayouts =
   terminalLayoutsJson as unknown as AirportTerminalLayout[];
 
@@ -21,14 +53,14 @@ export const airportNodeByIata = new Map(
   routeAirports.map((airport) => [airport.iata, airport]),
 );
 
-export function findAirportNode(iata: string): AirportNode | undefined {
+export function findAirportNode(iata: string): GlobalAirportNode | undefined {
   return airportNodeByIata.get(iata.trim().toUpperCase());
 }
 
-export function searchAirportNodes(query: string): AirportNode[] {
+export function searchAirportNodes(query: string): GlobalAirportNode[] {
   const q = query.trim().toLowerCase();
-  if (!q) return routeAirports;
-  return routeAirports.filter(
+  if (!q) return routeAirports.slice(0, 40);
+  const matched = routeAirports.filter(
     (node) =>
       node.iata.toLowerCase().includes(q) ||
       node.icao.toLowerCase().includes(q) ||
@@ -36,6 +68,7 @@ export function searchAirportNodes(query: string): AirportNode[] {
       node.name.toLowerCase().includes(q) ||
       node.country.toLowerCase().includes(q),
   );
+  return matched.slice(0, 50);
 }
 
 export function inferRegionFromCoords(

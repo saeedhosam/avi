@@ -39,7 +39,13 @@ export const MAP_COLORS = {
 
 export function createBaseMap(
   container: HTMLElement,
-  options: { center?: [number, number]; zoom?: number; minZoom?: number; maxZoom?: number } = {},
+  options: {
+    center?: [number, number];
+    zoom?: number;
+    minZoom?: number;
+    maxZoom?: number;
+    attribution?: boolean;
+  } = {},
   theme: MapTheme = "light",
 ): MapLibreMap {
   const map = new MapLibreMapClass({
@@ -55,24 +61,26 @@ export function createBaseMap(
     attributionControl: false,
   });
 
-  const attribControl = new AttributionControl({
-    compact: true,
-    customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
-  });
-  map.addControl(attribControl, "bottom-right");
+  if (options.attribution !== false) {
+    const attribControl = new AttributionControl({
+      compact: true,
+      customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
+    });
+    map.addControl(attribControl, "bottom-right");
 
-  const collapseAttribution = () => {
-    const attribContainer = (attribControl as unknown as { _container?: HTMLElement })._container;
-    if (attribContainer) {
-      attribContainer.classList.add("maplibregl-compact");
-      attribContainer.classList.remove("maplibregl-compact-show");
-      attribContainer.removeAttribute("open");
-    }
-  };
+    const collapseAttribution = () => {
+      const attribContainer = (attribControl as unknown as { _container?: HTMLElement })._container;
+      if (attribContainer) {
+        attribContainer.classList.add("maplibregl-compact");
+        attribContainer.classList.remove("maplibregl-compact-show");
+        attribContainer.removeAttribute("open");
+      }
+    };
 
-  collapseAttribution();
-  map.on("load", collapseAttribution);
-  map.on("styledata", collapseAttribution);
+    collapseAttribution();
+    map.on("load", collapseAttribution);
+    map.on("styledata", collapseAttribution);
+  }
 
   map.addControl(new NavigationControl({ showCompass: false }), "top-right");
   map.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");

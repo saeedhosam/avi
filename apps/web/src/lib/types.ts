@@ -81,6 +81,8 @@ export interface OperatingCarrierRoute {
   airlineName: string;
   flightNumbers: string[];
   dailyFrequencies: number;
+  weeklyFrequencies?: number;
+  operatingDays?: number[];
   aircraftTypes: string[];
 }
 
@@ -94,6 +96,8 @@ export interface DirectFlightConnection {
   durationFormatted: string;
   haulCategory: HaulCategory;
   dailyFlightsCount: number;
+  weeklyFlightsCount?: number;
+  operatingDays?: number[];
   hasDepartures: boolean;
   hasArrivals: boolean;
   operatingCarriers: OperatingCarrierRoute[];
@@ -113,6 +117,7 @@ export interface AirportRouteNetworkSummary {
   totalCountriesServed: number;
   totalOperatingAirlines: number;
   totalDailyFlights: number;
+  totalWeeklyFlights?: number;
   availableAirlines: AirlineFilterChipItem[];
 }
 

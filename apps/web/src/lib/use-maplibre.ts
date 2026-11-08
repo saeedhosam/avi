@@ -11,6 +11,7 @@ export function useMapLibre(
     zoom?: number;
     minZoom?: number;
     maxZoom?: number;
+    attribution?: boolean;
   } = {},
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
