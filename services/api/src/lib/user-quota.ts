@@ -49,7 +49,18 @@ class MemoryQuotaBackend implements QuotaBackend {
     }
     existing.value += cost;
     if (this.buckets.size > 5_000) {
-      this.buckets.clear();
+      // Prune expired buckets first
+      for (const [k, b] of this.buckets) {
+        if (b.expiresAt <= now) this.buckets.delete(k);
+      }
+      // If still overflowing, drop oldest inserted keys
+      if (this.buckets.size > 5_000) {
+        let toDrop = this.buckets.size - 4_000;
+        for (const k of this.buckets.keys()) {
+          this.buckets.delete(k);
+          if (--toDrop <= 0) break;
+        }
+      }
     }
     return existing.value;
   }
@@ -69,23 +80,24 @@ class RedisQuotaBackend implements QuotaBackend {
     private readonly log?: { warn: (message: string) => void },
   ) {}
 
-  private async ensureTtl(key: string, expiresAt: number): Promise<void> {
-    const ttl = Math.ceil((expiresAt - Date.now()) / 1000);
-    if (ttl <= 0) return;
-    // Redis `EXPIRE NX` only applies outside a TTL, equivalent to creating the
-    // bucket once per window.
-    await this.redis.sendCommand(new Redis.Command("expire", [key, ttl, "nx"]));
-  }
-
   async incrBy(key: string, cost: number, expiresAt: number): Promise<number> {
     try {
-      if (cost <= 0) {
+      if (cost === 0) {
         const existing = await this.get(key);
         return existing ?? 0;
       }
-      const next = await this.redis.incrby(key, cost);
-      await this.ensureTtl(key, expiresAt);
-      return next;
+      const ttl = Math.ceil((expiresAt - Date.now()) / 1000);
+      // Atomic pipeline: INCRBY and EXPIRE NX in a single network roundtrip
+      // ensures the key can never be created without its expiration TTL.
+      const pipeline = this.redis.pipeline().incrby(key, cost);
+      if (ttl > 0) {
+        pipeline.expire(key, ttl, "NX");
+      }
+      const results = await pipeline.exec();
+      if (!results || !results[0] || results[0][0]) {
+        throw results?.[0]?.[0] ?? new Error("Redis quota pipeline failed");
+      }
+      return results[0][1] as number;
     } catch (error) {
       this.log?.warn?.(`provider quota: Redis unavailable, falling back to in-process (${String(error)})`);
       return this.fallback.incrBy(key, cost, expiresAt);
@@ -117,19 +129,23 @@ export class UserQuotaService {
   private static readonly PLAN_TTL_MS = 60_000;
 
   constructor(
-    redisUrl: string | undefined,
+    redisOrUrl: Redis | string | undefined,
     private readonly listUserPlans: (uids: string[]) => Promise<Map<string, string>>,
     private readonly log: { warn: (message: string) => void; debug: (message: string) => void } = {
       warn: () => {},
       debug: () => {},
     },
   ) {
-    this.backend = redisUrl
-      ? new RedisQuotaBackend(
-          new Redis(redisUrl, { lazyConnect: false, maxRetriesPerRequest: 2 }),
-          log,
-        )
-      : new MemoryQuotaBackend(log);
+    if (redisOrUrl && typeof redisOrUrl === "object") {
+      this.backend = new RedisQuotaBackend(redisOrUrl, log);
+    } else if (typeof redisOrUrl === "string" && redisOrUrl.length > 0) {
+      this.backend = new RedisQuotaBackend(
+        new Redis(redisOrUrl, { lazyConnect: false, maxRetriesPerRequest: 2 }),
+        log,
+      );
+    } else {
+      this.backend = new MemoryQuotaBackend(log);
+    }
   }
 
   private async resolvePlan(uid: string): Promise<UserQuotaPlan> {

@@ -8,6 +8,7 @@
     "prebuild": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/contracts build",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
   },
@@ -16,7 +17,6 @@
     "@supabase/supabase-js": "^2.119.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.69.0",
-    "mapbox-gl": "^3.34.2",
     "maplibre-gl": "^6.16.0",
     "next": "16.4.5",
     "react": "19.3.1",
@@ -26,14 +26,14 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "^4.3.4",
     "@types/geojson": "^7946.0.16",
-    "@types/mapbox-gl": "^3.5.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4.3.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.0"
   },
   "description": "Avi web — live radar, flight tracking, route network, airport boards, terminal maps, alerts, and offline watchlist.",
   "packageManager": "pnpm@11.7.0"

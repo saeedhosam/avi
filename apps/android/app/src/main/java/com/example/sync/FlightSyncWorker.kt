@@ -10,7 +10,7 @@ import com.example.data.local.FlightAlertEntity
 import com.example.data.local.SkyTrackDatabase
 import com.example.data.remote.ApiConfig
 import com.example.model.Flight
-import com.example.data.remote.aerodatabox.FlightStateDiffer
+import com.example.data.FlightStateDiffer
 import com.example.data.remote.gateway.GatewayNetworkClient
 import com.example.data.remote.gateway.toDomainFlight
 import com.example.model.FlightStatus

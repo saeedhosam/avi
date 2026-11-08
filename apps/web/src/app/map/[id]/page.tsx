@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -13,11 +13,13 @@ import {
   Maximize2,
   Minimize2,
   Plane,
+  RefreshCw,
   Telescope,
   TriangleAlert,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { cn, geodesicDistanceKm, kmToNm } from "@/lib/utils";
+import { authFetch } from "@/lib/authed-fetch";
+import { cn, geodesicDistanceKm, kmToNm, normalizeFlightNumber } from "@/lib/utils";
 import type { Flight } from "@/lib/types";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
 
@@ -34,24 +36,72 @@ export default function FlightMapPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { flights } = useApp();
+  const { flights, upsertFlights, offlineMode } = useApp();
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupAttempted, setLookupAttempted] = useState(false);
+
+  const dateParam = searchParams.get("date") ?? "";
   const flight = useMemo(() => {
-    const id = decodeURIComponent(params.id ?? "");
+    const id = decodeURIComponent(params.id ?? "").trim();
+    const cleanId = id.replace(/\s+/g, "").toLowerCase();
     const numberMatch = (item: Flight) =>
-      item.id.toLowerCase() === id.toLowerCase() ||
-      item.flightNumber.replace(/\s+/g, "").toLowerCase() ===
-        id.replace(/\s+/g, "").toLowerCase();
-    const dateParam = searchParams.get("date") ?? "";
+      item.id.replace(/\s+/g, "").toLowerCase() === cleanId ||
+      normalizeFlightNumber(item.flightNumber).toLowerCase() === cleanId;
     const dateMatch = (item: Flight) =>
       !dateParam || (item.flightDate ?? "") === dateParam;
     return (
       flights.find((item) => numberMatch(item) && dateMatch(item)) ??
       flights.find(numberMatch)
     );
-  }, [flights, params.id, searchParams]);
+  }, [flights, params.id, dateParam]);
+
+  useEffect(() => {
+    if (flight || lookupAttempted || lookupLoading || offlineMode) return;
+    const rawId = decodeURIComponent(params.id ?? "").replace(/\s+/g, "");
+    if (!/^[A-Za-z0-9]{2,3}\d{1,4}[A-Za-z]?$/.test(rawId)) {
+      setLookupAttempted(true);
+      return;
+    }
+
+    let active = true;
+    setLookupLoading(true);
+    const dateQuery = dateParam ? `&date=${encodeURIComponent(dateParam)}` : "";
+    authFetch(`/api/flights/search?flight=${encodeURIComponent(rawId)}${dateQuery}`)
+      .then(async (res) => {
+        if (!active) return;
+        if (res.ok) {
+          const data = (await res.json()) as { flights?: Flight[] };
+          if (Array.isArray(data.flights) && data.flights.length > 0) {
+            upsertFlights(data.flights);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) {
+          setLookupLoading(false);
+          setLookupAttempted(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [flight, lookupAttempted, lookupLoading, offlineMode, params.id, dateParam, upsertFlights]);
 
   const [showHud, setShowHud] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+
+  if (lookupLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="size-6 animate-spin text-accent" />
+          <p className="text-xs font-semibold text-muted">Loading live flight telemetry…</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!flight) {
     return (
@@ -60,7 +110,7 @@ export default function FlightMapPage() {
           <EmptyState
             icon={<MapIcon className="size-6" />}
             title="Flight map unavailable"
-            description="This flight is not in the local cache. Search for it first to open the live map."
+            description="We could not find active telemetry for this flight. Check the flight number or search again."
             action={
               <Link href="/search">
                 <Button size="sm">Back to search</Button>

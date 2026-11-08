@@ -111,12 +111,13 @@ export default function SearchPage() {
     if (loading) return;
     if (mode === "FLIGHT_NUMBER") {
       const number = normalizeFlightNumber(flightNumber);
-      // Both fields are mandatory: a valid number and a recognised day.
-      if (number.length < 3 || departureDate === null) return;
+      // Valid flight number required. Departure date is optional (defaults to current active flight).
+      if (number.length < 3) return;
+      if (departureDateInput.trim() && departureDate === null) return;
       setActiveSearch({
         mode: "FLIGHT_NUMBER",
         number,
-        date: departureDate,
+        date: departureDate ?? "",
       });
       return;
     }
@@ -160,8 +161,9 @@ export default function SearchPage() {
       setResults([]);
       try {
         if (activeSearch.mode === "FLIGHT_NUMBER") {
+          const dateParam = activeSearch.date ? `&date=${encodeURIComponent(activeSearch.date)}` : "";
           const response = await authFetch(
-            `/api/flights/search?flight=${encodeURIComponent(activeSearch.number)}&date=${encodeURIComponent(activeSearch.date)}`,
+            `/api/flights/search?flight=${encodeURIComponent(activeSearch.number)}${dateParam}`,
             { signal: controller.signal, cache: "no-store" },
           );
           const data = (await response.json()) as {
@@ -277,7 +279,7 @@ export default function SearchPage() {
   const canSearch =
     mode === "FLIGHT_NUMBER"
       ? normalizeFlightNumber(flightNumber).length >= 3 &&
-        departureDate !== null
+        (!departureDateInput.trim() || departureDate !== null)
       : /^[A-Z]{3}$/.test(routeOrigin.trim().toUpperCase());
 
   const todayIso = isoDateToday();

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AppConfig } from "../config.js";
 
 export interface SupabaseWatchRow {
@@ -46,6 +47,7 @@ export interface WatchRowPatchTarget {
 export interface SupabaseAlertBody {
   user_id: string;
   flight_number: string;
+  flight_date?: string | null;
   alert_type: string;
   title: string;
   message: string;
@@ -71,6 +73,7 @@ export class SupabaseServer {
   private static readonly AUTH_CACHE_TTL_MS = 60_000;
   private static readonly AUTH_CACHE_MAX = 5_000;
   private readonly authCache = new Map<string, AuthIdentityCacheEntry>();
+  private readonly inFlightAuth = new Map<string, Promise<SupabaseAuthIdentity | null>>();
 
   constructor(private readonly config: AppConfig) {}
 
@@ -95,6 +98,8 @@ export class SupabaseServer {
   /**
    * Cache-backed identity lookup for a Supabase access token. Only the token
    * digest is used as the cache key; the token itself is never written.
+   * Concurrent requests for the same token are joined on an in-flight promise
+   * to eliminate duplicate network traffic and cache stampedes.
    */
   async authIdentity(token: string): Promise<SupabaseAuthIdentity | null> {
     if (!this.ready || !token) return null;
@@ -102,21 +107,45 @@ export class SupabaseServer {
     const now = Date.now();
     const cached = this.authCache.get(digest);
     if (cached && cached.expiresAt > now) {
-      if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) this.authCache.clear();
       return cached.identity;
     }
-    const identity = await this.fetchUserIdentity(token);
-    if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) this.authCache.clear();
-    this.authCache.set(digest, {
-      identity,
-      expiresAt: now + SupabaseServer.AUTH_CACHE_TTL_MS,
-    });
-    return identity;
+
+    const inFlight = this.inFlightAuth.get(digest);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      try {
+        const identity = await this.fetchUserIdentity(token);
+        const writeNow = Date.now();
+        if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) {
+          for (const [k, v] of this.authCache) {
+            if (v.expiresAt <= writeNow) this.authCache.delete(k);
+          }
+          if (this.authCache.size > SupabaseServer.AUTH_CACHE_MAX) {
+            let toDrop = this.authCache.size - 4_000;
+            for (const k of this.authCache.keys()) {
+              this.authCache.delete(k);
+              if (--toDrop <= 0) break;
+            }
+          }
+        }
+        this.authCache.set(digest, {
+          identity,
+          expiresAt: writeNow + SupabaseServer.AUTH_CACHE_TTL_MS,
+        });
+        return identity;
+      } finally {
+        this.inFlightAuth.delete(digest);
+      }
+    })();
+
+    this.inFlightAuth.set(digest, promise);
+    return promise;
   }
 
-  /** Stable, non-derivable cache key; avoids storing the raw token anywhere. */
+  /** Stable, cryptographic cache key; avoids storing the raw token anywhere. */
   private authCacheKey(token: string): string {
-    return Buffer.from(token).toString("base64url").slice(-64);
+    return createHash("sha256").update(token).digest("hex");
   }
 
   private async fetchUserIdentity(
@@ -470,7 +499,18 @@ export class SupabaseServer {
     if (!response.ok) {
       throw new Error(`stale snapshot prune failed with HTTP ${response.status}`);
     }
-    // Prefer: return=minimal gives us no count; the 204 means "purge ran".
+
+    // Also run alert retention cleanup to keep flight_alerts table bounded
+    try {
+      await fetch(`${this.base()}/rest/v1/rpc/prune_stale_alerts`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({ days_retention: 30 }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      // Non-critical background retention cleanup
+    }
     return 1;
   }
 }

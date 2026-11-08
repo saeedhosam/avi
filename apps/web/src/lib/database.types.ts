@@ -47,6 +47,24 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          event_id: string
+          provider: string
+          received_at: string
+        }
+        Insert: {
+          event_id: string
+          provider: string
+          received_at?: string
+        }
+        Update: {
+          event_id?: string
+          provider?: string
+          received_at?: string
+        }
+        Relationships: []
+      }
       device_tokens: {
         Row: {
           app_version: string | null
@@ -81,6 +99,8 @@ export type Database = {
         Row: {
           alert_type: string
           created_at: string
+          delivered_at: string | null
+          flight_date: string | null
           flight_number: string
           id: string
           is_read: boolean
@@ -92,6 +112,8 @@ export type Database = {
         Insert: {
           alert_type: string
           created_at?: string
+          delivered_at?: string | null
+          flight_date?: string | null
           flight_number: string
           id?: string
           is_read?: boolean
@@ -103,6 +125,8 @@ export type Database = {
         Update: {
           alert_type?: string
           created_at?: string
+          delivered_at?: string | null
+          flight_date?: string | null
           flight_number?: string
           id?: string
           is_read?: boolean
@@ -169,32 +193,38 @@ export type Database = {
       }
       profiles: {
         Row: {
+          billing_customer_id: string | null
           created_at: string
           display_name: string
           email: string
           home_airport: string | null
           id: string
           photo_url: string | null
+          plan: string
           theme_preference: string
           updated_at: string
         }
         Insert: {
+          billing_customer_id?: string | null
           created_at?: string
           display_name: string
           email?: string
           home_airport?: string | null
           id: string
           photo_url?: string | null
+          plan?: string
           theme_preference?: string
           updated_at?: string
         }
         Update: {
+          billing_customer_id?: string | null
           created_at?: string
           display_name?: string
           email?: string
           home_airport?: string | null
           id?: string
           photo_url?: string | null
+          plan?: string
           theme_preference?: string
           updated_at?: string
         }
@@ -265,8 +295,10 @@ export type Database = {
           flight_date: string | null
           flight_id: string
           flight_number: string
+          next_poll_at: string | null
           notes: string
           origin_code: string
+          poll_priority: number | null
           snapshot: Json | null
           status: string
           updated_at: string
@@ -279,8 +311,10 @@ export type Database = {
           flight_date?: string | null
           flight_id: string
           flight_number: string
+          next_poll_at?: string | null
           notes?: string
           origin_code?: string
+          poll_priority?: number | null
           snapshot?: Json | null
           status?: string
           updated_at?: string
@@ -293,8 +327,10 @@ export type Database = {
           flight_date?: string | null
           flight_id?: string
           flight_number?: string
+          next_poll_at?: string | null
           notes?: string
           origin_code?: string
+          poll_priority?: number | null
           snapshot?: Json | null
           status?: string
           updated_at?: string
@@ -307,7 +343,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      prune_stale_alerts: { Args: { days_retention?: number }; Returns: number }
     }
     Enums: {
       [_ in never]: never

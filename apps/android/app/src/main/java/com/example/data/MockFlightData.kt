@@ -195,7 +195,18 @@ object MockFlightData {
     )
 
     fun getAirport(code: String): Airport {
-        return airports.find { it.code.equals(code, ignoreCase = true) } ?: airports[0]
+        val clean = code.trim().uppercase()
+        return airports.find { it.code.equals(clean, ignoreCase = true) }
+            ?: Airport(
+                code = clean,
+                name = "$clean Airport",
+                city = clean,
+                country = "International",
+                timezone = "UTC",
+                latitude = 0.0,
+                longitude = 0.0,
+                weather = AirportWeather(20, 68, "Clear Sky", "10 kt", "10+ mi", 50)
+            )
     }
 
     val initialFlights = listOf(

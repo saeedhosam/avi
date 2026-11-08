@@ -18,5 +18,4 @@ minimumReleaseAgeExclude:
   - '@fastify/cors@11.4.1'
   - lucide-react@1.69.0
 
-patchedDependencies:
-  mapbox-gl: patches/mapbox-gl.patch
+

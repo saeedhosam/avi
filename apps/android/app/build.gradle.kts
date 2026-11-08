@@ -14,7 +14,7 @@ android {
   compileSdk { version = release(37) }
 
   defaultConfig {
-    applicationId = "com.aistudio.skytrack.wkvzp"
+    applicationId = "org.codestep.avi"
     minSdk = 24
     targetSdk = 36
     versionCode = 1

@@ -1,8 +1,9 @@
 package com.example
 
+import com.example.data.FlightStateDiffer
 import com.example.data.MockFlightData
 import com.example.data.remote.ApiConfig
-import com.example.data.remote.aerodatabox.*
+import com.example.data.remote.gateway.*
 import com.example.data.remote.weather.*
 import com.example.model.AlertType
 import com.example.model.FlightCategory
@@ -13,46 +14,51 @@ import org.junit.Test
 class AeroDataBoxProductionTest {
 
     @Test
-    fun `normalizeFlightNumber formats compact and spaced codes`() {
-        assertEquals("AA 100", AeroDataBoxMapper.normalizeFlightNumber("AA100"))
-        assertEquals("BA 178", AeroDataBoxMapper.normalizeFlightNumber("ba 178"))
-        assertEquals("DL 404", AeroDataBoxMapper.normalizeFlightNumber("DL-404"))
-    }
-
-    @Test
-    fun `computeDelayMinutes calculates schedule revision accurately`() {
-        val scheduled = "2026-11-04 14:15-05:00"
-        val revised = "2026-11-04 14:50-05:00"
-        assertEquals(35, AeroDataBoxMapper.computeDelayMinutes(scheduled, revised))
-        assertEquals(0, AeroDataBoxMapper.computeDelayMinutes(scheduled, scheduled))
-    }
-
-    @Test
-    fun `mapDtoToFlight maps AeroDataBox payload to domain Flight`() {
-        val dto = AeroFlightDto(
-            number = "AA 100",
-            status = "Delayed",
-            airline = AeroAirlineDto(name = "American Airlines", iata = "AA"),
-            aircraft = AeroAircraftDto(reg = "N732AN", model = "Boeing 777-300ER"),
-            departure = AeroMovementDto(
-                airport = AeroAirportDto(iata = "JFK", name = "John F. Kennedy", municipalityName = "New York"),
-                scheduledTime = AeroTimeDto(local = "2026-11-04 18:30-05:00"),
-                revisedTime = AeroTimeDto(local = "2026-11-04 19:05-05:00"),
-                terminal = "8",
-                gate = "B14",
-                checkInDesk = "12-18"
+    fun `mapConsoleFlightDto maps gateway response to domain Flight`() {
+        val dto = ConsoleFlightDto(
+            id = "AA100",
+            flightDate = "2026-11-04",
+            flightNumber = "AA 100",
+            airline = "American Airlines",
+            airlineCode = "AA",
+            origin = ConsoleAirportDto(
+                code = "JFK",
+                name = "John F. Kennedy",
+                city = "New York",
+                country = "United States",
+                timezone = "America/New_York",
+                latitude = 40.6413,
+                longitude = -73.7781
             ),
-            arrival = AeroMovementDto(
-                airport = AeroAirportDto(iata = "LHR", name = "London Heathrow", municipalityName = "London"),
-                scheduledTime = AeroTimeDto(local = "2026-11-05 06:35+00:00"),
-                revisedTime = AeroTimeDto(local = "2026-11-05 07:10+00:00"),
-                terminal = "3",
-                gate = "22",
-                baggageBelt = "7"
+            destination = ConsoleAirportDto(
+                code = "LHR",
+                name = "London Heathrow",
+                city = "London",
+                country = "United Kingdom",
+                timezone = "Europe/London",
+                latitude = 51.4700,
+                longitude = -0.4543
+            ),
+            departureTimeScheduled = "18:30",
+            departureTimeEstimated = "19:05",
+            arrivalTimeScheduled = "06:35",
+            arrivalTimeEstimated = "07:10",
+            status = "DELAYED",
+            statusNote = "Delayed by 35m",
+            delayMinutes = 35,
+            terminalDeparture = "8",
+            gateDeparture = "Gate B14",
+            checkInCounter = "12-18",
+            terminalArrival = "3",
+            gateArrival = "22",
+            baggageCarousel = "Carousel 7",
+            aircraft = ConsoleAircraftDto(
+                model = "Boeing 777-300ER",
+                registration = "N732AN"
             )
         )
 
-        val flight = AeroDataBoxMapper.mapDtoToFlight(dto)
+        val flight = dto.toDomainFlight()
         assertNotNull(flight)
         assertEquals("AA100", flight!!.id)
         assertEquals("AA 100", flight.flightNumber)
@@ -137,7 +143,6 @@ class AeroDataBoxProductionTest {
 
     @Test
     fun `ApiConfig reports gateway readiness instead of on-device provider keys`() {
-        // Android no longer holds a provider key; the gateway is authoritative.
         assertTrue(ApiConfig.isGatewayConfigured)
         assertTrue(ApiConfig.hasValidAeroDataBoxKey(""))
         assertTrue(ApiConfig.hasValidAeroDataBoxKey("DEFAULT_AERODATABOX_KEY"))

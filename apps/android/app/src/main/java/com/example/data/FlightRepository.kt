@@ -15,7 +15,7 @@ import com.example.data.remote.ApiConfig
 import com.example.data.remote.DataSourceMode
 import com.example.data.remote.gateway.GatewayNetworkClient
 import com.example.data.remote.gateway.toDomainFlight
-import com.example.data.remote.aerodatabox.FlightStateDiffer
+import com.example.data.FlightStateDiffer
 import com.example.model.*
 import com.example.data.supabase.CloudFlightSnapshot
 import com.example.data.supabase.SupabaseClientProvider

@@ -203,7 +203,7 @@ export function flightKey(flight: Pick<Flight, "flightNumber" | "flightDate">) {
   return flight.flightDate ? `${number}|${flight.flightDate}` : `${number}|any`;
 }
 
-function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
+export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[] {
   const alerts: FlightAlert[] = [];
   // Timestamps are stored as ISO instants (the alert engine writes the same);
   // the UI renders them relative-to-now with formatAlertTimestamp().
@@ -493,7 +493,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 existing.telemetry.hasLiveLocation,
             },
           };
-          if (existing.isWatchlisted && source !== "cloud") {
+          // Alerts are server-owned when Supabase/watch-engine is connected.
+          // Only generate local fallback alerts in purely offline/guest mode to avoid
+          // duplicate notifications alongside server Realtime events.
+          if (existing.isWatchlisted && source !== "cloud" && !supabaseReady && !account.isSignedIn) {
             newAlerts.push(...buildChangeAlerts(existing, merged));
           }
           map.set(key, merged);
@@ -507,7 +510,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFlights(updated);
       newAlerts.forEach((alert) => addAlert(alert, true));
     },
-    [addAlert],
+    [account.isSignedIn, addAlert, supabaseReady],
   );
 
   const mergeCloudWatchlist = useCallback(

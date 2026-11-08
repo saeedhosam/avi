@@ -33,7 +33,7 @@ abstract class SkyTrackDatabase : RoomDatabase() {
                     SkyTrackDatabase::class.java,
                     "skytrack_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigrationOnDowngrade(false)
                     .build()
                 INSTANCE = instance
                 instance

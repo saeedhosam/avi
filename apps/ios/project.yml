@@ -47,11 +47,23 @@ targets:
       - package: Supabase
         product: Supabase
 
+  AviTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AviTests
+    dependencies:
+      - target: Avi
+
 schemes:
   Avi:
     build:
       targets:
         Avi: all
+        AviTests: [test]
+    test:
+      targets:
+        - AviTests
     run:
       config: Debug
     archive:

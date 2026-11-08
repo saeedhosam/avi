@@ -21,7 +21,6 @@ import {
   Plane,
   X,
   Share2,
-  Box,
   Compass,
   ArrowRight,
   Info,
@@ -44,18 +43,6 @@ import {
   Panel,
   StatusBadge,
 } from "@/components/ui";
-
-const MapboxAirportMap = dynamic(
-  () => import("@/components/mapbox-airport-map").then((m) => m.MapboxAirportMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[580px] w-full items-center justify-center rounded-2xl border border-line bg-[#081320]">
-        <p className="text-xs text-muted">Loading Mapbox 3D airport map…</p>
-      </div>
-    ),
-  },
-);
 
 const AirportGroundsMap = dynamic(
   () => import("@/components/airport-grounds-map").then((m) => m.AirportGroundsMap),
@@ -93,7 +80,7 @@ const CATEGORY_ORDER: AmenityCategory[] = [
 
 export default function AirportsPage() {
   const [airportCode, setAirportCode] = useState("CAI");
-  const [viewMode, setViewMode] = useState<"MAPBOX" | "INDOOR" | "GROUNDS">("MAPBOX");
+  const [viewMode, setViewMode] = useState<"GROUNDS" | "INDOOR">("GROUNDS");
   const [category, setCategory] = useState<AmenityCategory>("ALL");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<TerminalAmenity | null>(null);
@@ -127,7 +114,7 @@ export default function AirportsPage() {
         setLevel(layout.availableLevels.includes(1) ? 1 : layout.availableLevels[0] ?? 0);
       }
     }
-    setViewMode("MAPBOX");
+    setViewMode("GROUNDS");
     setSelected(null);
     setQuery("");
   }, [airportCode, layout, level]);
@@ -149,7 +136,7 @@ export default function AirportsPage() {
     } else if (mode === "INDOOR") {
       setViewMode("INDOOR");
     } else if (mode === "MAPBOX") {
-      setViewMode("MAPBOX");
+      setViewMode("GROUNDS");
     }
 
     if (gate && layout) {
@@ -309,19 +296,16 @@ export default function AirportsPage() {
           <div className="flex rounded-lg border border-line bg-surface-2 p-0.5">
             <button
               type="button"
-              onClick={() => setViewMode("MAPBOX")}
+              onClick={() => setViewMode("GROUNDS")}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
-                viewMode === "MAPBOX"
+                viewMode === "GROUNDS"
                   ? "bg-accent text-surface-0 shadow-sm"
                   : "text-muted hover:text-ink",
               )}
             >
-              <Box className="size-3.5" />
-              Mapbox 3D
-              <span className="ml-0.5 rounded bg-black/20 px-1 py-0.2 font-mono text-[9px]">
-                3D
-              </span>
+              <Compass className="size-3.5" />
+              Airfield & Grounds
             </button>
             <button
               type="button"
@@ -339,20 +323,7 @@ export default function AirportsPage() {
               )}
             >
               <Layers className="size-3.5" />
-              Floor Schematic
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("GROUNDS")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
-                viewMode === "GROUNDS"
-                  ? "bg-accent text-surface-0 shadow-sm"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <Compass className="size-3.5" />
-              Airfield Radar
+              Terminal Concourse
             </button>
           </div>
 
@@ -599,16 +570,7 @@ export default function AirportsPage() {
 
         {/* Center Main Viewport */}
         <main className="space-y-3">
-          {viewMode === "MAPBOX" ? (
-            <MapboxAirportMap
-              airport={airportNode}
-              amenities={layout?.amenities ?? []}
-              selectedAmenity={selected}
-              onSelectAmenity={selectAmenity}
-              activeLevel={level}
-              className="h-[580px] w-full"
-            />
-          ) : viewMode === "INDOOR" && layout && floor ? (
+          {viewMode === "INDOOR" && layout && floor ? (
             <TerminalMap
               layout={layout}
               floor={floor}
@@ -623,7 +585,9 @@ export default function AirportsPage() {
               airport={airportNode}
               className="h-[580px] w-full"
               hasIndoorSchematic={Boolean(layout)}
-              onSelectTerminal={() => setViewMode("MAPBOX")}
+              onSelectTerminal={() => {
+                if (layout) setViewMode("INDOOR");
+              }}
             />
           )}
 

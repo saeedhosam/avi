@@ -74,14 +74,10 @@ class FlightNotificationScheduler(private val context: Context) {
         )
 
         alarmManager?.let { am ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (am.canScheduleExactAlarms()) {
-                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-                } else {
-                    am.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
             } else {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                am.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
             }
         }
 

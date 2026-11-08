@@ -4,6 +4,8 @@ import type { EngineStats } from "../engine/watch-engine.js";
 
 /** Redis key the worker publishes its latest tick stats to. */
 const STATS_KEY = "avi:engine:status";
+/** Redis key for distributed single-writer leader election across worker containers. */
+const LEADER_LOCK_KEY = "avi:engine:leader_lock";
 /** A worker dead for longer than this makes the gateway report stats as null. */
 const STATS_TTL_SECONDS = 90;
 
@@ -12,12 +14,49 @@ export class EngineStatusStore {
   private readonly memory: { stats: EngineStats | null; at: number } = { stats: null, at: 0 };
 
   constructor(
-    redisUrl: string | undefined,
+    redisOrUrl: Redis | string | undefined,
     private readonly log: { warn: (message: string) => void },
   ) {
-    this.redis = redisUrl
-      ? new Redis(redisUrl, { lazyConnect: false, maxRetriesPerRequest: 2 })
-      : null;
+    if (redisOrUrl && typeof redisOrUrl === "object") {
+      this.redis = redisOrUrl;
+    } else if (typeof redisOrUrl === "string" && redisOrUrl.length > 0) {
+      this.redis = new Redis(redisOrUrl, { lazyConnect: false, maxRetriesPerRequest: 2 });
+    } else {
+      this.redis = null;
+    }
+  }
+
+  /**
+   * Acquires or renews the distributed leader lease. Only the leader container executes ticks.
+   */
+  async acquireLock(instanceId: string, ttlSeconds = 30): Promise<boolean> {
+    if (!this.redis) return true; // Single-process mode
+    try {
+      const res = await this.redis.set(LEADER_LOCK_KEY, instanceId, "EX", ttlSeconds, "NX");
+      if (res === "OK") return true;
+      const current = await this.redis.get(LEADER_LOCK_KEY);
+      if (current === instanceId) {
+        await this.redis.expire(LEADER_LOCK_KEY, ttlSeconds);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      this.log.warn(`engine leader lock error, assuming single worker (${String(error)})`);
+      return true;
+    }
+  }
+
+  /** Releases the leader lease upon graceful container shutdown. */
+  async releaseLock(instanceId: string): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const current = await this.redis.get(LEADER_LOCK_KEY);
+      if (current === instanceId) {
+        await this.redis.del(LEADER_LOCK_KEY);
+      }
+    } catch (error) {
+      this.log.warn(`engine leader lock release failed (${String(error)})`);
+    }
   }
 
   /** Publishes the latest tick stats. A worker writes only after a successful tick. */

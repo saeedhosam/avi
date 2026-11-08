@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import type { FlightSummary } from "../domain/flight.js";
@@ -49,10 +50,12 @@ export interface EngineStats {
  *
  * State lives in Postgres, not in this process: `watchlist_items.next_poll_at`
  * is the poll ladder, and `flight_alerts` dedupes on a unique index. The
- * engine is restart- and concurrency-safe; an engine container provides the
- * single writer via a PostgREST advisory lock.
+ * engine is restart- and concurrency-safe; single-writer execution is enforced
+ * by service topology (a dedicated `avi-engine` container running with
+ * `WATCH_ENGINE_ENABLED=true`, while API gateway containers run with the engine disabled).
  */
 export class WatchEngine {
+  private readonly instanceId = randomUUID();
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private stopped = false;
@@ -118,6 +121,13 @@ export class WatchEngine {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    if (this.statusStore) {
+      try {
+        await this.statusStore.releaseLock(this.instanceId);
+      } catch (err) {
+        this.log.warn({ err }, "failed to release engine leader lock on stop");
+      }
+    }
   }
 
   private scheduleNext(delayMs: number): void {
@@ -178,6 +188,15 @@ export class WatchEngine {
 
   async tick(): Promise<EngineStats> {
     if (this.running) return this.stats();
+    if (this.statusStore) {
+      const leaseTtl = Math.max(15, Math.ceil((this.config.WATCH_ENGINE_TICK_MS / 1000) * 3));
+      const isLeader = await this.statusStore.acquireLock(this.instanceId, leaseTtl);
+      if (!isLeader) {
+        this.log.debug("watch engine tick skipped: another container holds the leader lock");
+        this.scheduleNext(this.config.WATCH_ENGINE_TICK_MS);
+        return this.stats();
+      }
+    }
     this.running = true;
     try {
       await this.runTick();
@@ -444,6 +463,7 @@ export class WatchEngine {
           alerts: drafts.map((draft) => ({
             user_id: row.user_id,
             flight_number: job.flightNumber,
+            flight_date: job.flightDate ?? (typeof merged.flightDate === "string" ? merged.flightDate : null),
             alert_type: draft.type,
             title: draft.title,
             message: draft.message,

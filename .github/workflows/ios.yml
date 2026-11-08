@@ -27,3 +27,13 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
+      - name: Run unit tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild \
+            -project Avi.xcodeproj \
+            -scheme Avi \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            test

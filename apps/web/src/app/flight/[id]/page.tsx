@@ -87,7 +87,7 @@ export default function FlightDetailPage() {
   useEffect(() => {
     if (flight || lookupState !== "idle") return;
     const rawId = decodeURIComponent(params.id ?? "").replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9]{5,8}$/.test(rawId)) {
+    if (!/^[A-Za-z0-9]{2,3}\d{1,4}[A-Za-z]?$/.test(rawId)) {
       setLookupState("notfound");
       return;
     }
