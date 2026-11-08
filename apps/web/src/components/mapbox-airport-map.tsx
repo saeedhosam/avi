@@ -68,7 +68,7 @@ export function MapboxAirportMap({
   const [currentZoom, setCurrentZoom] = useState(15.5);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Initialize Mapbox map
+  // Initialize Mapbox map once
   useEffect(() => {
     if (!containerRef.current) return;
     if (!token) {
@@ -97,10 +97,16 @@ export function MapboxAirportMap({
         "bottom-right",
       );
 
-      map.on("load", () => {
-        setMapLoaded(true);
-
+      const apply3DBuildings = () => {
         try {
+          // Only add artificial 3D extrusions on dark/vector styles; keep satellite crystal-clear
+          if (activeStyle === "satellite") {
+            if (map.getLayer("3d-buildings")) {
+              map.removeLayer("3d-buildings");
+            }
+            return;
+          }
+
           const style = map.getStyle();
           const layers = style?.layers;
           const labelLayerId = layers?.find(
@@ -139,6 +145,15 @@ export function MapboxAirportMap({
         } catch (err) {
           console.warn("Could not inject 3D buildings layer:", err);
         }
+      };
+
+      map.on("load", () => {
+        setMapLoaded(true);
+        apply3DBuildings();
+      });
+
+      map.on("style.load", () => {
+        apply3DBuildings();
       });
 
       map.on("zoom", () => {
@@ -155,7 +170,17 @@ export function MapboxAirportMap({
     } catch (e) {
       console.warn("Mapbox initialization error:", e);
     }
-  }, [token, activeStyle, airport.iata, airport.latitude, airport.longitude, is3D]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Smooth style transitions without recreating WebGL context or workers
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+    const targetUrl = MAP_STYLES.find((s) => s.id === activeStyle)?.url;
+    if (targetUrl) {
+      mapRef.current.setStyle(targetUrl);
+    }
+  }, [activeStyle, mapLoaded]);
 
   // Recenter when airport changes
   useEffect(() => {

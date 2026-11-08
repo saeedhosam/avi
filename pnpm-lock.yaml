@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  mapbox-gl: bbb662e1aa7a40773bb923a1540141934ec981810bd7bdca3a10585dfc850cfc
+
 importers:
 
   .:
@@ -34,7 +37,7 @@ importers:
         version: 1.69.0(@types/react@19.3.0)(react@19.3.1)
       mapbox-gl:
         specifier: ^3.34.2
-        version: 3.34.2
+        version: 3.34.2(patch_hash=bbb662e1aa7a40773bb923a1540141934ec981810bd7bdca3a10585dfc850cfc)
       maplibre-gl:
         specifier: ^6.16.0
         version: 6.16.0
@@ -3688,7 +3691,7 @@ snapshots:
 
   '@types/mapbox-gl@3.5.0':
     dependencies:
-      mapbox-gl: 3.34.2
+      mapbox-gl: 3.34.2(patch_hash=bbb662e1aa7a40773bb923a1540141934ec981810bd7bdca3a10585dfc850cfc)
 
   '@types/node@20.19.43':
     dependencies:
@@ -5057,7 +5060,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  mapbox-gl@3.34.2: {}
+  mapbox-gl@3.34.2(patch_hash=bbb662e1aa7a40773bb923a1540141934ec981810bd7bdca3a10585dfc850cfc): {}
 
   maplibre-gl@6.16.0:
     dependencies:
