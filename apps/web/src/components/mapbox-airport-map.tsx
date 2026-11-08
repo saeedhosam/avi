@@ -97,6 +97,27 @@ export function MapboxAirportMap({
         "bottom-right",
       );
 
+      // Handle Mapbox tile & source errors gracefully to prevent Next.js Turbopack dev overlay crashes
+      map.on("error", (e) => {
+        const err = e?.error as (Error & { status?: number }) | undefined;
+        if (
+          !err ||
+          err.status === 404 ||
+          err.status === 403 ||
+          err.status === 422 ||
+          err.name === "AbortError" ||
+          (typeof err.message === "string" &&
+            (err.message.includes("404") ||
+              err.message.includes("403") ||
+              err.message.includes("abort") ||
+              err.message.includes("AJAXError")))
+        ) {
+          // Normal tile missing/overscaled behavior in high-zoom satellite or canceled network requests
+          return;
+        }
+        console.warn("Mapbox non-critical notice:", err.message || err);
+      });
+
       const apply3DBuildings = () => {
         try {
           // Only add artificial 3D extrusions on dark/vector styles; keep satellite crystal-clear
@@ -178,6 +199,15 @@ export function MapboxAirportMap({
     if (!mapRef.current || !mapLoaded) return;
     const targetUrl = MAP_STYLES.find((s) => s.id === activeStyle)?.url;
     if (targetUrl) {
+      if (activeStyle === "satellite") {
+        // Satellite rasters max out at zoom 18; clamp maxZoom so Mapbox overscales rather than 404ing
+        mapRef.current.setMaxZoom(18.5);
+        if (mapRef.current.getZoom() > 18.5) {
+          mapRef.current.setZoom(18.2);
+        }
+      } else {
+        mapRef.current.setMaxZoom(20);
+      }
       mapRef.current.setStyle(targetUrl);
     }
   }, [activeStyle, mapLoaded]);
