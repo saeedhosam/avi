@@ -11,6 +11,53 @@
       0
     ],
     "floors": {
+      "0": {
+        "level": 0,
+        "levelName": "Arrivals & Ground Transit",
+        "description": "Baggage Claim, Customs, AirTrain & Taxi Stands",
+        "concourseSections": [
+          {
+            "id": "JFK_BAGGAGE_HALL",
+            "name": "International Baggage Claim",
+            "start": {
+              "x": 0.25,
+              "y": 0.55
+            },
+            "end": {
+              "x": 0.75,
+              "y": 0.55
+            },
+            "width": 0.14,
+            "gatesRange": "Carousels 1–10"
+          },
+          {
+            "id": "JFK_AIRTRAIN_LINK",
+            "name": "AirTrain Walkway & Taxi Stand",
+            "start": {
+              "x": 0.5,
+              "y": 0.7
+            },
+            "end": {
+              "x": 0.5,
+              "y": 0.9
+            },
+            "width": 0.08,
+            "gatesRange": "AirTrain to Jamaica / Howard Beach"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.55
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.62
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.82
+        }
+      },
       "1": {
         "level": 1,
         "levelName": "Departures & Gates",
@@ -18,7 +65,7 @@
         "concourseSections": [
           {
             "id": "JFK_CONC_A",
-            "name": "Concourse A (Gates A2\u2013A7)",
+            "name": "Concourse A (Gates A2–A7)",
             "start": {
               "x": 0.42,
               "y": 0.62
@@ -28,11 +75,11 @@
               "y": 0.28
             },
             "width": 0.055,
-            "gatesRange": "A2\u2013A7"
+            "gatesRange": "A2–A7"
           },
           {
             "id": "JFK_CONC_B1",
-            "name": "Concourse B (Gates B20\u2013B32)",
+            "name": "Concourse B (Gates B20–B32)",
             "start": {
               "x": 0.58,
               "y": 0.62
@@ -42,11 +89,11 @@
               "y": 0.38
             },
             "width": 0.055,
-            "gatesRange": "B20\u2013B32"
+            "gatesRange": "B20–B32"
           },
           {
             "id": "JFK_CONC_B2",
-            "name": "Concourse B Extension (Gates B33\u2013B45)",
+            "name": "Concourse B Extension (Gates B33–B45)",
             "start": {
               "x": 0.82,
               "y": 0.38
@@ -56,7 +103,7 @@
               "y": 0.16
             },
             "width": 0.05,
-            "gatesRange": "B33\u2013B45"
+            "gatesRange": "B33–B45"
           },
           {
             "id": "JFK_CENTRAL_HALL",
@@ -132,53 +179,6 @@
           "x": 0.5,
           "y": 0.85
         }
-      },
-      "0": {
-        "level": 0,
-        "levelName": "Arrivals & Ground Transit",
-        "description": "Baggage Claim, Customs, AirTrain & Taxi Stands",
-        "concourseSections": [
-          {
-            "id": "JFK_BAGGAGE_HALL",
-            "name": "International Baggage Claim",
-            "start": {
-              "x": 0.25,
-              "y": 0.55
-            },
-            "end": {
-              "x": 0.75,
-              "y": 0.55
-            },
-            "width": 0.14,
-            "gatesRange": "Carousels 1\u201310"
-          },
-          {
-            "id": "JFK_AIRTRAIN_LINK",
-            "name": "AirTrain Walkway & Taxi Stand",
-            "start": {
-              "x": 0.5,
-              "y": 0.7
-            },
-            "end": {
-              "x": 0.5,
-              "y": 0.9
-            },
-            "width": 0.08,
-            "gatesRange": "AirTrain to Jamaica / Howard Beach"
-          }
-        ],
-        "centralHubCenter": {
-          "x": 0.5,
-          "y": 0.55
-        },
-        "securityPosition": {
-          "x": 0.5,
-          "y": 0.62
-        },
-        "entrancePosition": {
-          "x": 0.5,
-          "y": 0.82
-        }
       }
     },
     "amenities": [
@@ -196,7 +196,7 @@
           "y": 0.76
         },
         "gateNumber": null,
-        "openingHours": "24/7 (PreCheck: 04:30\u201321:30)",
+        "openingHours": "24/7 (PreCheck: 04:30–21:30)",
         "accessInfo": null,
         "waitTimeMinutes": 6,
         "walkTimeFromSecurityMinutes": 0,
@@ -380,7 +380,7 @@
           "y": 0.58
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 22:00",
+        "openingHours": "05:00 – 22:00",
         "accessInfo": "Amex Centurion, Platinum & Delta Reserve Cardmembers",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 2,
@@ -408,7 +408,7 @@
           "y": 0.38
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 23:30",
+        "openingHours": "05:00 – 23:30",
         "accessInfo": "Delta One, SkyTeam Elite Plus, Delta Reserve",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 6,
@@ -436,7 +436,7 @@
           "y": 0.38
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 08:30 & 14:00 \u2013 23:30",
+        "openingHours": "05:00 – 08:30 & 14:00 – 23:30",
         "accessInfo": "Upper Class Passengers & Flying Club Gold",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 7,
@@ -464,7 +464,7 @@
           "y": 0.44
         },
         "gateNumber": null,
-        "openingHours": "16:00 \u2013 22:30",
+        "openingHours": "16:00 – 22:30",
         "accessInfo": "Emirates First/Business & Skywards Gold/Platinum",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 5,
@@ -491,7 +491,7 @@
           "y": 0.52
         },
         "gateNumber": null,
-        "openingHours": "06:00 \u2013 23:00",
+        "openingHours": "06:00 – 23:00",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 5,
@@ -546,7 +546,7 @@
           "y": 0.42
         },
         "gateNumber": null,
-        "openingHours": "06:30 \u2013 22:00",
+        "openingHours": "06:30 – 22:00",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 7,
@@ -601,7 +601,7 @@
           "y": 0.59
         },
         "gateNumber": null,
-        "openingHours": "07:00 \u2013 21:30",
+        "openingHours": "07:00 – 21:30",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 3,
@@ -681,7 +681,7 @@
           "y": 0.88
         },
         "gateNumber": null,
-        "openingHours": "24/7 (Every 4\u20138 mins)",
+        "openingHours": "24/7 (Every 4–8 mins)",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 4,
@@ -696,7 +696,7 @@
       },
       {
         "id": "JFK_BAGGAGE_CLAIM",
-        "name": "Baggage Claim Carousels 4\u20138",
+        "name": "Baggage Claim Carousels 4–8",
         "category": "TRANSIT",
         "airportCode": "JFK",
         "terminal": "T4",
@@ -740,7 +740,7 @@
         "concourseSections": [
           {
             "id": "LHR_MAIN_A_NORTH",
-            "name": "Concourse A North (Gates A1\u2013A11)",
+            "name": "Concourse A North (Gates A1–A11)",
             "start": {
               "x": 0.35,
               "y": 0.48
@@ -750,11 +750,11 @@
               "y": 0.22
             },
             "width": 0.065,
-            "gatesRange": "A1\u2013A11"
+            "gatesRange": "A1–A11"
           },
           {
             "id": "LHR_MAIN_A_SOUTH",
-            "name": "Concourse A South (Gates A12\u2013A23)",
+            "name": "Concourse A South (Gates A12–A23)",
             "start": {
               "x": 0.65,
               "y": 0.48
@@ -764,7 +764,7 @@
               "y": 0.22
             },
             "width": 0.065,
-            "gatesRange": "A12\u2013A23"
+            "gatesRange": "A12–A23"
           },
           {
             "id": "LHR_CENTRAL_ATRIUM",
@@ -810,7 +810,7 @@
           "y": 0.74
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 22:30",
+        "openingHours": "05:00 – 22:30",
         "accessInfo": null,
         "waitTimeMinutes": 5,
         "walkTimeFromSecurityMinutes": 0,
@@ -846,7 +846,7 @@
         "assignedFlightNumber": "BA 117",
         "features": [
           "Biometric Smart Gate",
-          "Priority Boarding Groups 1\u20139"
+          "Priority Boarding Groups 1–9"
         ]
       },
       {
@@ -889,7 +889,7 @@
           "y": 0.65
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 22:30",
+        "openingHours": "05:00 – 22:30",
         "accessInfo": "British Airways First Class & Concorde Room Cardholders",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 1,
@@ -917,7 +917,7 @@
           "y": 0.44
         },
         "gateNumber": null,
-        "openingHours": "05:00 \u2013 22:30",
+        "openingHours": "05:00 – 22:30",
         "accessInfo": "Club World, Club Europe, Silver / Gold Executive Club",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 3,
@@ -945,7 +945,7 @@
           "y": 0.46
         },
         "gateNumber": null,
-        "openingHours": "05:30 \u2013 21:30",
+        "openingHours": "05:30 – 21:30",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 3,
@@ -972,7 +972,7 @@
           "y": 0.5
         },
         "gateNumber": null,
-        "openingHours": "06:00 \u2013 21:00",
+        "openingHours": "06:00 – 21:00",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 2,
@@ -1004,7 +1004,7 @@
         "concourseSections": [
           {
             "id": "SFO_BOARDING_A",
-            "name": "Boarding Area A (Gates A1\u2013A15)",
+            "name": "Boarding Area A (Gates A1–A15)",
             "start": {
               "x": 0.4,
               "y": 0.55
@@ -1014,11 +1014,11 @@
               "y": 0.25
             },
             "width": 0.06,
-            "gatesRange": "A1\u2013A15"
+            "gatesRange": "A1–A15"
           },
           {
             "id": "SFO_BOARDING_G",
-            "name": "Boarding Area G (Gates G91\u2013G102)",
+            "name": "Boarding Area G (Gates G91–G102)",
             "start": {
               "x": 0.6,
               "y": 0.55
@@ -1028,7 +1028,7 @@
               "y": 0.25
             },
             "width": 0.06,
-            "gatesRange": "G91\u2013G102"
+            "gatesRange": "G91–G102"
           },
           {
             "id": "SFO_MAIN_HALL",
@@ -1074,7 +1074,7 @@
           "y": 0.68
         },
         "gateNumber": null,
-        "openingHours": "04:30 \u2013 00:30",
+        "openingHours": "04:30 – 00:30",
         "accessInfo": null,
         "waitTimeMinutes": 4,
         "walkTimeFromSecurityMinutes": 0,
@@ -1153,7 +1153,7 @@
           "y": 0.52
         },
         "gateNumber": null,
-        "openingHours": "06:30 \u2013 22:30",
+        "openingHours": "06:30 – 22:30",
         "accessInfo": "Long-haul United Polaris Business & Star Alliance First/Business",
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 2,
@@ -1180,7 +1180,7 @@
           "y": 0.58
         },
         "gateNumber": null,
-        "openingHours": "06:00 \u2013 23:00",
+        "openingHours": "06:00 – 23:00",
         "accessInfo": null,
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 2,
@@ -1213,7 +1213,7 @@
         "concourseSections": [
           {
             "id": "DXB_CONC_B",
-            "name": "Concourse B (Gates B1\u2013B32)",
+            "name": "Concourse B (Gates B1–B32)",
             "start": {
               "x": 0.2,
               "y": 0.5
@@ -1223,7 +1223,7 @@
               "y": 0.5
             },
             "width": 0.08,
-            "gatesRange": "B1\u2013B32"
+            "gatesRange": "B1–B32"
           },
           {
             "id": "DXB_CONC_A_PIER",
@@ -1237,7 +1237,7 @@
               "y": 0.15
             },
             "width": 0.07,
-            "gatesRange": "A1\u2013A24 (All A380)"
+            "gatesRange": "A1–A24 (All A380)"
           }
         ],
         "centralHubCenter": {
@@ -1300,7 +1300,7 @@
         "waitTimeMinutes": null,
         "walkTimeFromSecurityMinutes": 3,
         "walkDistanceMeters": 190,
-        "rating": 5.0,
+        "rating": 5,
         "assignedFlightNumber": null,
         "features": [
           "Timeless Spa Treatments",
@@ -1335,6 +1335,411 @@
           "Luxury Electronics",
           "Finest Dates & Confectionery",
           "Millennium Millionaire Raffle"
+        ]
+      }
+    ]
+  },
+  {
+    "airportCode": "CAI",
+    "airportName": "Cairo International Airport",
+    "city": "Cairo",
+    "terminalId": "T3",
+    "terminalName": "Terminal 3 (Star Alliance & EgyptAir Hub)",
+    "availableLevels": [
+      1,
+      0
+    ],
+    "floors": {
+      "0": {
+        "level": 0,
+        "levelName": "Arrivals & Baggage Reclaim",
+        "description": "International Baggage Belts 1–8, Passport Control & Customs",
+        "concourseSections": [
+          {
+            "id": "CAI_ARR_BAGGAGE",
+            "name": "Baggage Claim Hall (Carousels 1–8)",
+            "start": {
+              "x": 0.25,
+              "y": 0.5
+            },
+            "end": {
+              "x": 0.75,
+              "y": 0.5
+            },
+            "width": 0.16,
+            "gatesRange": "Carousels 1–8"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.35
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.78
+        }
+      },
+      "1": {
+        "level": 1,
+        "levelName": "Departures & Boarding Gates",
+        "description": "Main Concourse G & F, Security, Al-Fursan Lounges & Duty Free",
+        "concourseSections": [
+          {
+            "id": "CAI_CONC_G",
+            "name": "Concourse G (Gates G1–G12)",
+            "start": {
+              "x": 0.38,
+              "y": 0.52
+            },
+            "end": {
+              "x": 0.16,
+              "y": 0.26
+            },
+            "width": 0.065,
+            "gatesRange": "G1–G12"
+          },
+          {
+            "id": "CAI_CONC_F",
+            "name": "Concourse F (Gates F1–F10)",
+            "start": {
+              "x": 0.62,
+              "y": 0.52
+            },
+            "end": {
+              "x": 0.84,
+              "y": 0.26
+            },
+            "width": 0.065,
+            "gatesRange": "F1–F10"
+          },
+          {
+            "id": "CAI_CENTRAL_SOUK",
+            "name": "Central Duty Free & Food Court",
+            "start": {
+              "x": 0.32,
+              "y": 0.56
+            },
+            "end": {
+              "x": 0.68,
+              "y": 0.56
+            },
+            "width": 0.12,
+            "gatesRange": "Duty Free Plaza"
+          }
+        ],
+        "centralHubCenter": {
+          "x": 0.5,
+          "y": 0.52
+        },
+        "securityPosition": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "entrancePosition": {
+          "x": 0.5,
+          "y": 0.88
+        }
+      }
+    },
+    "amenities": [
+      {
+        "id": "CAI_SECURITY_MAIN",
+        "name": "Main Terminal 3 TSA & Passport Security",
+        "category": "SECURITY",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Central",
+        "level": 1,
+        "locationDescription": "Level 1, Post-Check-In departures entrance",
+        "position": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "All departing passengers with boarding pass",
+        "waitTimeMinutes": 10,
+        "walkTimeFromSecurityMinutes": 0,
+        "walkDistanceMeters": 0,
+        "rating": 4.2,
+        "assignedFlightNumber": null,
+        "features": [
+          "Body Scanners",
+          "Fast Track lane",
+          "e-Gates for biometrics"
+        ]
+      },
+      {
+        "id": "CAI_GATE_G1",
+        "name": "Gate G1",
+        "category": "GATE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse G",
+        "level": 1,
+        "locationDescription": "Concourse G, Left Wing",
+        "position": {
+          "x": 0.34,
+          "y": 0.46
+        },
+        "gateNumber": "G1",
+        "openingHours": "24 Hours",
+        "accessInfo": "International departures",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 180,
+        "rating": null,
+        "assignedFlightNumber": "MS985",
+        "features": [
+          "Airbridge",
+          "Priority Boarding Lane",
+          "USB Charging"
+        ]
+      },
+      {
+        "id": "CAI_GATE_G4",
+        "name": "Gate G4 (Widebody)",
+        "category": "GATE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse G",
+        "level": 1,
+        "locationDescription": "Concourse G, Mid-Pier",
+        "position": {
+          "x": 0.25,
+          "y": 0.36
+        },
+        "gateNumber": "G4",
+        "openingHours": "24 Hours",
+        "accessInfo": "Long-haul widebody flights",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 5,
+        "walkDistanceMeters": 290,
+        "rating": null,
+        "assignedFlightNumber": "MS777",
+        "features": [
+          "Dual Jetbridge",
+          "High capacity seating"
+        ]
+      },
+      {
+        "id": "CAI_GATE_G12",
+        "name": "Gate G12",
+        "category": "GATE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse G",
+        "level": 1,
+        "locationDescription": "Concourse G, Far Pier tip",
+        "position": {
+          "x": 0.16,
+          "y": 0.26
+        },
+        "gateNumber": "G12",
+        "openingHours": "24 Hours",
+        "accessInfo": "Regional and European flights",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 8,
+        "walkDistanceMeters": 460,
+        "rating": null,
+        "assignedFlightNumber": "MS799",
+        "features": [
+          "Jetbridge",
+          "Restroom adjacent"
+        ]
+      },
+      {
+        "id": "CAI_GATE_F2",
+        "name": "Gate F2",
+        "category": "GATE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse F",
+        "level": 1,
+        "locationDescription": "Concourse F, Right Wing",
+        "position": {
+          "x": 0.66,
+          "y": 0.46
+        },
+        "gateNumber": "F2",
+        "openingHours": "24 Hours",
+        "accessInfo": "Star Alliance departures",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 190,
+        "rating": null,
+        "assignedFlightNumber": "LH583",
+        "features": [
+          "Jetbridge",
+          "Flight Information Display"
+        ]
+      },
+      {
+        "id": "CAI_GATE_F8",
+        "name": "Gate F8",
+        "category": "GATE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse F",
+        "level": 1,
+        "locationDescription": "Concourse F, Outer Pier",
+        "position": {
+          "x": 0.82,
+          "y": 0.28
+        },
+        "gateNumber": "F8",
+        "openingHours": "24 Hours",
+        "accessInfo": "International departures",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 7,
+        "walkDistanceMeters": 420,
+        "rating": null,
+        "assignedFlightNumber": "TK693",
+        "features": [
+          "Jetbridge",
+          "Device charging bar"
+        ]
+      },
+      {
+        "id": "CAI_LOUNGE_ALFURSAN",
+        "name": "EgyptAir Al-Fursan First & Business Lounge",
+        "category": "LOUNGE",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Central Atrium",
+        "level": 1,
+        "locationDescription": "Level 1, Central Mezzanine right after Security",
+        "position": {
+          "x": 0.44,
+          "y": 0.58
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "Star Alliance Gold, EgyptAir Business/First Class, Priority Pass",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 90,
+        "rating": 4.4,
+        "assignedFlightNumber": null,
+        "features": [
+          "Buffet & Hot Dining",
+          "Showers",
+          "Quiet Sleep Pods",
+          "High-speed Wi-Fi",
+          "Barista Coffee"
+        ]
+      },
+      {
+        "id": "CAI_DUTY_FREE",
+        "name": "EgyptAir Duty Free Mega Store",
+        "category": "SHOPPING",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Central Souk",
+        "level": 1,
+        "locationDescription": "Central Plaza, directly facing the security exit",
+        "position": {
+          "x": 0.56,
+          "y": 0.56
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "All departing travelers",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 80,
+        "rating": 4.3,
+        "assignedFlightNumber": null,
+        "features": [
+          "Perfumes & Cosmetics",
+          "Egyptian Souvenirs",
+          "Electronics",
+          "Confectionery"
+        ]
+      },
+      {
+        "id": "CAI_CAFE_COSTA",
+        "name": "Costa Coffee & Egyptian Pastries",
+        "category": "DINING",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse G",
+        "level": 1,
+        "locationDescription": "Concourse G entry near Gate G2",
+        "position": {
+          "x": 0.38,
+          "y": 0.42
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "Public airside",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 3,
+        "walkDistanceMeters": 140,
+        "rating": 4.1,
+        "assignedFlightNumber": null,
+        "features": [
+          "Espresso Bar",
+          "Fresh Sandwiches",
+          "Takeaway"
+        ]
+      },
+      {
+        "id": "CAI_RESTROOM_G",
+        "name": "Restrooms & Baby Care Facility",
+        "category": "RESTROOM",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Concourse G",
+        "level": 1,
+        "locationDescription": "Opposite Gate G3",
+        "position": {
+          "x": 0.32,
+          "y": 0.4
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "Wheelchair Accessible",
+        "waitTimeMinutes": null,
+        "walkTimeFromSecurityMinutes": 4,
+        "walkDistanceMeters": 210,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Accessible WC",
+          "Baby Changing Room",
+          "Water Station"
+        ]
+      },
+      {
+        "id": "CAI_BAGGAGE_CLAIM",
+        "name": "Arrivals Baggage Carousels 1–8",
+        "category": "TRANSIT",
+        "airportCode": "CAI",
+        "terminal": "T3",
+        "concourse": "Arrivals Hall",
+        "level": 0,
+        "locationDescription": "Level 0 Ground Floor, Post-Passport Control",
+        "position": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "gateNumber": null,
+        "openingHours": "24 Hours",
+        "accessInfo": "Arriving passengers only",
+        "waitTimeMinutes": 15,
+        "walkTimeFromSecurityMinutes": 2,
+        "walkDistanceMeters": 100,
+        "rating": null,
+        "assignedFlightNumber": null,
+        "features": [
+          "Luggage Carts",
+          "Lost & Found Desk",
+          "Customs Declaration"
         ]
       }
     ]
