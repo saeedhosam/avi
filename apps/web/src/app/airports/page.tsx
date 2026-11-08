@@ -37,7 +37,6 @@ import {
 import type { AmenityCategory, Flight, TerminalAmenity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AMENITY_META, TerminalMap } from "@/components/terminal-map";
-import { AirportGroundsMap } from "@/components/airport-grounds-map";
 import {
   Button,
   MetricTile,
@@ -53,6 +52,18 @@ const MapboxAirportMap = dynamic(
     loading: () => (
       <div className="flex h-[580px] w-full items-center justify-center rounded-2xl border border-line bg-[#081320]">
         <p className="text-xs text-muted">Loading Mapbox 3D airport map…</p>
+      </div>
+    ),
+  },
+);
+
+const AirportGroundsMap = dynamic(
+  () => import("@/components/airport-grounds-map").then((m) => m.AirportGroundsMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[580px] w-full items-center justify-center rounded-2xl border border-line bg-[#081320]">
+        <p className="text-xs text-muted">Loading airfield map…</p>
       </div>
     ),
   },

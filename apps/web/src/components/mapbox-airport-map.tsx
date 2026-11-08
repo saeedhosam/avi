@@ -1,5 +1,23 @@
 "use client";
 
+// Shield global constructors from MapLibre / Mapbox cross-library serialization conflict
+if (typeof window !== "undefined") {
+  try {
+    const orig = Object.defineProperty;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Object as any).defineProperty = function <T>(
+      obj: T,
+      prop: PropertyKey,
+      desc: PropertyDescriptor & ThisType<unknown>,
+    ): T {
+      if (prop === "_classRegistryKey" && (obj === Set || obj === Error || obj === Map)) {
+        return obj;
+      }
+      return orig.call(Object, obj, prop, desc) as T;
+    };
+  } catch {}
+}
+
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -82,40 +100,44 @@ export function MapboxAirportMap({
       map.on("load", () => {
         setMapLoaded(true);
 
-        // Add 3D building extrusions if using classic dark or satellite
-        const layers = map.getStyle().layers;
-        const labelLayerId = layers?.find(
-          (layer) => layer.type === "symbol" && layer.layout?.["text-field"],
-        )?.id;
+        try {
+          const style = map.getStyle();
+          const layers = style?.layers;
+          const labelLayerId = layers?.find(
+            (layer) => layer.type === "symbol" && layer.layout && "text-field" in layer.layout,
+          )?.id;
 
-        if (map.getSource("composite") && !map.getLayer("3d-buildings")) {
-          map.addLayer(
-            {
-              id: "3d-buildings",
-              source: "composite",
-              "source-layer": "building",
-              filter: ["==", "extrude", "true"],
-              type: "fill-extrusion",
-              minzoom: 13,
-              paint: {
-                "fill-extrusion-color": [
-                  "interpolate",
-                  ["linear"],
-                  ["get", "height"],
-                  0,
-                  "#142236",
-                  30,
-                  "#1e3656",
-                  80,
-                  "#2e5684",
-                ],
-                "fill-extrusion-height": ["get", "height"],
-                "fill-extrusion-base": ["get", "min_height"],
-                "fill-extrusion-opacity": 0.88,
+          if (map.getSource("composite") && !map.getLayer("3d-buildings")) {
+            map.addLayer(
+              {
+                id: "3d-buildings",
+                source: "composite",
+                "source-layer": "building",
+                filter: ["==", "extrude", "true"],
+                type: "fill-extrusion",
+                minzoom: 13,
+                paint: {
+                  "fill-extrusion-color": [
+                    "interpolate",
+                    ["linear"],
+                    ["get", "height"],
+                    0,
+                    "#142236",
+                    30,
+                    "#1e3656",
+                    80,
+                    "#2e5684",
+                  ],
+                  "fill-extrusion-height": ["get", "height"],
+                  "fill-extrusion-base": ["get", "min_height"],
+                  "fill-extrusion-opacity": 0.88,
+                },
               },
-            },
-            labelLayerId,
-          );
+              labelLayerId,
+            );
+          }
+        } catch (err) {
+          console.warn("Could not inject 3D buildings layer:", err);
         }
       });
 
