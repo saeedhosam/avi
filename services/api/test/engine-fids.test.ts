@@ -302,4 +302,87 @@ describe("watch engine FIDS consolidation", () => {
     // One 2-unit flight lookup after the failed board; no double spend.
     expect(stats.units.unitsUsed).toBe(2);
   });
+
+  it("does not poll a settled row whose next_poll_at is null", async () => {
+    const settled = {
+      user_id: "u9",
+      flight_id: "BA117-2026-11-08",
+      flight_number: "BA 117",
+      flight_date: "2026-11-08",
+      status: "LANDED",
+      notes: "",
+      next_poll_at: null,
+      poll_priority: 3,
+      snapshot: {
+        ...dayAheadSnapshot("BA 117", "BA117-2026-11-08"),
+        status: "LANDED",
+        baggageCarousel: "Carousel 9",
+      },
+    };
+    const fetchMock = vi.fn().mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes("updated_at=lte.")) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/rest/v1/watchlist_items?")) {
+        const parsed = new URL(url);
+        const nextPollAt = parsed.searchParams.get("next_poll_at");
+        const pollPriority = parsed.searchParams.get("poll_priority");
+        // Settled rows keep next_poll_at = null; only the lte query (timestamp)
+        // or an adoption query that (wrongly) ignores poll_priority matches.
+        const matched =
+          nextPollAt === "is.null" &&
+          (pollPriority !== "is.null" || settled.poll_priority == null);
+        return new Response(JSON.stringify(matched ? [settled] : []), { status: 200 });
+      }
+      if (url.includes("/rest/v1/profiles?select=id,plan")) {
+        return new Response(JSON.stringify([{ id: "u9", plan: "FREE" }]), { status: 200 });
+      }
+      return new Response("{}", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const supabase = new SupabaseServer(
+      loadConfig({
+        NODE_ENV: "test",
+        LOG_LEVEL: "silent",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SECRET_KEY: "sb_secret_test",
+      }),
+    );
+    const searchFlight = vi.fn();
+    const lookupFids = vi.fn();
+    const provider = {
+      searchFlight,
+      lookupFids,
+      configured: true,
+    };
+
+    const engine = new WatchEngine(
+      loadConfig({
+        NODE_ENV: "test",
+        LOG_LEVEL: "silent",
+        WATCH_ENGINE_TICK_MS: "300000",
+        WATCH_ENGINE_SWEEPS_PER_TICK: "8",
+        WATCH_ENGINE_FIDS_MIN_GROUP: "2",
+        UNIT_BUDGET_PER_MONTH: "10000",
+      }),
+      provider,
+      supabase,
+      new UsageTracker(10_000),
+      {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      } as unknown as FastifyBaseLogger,
+    );
+
+    const stats = await engine.tick();
+    await engine.stop();
+
+    expect(searchFlight).not.toHaveBeenCalled();
+    expect(lookupFids).not.toHaveBeenCalled();
+    expect(stats.lastSwept).toBe(0);
+  });
 });

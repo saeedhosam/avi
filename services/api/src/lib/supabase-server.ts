@@ -277,11 +277,15 @@ export class SupabaseServer {
   }
 
   /**
-   * Rows the engine is due to poll right now. `next_poll_at is null` is an
-   * adoption case (row written before the engine state migration). We fetch
-   * both shapes with two plain requests instead of a PostgREST `or=(...)`
-   * filter, and pre-encode the timestamp values: PostgREST rejects unescaped
-   * `:` in filter values (`unexpected "l" expecting operator`).
+   * Rows the engine is due to poll right now. `next_poll_at is null` is only an
+   * adoption case when the row was never touched by the engine (legacy or
+   * client-created): the ladder always writes both columns together, so a
+   * settled row has `next_poll_at = null` *and* a non-null `poll_priority`
+   * (currently 3). Requiring `poll_priority is null` for adoption stops settled
+   * rows from being re-polled on every tick. We fetch both shapes with two
+   * plain requests instead of a PostgREST `or=(...)` filter, and pre-encode the
+   * timestamp values: PostgREST rejects unescaped `:` in filter values
+   * (`unexpected "l" expecting operator`).
    */
   async listWatchlist(limit: number): Promise<SupabaseWatchRow[]> {
     const nowIso = encodeURIComponent(new Date().toISOString());
@@ -289,7 +293,7 @@ export class SupabaseServer {
     const seen = new Set<string>();
     for (const filter of [
       `next_poll_at=lte.${nowIso}`,
-      "next_poll_at=is.null",
+      "next_poll_at=is.null&poll_priority=is.null",
     ] as const) {
       const query = [
         filter,

@@ -23,8 +23,12 @@ Applied migrations:
 8. `watchlist_flight_date` - date-scoped watchlist entries
 9. `plans_and_watchlist_identity` - `profiles.plan` (backend-only writes), column-level client grants, date-scoped `flight_id` backfill
 10. `push_delivery` - `flight_alerts.delivered_at` watermark for the Web Push loop
-11. `server_owned_fields` - engine owns `watchlist_items.snapshot/status` and all alert writes; clients can only mark alerts read
-12. `billing_events` - provider event-id idempotency for webhooks
+11. `billing` - `profiles.billing_customer_id` for provider billing
+12. `server_owned_fields` - engine owns `watchlist_items.snapshot/status` and all alert writes; clients can only mark alerts read
+13. `billing_events` - provider event-id idempotency for webhooks
+14. `engine_state` - `watchlist_items.next_poll_at/poll_priority` durable poll ladder and replay-safe alert index
+15. `flight_alerts_date_scope` - date-scoped alert deduplication for recurring flight numbers
+16. `protect_engine_poll_state` - column-level client grants and trigger restore keep `next_poll_at/poll_priority` engine-owned
 
 ## Client boundary
 
@@ -35,6 +39,14 @@ Applied migrations:
 - `profiles.plan` is enforced server-side (`FREE`/`PLUS`/`PRO` concurrency
   limits of 3/15/50 tracked flights); authenticated clients hold only
   column-level UPDATE/INSERT grants, so they cannot self-upgrade.
+- `watchlist_items.snapshot`, `status`, `next_poll_at`, and `poll_priority` are
+  engine-owned. Authenticated clients hold column-level INSERT/UPDATE only for
+  membership/notes plus the `snapshot`/`status` fields their upsert sends; they
+  have no INSERT or UPDATE privilege on `next_poll_at`/`poll_priority`, so they
+  cannot seed or manipulate the poll ladder (which would force paid provider
+  polls). The server-owned-fields trigger additionally restores
+  `snapshot`/`status`/ladder values on authenticated updates as
+  defense-in-depth.
 
 ## Data model
 
@@ -43,7 +55,7 @@ User-owned:
 - `profiles` (plan tier, backend-written)
 - `watchlist_items` (PK `user_id, flight_id`; `flight_id` is date-scoped:
   `<COMPACT>-<YYYY-MM-DD>`); clients own membership/notes, the engine owns
-  `snapshot` and `status`
+  `snapshot`, `status`, `next_poll_at`, and `poll_priority`
 - `flight_alerts` (engine-written, `delivered_at` push watermark); clients may
   only read and mark read
 - `device_tokens`

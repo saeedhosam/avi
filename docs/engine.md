@@ -23,8 +23,10 @@ avi-redis (shared counters + engine stats)
 - `scheduleNextPoll()` in `services/api/src/engine/snapshot.ts` is the
   restart-safe ladder, written back into
   `watchlist_items.next_poll_at / poll_priority`.
-- `listWatchlist(limit)` fetches only rows where `next_poll_at <= now()` or
-  null; every row it returns is the ones due.
+- `listWatchlist(limit)` fetches only rows where `next_poll_at <= now()`, plus
+  never-adopted rows (`next_poll_at is null` **and** `poll_priority is null`).
+  Settled rows have `next_poll_at = null` but a non-null priority, so they stay
+  out of the due list.
 - `flight_alerts` dedupes on `(user_id, flight_number, alert_type, message)`
   via `Prefer: resolution=ignore-duplicates`; `seenAlerts` in-process set is
   gone.
