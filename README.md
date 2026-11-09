@@ -40,6 +40,11 @@ pnpm dev
 - API: <http://localhost:8080>
 - API docs: <http://localhost:8080/openapi.json>
 
+The `dev` script passes `--ui=tui` explicitly instead of relying only on the
+`ui` setting in `turbo.json`. Turbo's npm wrapper detects TUI mode from the CLI
+flag, so without it the wrapper grabs stdin on Windows to relay Ctrl+C while the
+TUI is also reading the console, which makes keystrokes arrive twice.
+
 Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in public Supabase values plus the server-only AeroDataBox key. Copy `services/api/.env.example` to `services/api/.env` for the API.
 
 ## Supabase
