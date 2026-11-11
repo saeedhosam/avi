@@ -62,6 +62,10 @@ export interface ProviderMeta {
   source: "live" | "cached" | "not_configured" | "quota_fallback";
   fetchedAt: string;
   cached: boolean;
+  /** True when a cached response is past its fresh window. */
+  stale?: boolean;
+  /** Age of the cached payload in whole seconds. */
+  cacheAgeSeconds?: number;
   attribution: string;
 }
 

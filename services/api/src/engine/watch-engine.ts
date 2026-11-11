@@ -353,7 +353,13 @@ export class WatchEngine {
                   : 0;
               for (const { job, summary } of matchedJobs) {
                 const allowed = allowedFor(job);
-                refreshed += await this.applySummary(job, summary, allowed, perJobShare);
+                refreshed += await this.applySummary(
+                  job,
+                  summary,
+                  allowed,
+                  perJobShare,
+                  board.meta.source === "cached",
+                );
                 pending.splice(pending.indexOf(job), 1);
               }
             }
@@ -420,6 +426,7 @@ export class WatchEngine {
           result.meta.source === "live"
             ? this.config.AERODATABOX_UNITS_PER_FLIGHT / Math.max(1, allowed.length || 1)
             : 0,
+          result.meta.source === "cached",
         );
       } catch (error) {
         pendingJobs += 1;
@@ -445,12 +452,13 @@ export class WatchEngine {
     summary: FlightSummary,
     allowed: SupabaseWatchRow[],
     unitsPerRowShare: number,
+    cached = false,
   ): Promise<number> {
     const nowMs = Date.now();
     let applied = 0;
     for (const row of allowed) {
       const previous = snapshotFromRow(row);
-      const merged = mergeSnapshot(previous, summary, nowMs);
+      const merged = mergeSnapshot(previous, summary, nowMs, { cached });
       const drafts = diffAlerts(previous, merged, job.flightNumber);
       if (drafts.length) {
         this.log.info(

@@ -1,12 +1,15 @@
 import type { AppConfig } from "../config.js";
-import { hasValidAeroDataBoxKey } from "../config.js";
 import type {
   FlightEndpoint,
   FlightSearchResult,
   FlightStatus,
   FlightSummary,
 } from "../domain/flight.js";
-import { TtlCache } from "../lib/cache.js";
+import {
+  PROVIDER_STALE_MS,
+  PROVIDER_TTL_MS,
+} from "../lib/provider-cache.js";
+import { AeroDataBoxClient } from "./aero-client.js";
 
 interface AeroAirportDto {
   iata?: string;
@@ -229,33 +232,17 @@ function mapFlight(
 }
 
 export class AeroDataBoxProvider {
-  private readonly cache = new TtlCache(500);
-  private readonly host: string;
+  private readonly client: AeroDataBoxClient;
 
-  constructor(private readonly config: AppConfig) {
-    const host = config.AERODATABOX_API_HOST.replace(/^https?:\/\//, "")
-      .replace(/\/$/, "")
-      .trim();
-    this.host = host || "api.aerodatabox.com";
+  constructor(
+    config: AppConfig,
+    client: AeroDataBoxClient = new AeroDataBoxClient(config),
+  ) {
+    this.client = client;
   }
 
   get configured(): boolean {
-    return hasValidAeroDataBoxKey(this.config.AERODATABOX_API_KEY);
-  }
-
-  private headers(): Record<string, string> {
-    const key = this.config.AERODATABOX_API_KEY ?? "";
-    if (this.host.includes("rapidapi.com")) {
-      return {
-        Accept: "application/json",
-        "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": this.host,
-      };
-    }
-    return {
-      Accept: "application/json",
-      "X-Api-Key": key,
-    };
+    return this.client.configured;
   }
 
   async searchFlight(rawNumber: string): Promise<FlightSearchResult> {
@@ -274,90 +261,56 @@ export class AeroDataBoxProvider {
       };
     }
 
-    const cacheKey = `flight:${flightNumber}`;
-    const cached = this.cache.get<{
-      flights: FlightSummary[];
-      fetchedAt: string;
-    }>(cacheKey);
-    if (cached) {
-      return {
-        flights: cached.flights,
-        meta: {
-          source: "cached",
-          // Preserve the original provider retrieval time on a cache hit.
-          fetchedAt: cached.fetchedAt,
-          cached: true,
-          attribution: "AeroDataBox",
-        },
-      };
-    }
-
-    const url = `https://${this.host}/flights/number/${encodeURIComponent(
+    const path = `/flights/number/${encodeURIComponent(
       flightNumber,
     )}?withAircraftImage=false&withLocation=true`;
+    const result = await this.client.get<AeroFlightDto[]>(path, {
+      ttlMs: PROVIDER_TTL_MS.flightStatus,
+      staleTtlMs: PROVIDER_STALE_MS.flightStatus,
+    });
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: this.headers(),
-        signal: AbortSignal.timeout(12_000),
-      });
-    } catch {
-      throw new ProviderError("AeroDataBox request failed", 502);
-    }
-
-    if (response.status === 204) {
-      this.cache.set(cacheKey, { flights: [], fetchedAt }, 60_000);
-      return {
-        flights: [],
-        meta: {
-          source: "live",
-          fetchedAt,
-          cached: false,
-          attribution: "AeroDataBox",
-        },
-      };
-    }
-
-    if (response.status === 401 || response.status === 403) {
-      throw new ProviderError(
-        "AeroDataBox authentication failed. Check AERODATABOX_API_KEY.",
-        502,
-      );
-    }
-
-    if (response.status === 429) {
+    if (result.mode === "QUOTA_FALLBACK") {
       return {
         flights: [],
         meta: {
           source: "quota_fallback",
-          fetchedAt,
+          fetchedAt: result.fetchedAt,
           cached: false,
+          stale: false,
+          cacheAgeSeconds: result.cacheAgeSeconds,
           attribution: "AeroDataBox",
         },
       };
     }
 
-    if (!response.ok) {
+    if (
+      result.mode === "ERROR" ||
+      result.mode === "NOT_FOUND" ||
+      result.mode === "INVALID_REQUEST"
+    ) {
       throw new ProviderError(
-        `AeroDataBox request failed with HTTP ${response.status}`,
+        `AeroDataBox request failed with HTTP ${result.status}`,
         502,
       );
     }
 
-    const payload = (await response.json()) as AeroFlightDto[];
-    const flights = payload
+    if (result.data != null && !Array.isArray(result.data)) {
+      throw new ProviderError("AeroDataBox returned an unexpected payload", 502);
+    }
+
+    const flights = (result.data ?? [])
       .map((dto) => mapFlight(dto))
       .filter((flight): flight is FlightSummary => flight !== null);
-
-    this.cache.set(cacheKey, { flights, fetchedAt }, 60_000);
 
     return {
       flights,
       meta: {
-        source: "live",
-        fetchedAt,
-        cached: false,
+        source: result.cached ? "cached" : "live",
+        // Preserve the original provider retrieval time on a cache hit.
+        fetchedAt: result.fetchedAt,
+        cached: result.cached,
+        stale: result.stale,
+        cacheAgeSeconds: result.cacheAgeSeconds,
         attribution: "AeroDataBox",
       },
     };
@@ -369,58 +322,44 @@ export class AeroDataBoxProvider {
    * airport in the refresh window — a 2-unit call replacing N × 2-unit calls.
    */
   async lookupFids(rawCode: string): Promise<{
-    meta: { source: "live" | "cached" | "quota_fallback" | "not_configured" | "error" };
+    meta: {
+      source: "live" | "cached" | "quota_fallback" | "not_configured" | "error";
+      stale?: boolean;
+      cacheAgeSeconds?: number;
+    };
     summaries: FlightSummary[];
   }> {
     const code = rawCode.trim().toUpperCase();
     if (!this.configured) {
       return { meta: { source: "not_configured" }, summaries: [] };
     }
-    const cacheKey = `fids:${code}`;
-    const cached = this.cache.get<FlightSummary[]>(cacheKey);
-    if (cached) {
-      return {
-        meta: { source: "cached" },
-        summaries: cached,
-      };
-    }
 
-    let response: Response;
-    try {
-      response = await fetch(
-        `https://${this.host}/flights/airports/iata/${encodeURIComponent(code)}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
-        {
-          headers: this.headers(),
-          signal: AbortSignal.timeout(12_000),
-        },
-      );
-    } catch {
-      return { meta: { source: "error" }, summaries: [] };
-    }
+    const result = await this.client.get<{
+      departures?: unknown[];
+      arrivals?: unknown[];
+    }>(
+      `/flights/airports/iata/${encodeURIComponent(code)}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
+      {
+        ttlMs: PROVIDER_TTL_MS.airportBoard,
+        staleTtlMs: PROVIDER_STALE_MS.airportBoard,
+      },
+    );
 
-    if (response.status === 204) {
-      return { meta: { source: "live" }, summaries: [] };
-    }
-    if (response.status === 429) {
+    if (result.mode === "QUOTA_FALLBACK") {
       return { meta: { source: "quota_fallback" }, summaries: [] };
     }
-    if (!response.ok) {
-      return { meta: { source: "error" }, summaries: [] };
-    }
-
-    let payload: { departures?: unknown[]; arrivals?: unknown[] } = {};
-    try {
-      payload = (await response.json()) as { departures?: unknown[]; arrivals?: unknown[] };
-    } catch {
+    if (result.mode !== "LIVE_AERODATABOX") {
       return { meta: { source: "error" }, summaries: [] };
     }
     if (
-      !Array.isArray(payload.departures) &&
-      !Array.isArray(payload.arrivals)
+      result.data != null &&
+      (!Array.isArray(result.data.departures) &&
+        !Array.isArray(result.data.arrivals))
     ) {
       return { meta: { source: "error" }, summaries: [] };
     }
 
+    const payload = result.data ?? {};
     const departures = (Array.isArray(payload.departures) ? payload.departures : [])
       .map((dto) => mapFlight(dto as unknown as AeroFlightDto, true));
     const arrivals = (Array.isArray(payload.arrivals) ? payload.arrivals : [])
@@ -429,7 +368,13 @@ export class AeroDataBoxProvider {
       (flight): flight is FlightSummary => flight !== null,
     );
 
-    this.cache.set(cacheKey, summaries, 60_000);
-    return { meta: { source: "live" }, summaries };
+    return {
+      meta: {
+        source: result.cached ? "cached" : "live",
+        stale: result.stale,
+        cacheAgeSeconds: result.cacheAgeSeconds,
+      },
+      summaries,
+    };
   }
 }

@@ -60,7 +60,7 @@ export async function fetchAeroJson<T>(
 ): Promise<{
   data: T | null;
   status: number;
-  mode: "LIVE_AERODATABOX" | "QUOTA_FALLBACK" | "NOT_CONFIGURED" | "ERROR";
+  mode: "LIVE_AERODATABOX" | "QUOTA_FALLBACK" | "NOT_CONFIGURED" | "NOT_FOUND" | "ERROR";
 }> {
   if (!hasValidAeroKey()) {
     return { data: null, status: 0, mode: "NOT_CONFIGURED" };
@@ -85,7 +85,7 @@ export async function fetchAeroJson<T>(
       return { data: null, status: 429, mode: "QUOTA_FALLBACK" };
     }
     if (response.status === 400 || response.status === 404) {
-      return { data: null, status: response.status, mode: "LIVE_AERODATABOX" };
+      return { data: null, status: response.status, mode: "NOT_FOUND" };
     }
     if (!response.ok) {
       return { data: null, status: response.status, mode: "ERROR" };

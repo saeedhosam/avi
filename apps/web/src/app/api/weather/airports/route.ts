@@ -153,8 +153,6 @@ export async function GET(request: Request) {
           visibilityMeters,
           current.weather_code,
         ),
-        // Open-Meteo is a model, not a METAR feed. Never synthesize a METAR.
-        metarRaw: "",
       };
     });
 

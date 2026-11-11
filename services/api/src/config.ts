@@ -14,6 +14,22 @@ const ConfigSchema = z.object({
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SECRET_KEY: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  // Shared provider response cache. When Redis is configured the cache is
+  // shared by every gateway replica; without it the cache is per-process.
+  // Set PROVIDER_CACHE_ENABLED=false to bypass both tiers.
+  PROVIDER_CACHE_ENABLED: z
+    .string()
+    .default("true")
+    .transform((value) => !["false", "0", "no"].includes(value.trim().toLowerCase())),
+  // Forward schedule source. "none" means the gateway reports schedules as
+  // explicitly unavailable instead of synthesizing operating days.
+  SCHEDULE_PROVIDER: z.enum(["none", "flightaware"]).default("none"),
+  FLIGHTAWARE_API_KEY: z.string().optional(),
+  FLIGHTAWARE_API_BASE_URL: z
+    .string()
+    .default("https://aeroapi.flightaware.com/aeroapi"),
+  // Published schedules are returned for at most three weeks per request.
+  SCHEDULE_MAX_DAYS: z.coerce.number().int().min(1).max(21).default(7),
   // Provider auth: every provider-backed route must carry a valid Supabase
   // access token. "log" observes and logs; "enforce" rejects requests that
   // lack one.

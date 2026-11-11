@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { DATA_SOURCE_META } from "@/lib/data-source";
 import { AccountDialog } from "./account-dialog";
 import { NotificationsDialog } from "./notifications-dialog";
-import { Button, IconButton, Modal } from "./ui";
+import { Button, Modal } from "./ui";
 
 const NAV_ITEMS = [
   { href: "/search", label: "Search", icon: Search, tag: "Flight lookup" },
@@ -47,20 +47,6 @@ const NAV_ITEMS = [
   { href: "/watchlist", label: "Watchlist", icon: Glasses, tag: "Watched flights" },
 ];
 
-const PAGE_TITLES: Record<string, { title: string; eyebrow: string }> = {
-  "/search": { title: "Flight Search", eyebrow: "Provider flight lookup" },
-  "/routes": { title: "Route Network", eyebrow: "Global direct connections" },
-  "/airports": {
-    title: "Airport Indoor Maps",
-    eyebrow: "Gate-level indoor wayfinding",
-  },
-  "/airplanes": {
-    title: "Airplane Seat Maps",
-    eyebrow: "Aircraft cabin layouts & seat specs",
-  },
-  "/watchlist": { title: "Watchlist", eyebrow: "Saved flights & live alerts" },
-};
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
@@ -79,17 +65,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
-
-  const pageKey =
-    Object.keys(PAGE_TITLES).find(
-      (key) =>
-        pathname === key || (key !== "/search" && pathname.startsWith(key)),
-    ) ?? "/search";
-  const meta = pathname.startsWith("/flight/")
-    ? { title: "Flight Dossier", eyebrow: "Provider flight detail" }
-    : pathname.startsWith("/map/")
-      ? { title: "Flight Map", eyebrow: "Route and live position when reported" }
-      : PAGE_TITLES[pageKey];
 
   const source = DATA_SOURCE_META[dataSourceMode];
 
@@ -161,6 +136,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="space-y-2 border-t border-line/60 p-3">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={refreshData}
+              disabled={syncing}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line/70 bg-surface-2/60 px-2 py-2 text-[10px] font-bold text-muted transition-colors hover:border-accent/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <RefreshCw
+                className={cn("size-3.5", syncing && "animate-spin")}
+              />
+              Refresh
+            </button>
+            <button
+              onClick={() => setNotificationsOpen(true)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line/70 bg-surface-2/60 px-2 py-2 text-[10px] font-bold text-muted transition-colors hover:border-accent/40 hover:text-ink"
+            >
+              <Bell className="size-3.5" />
+              Alerts
+              {unreadAlertCount > 0 && (
+                <span className="rounded-full bg-[#F59E0B] px-1.5 text-[9px] font-bold leading-4 text-[#070E17]">
+                  {unreadAlertCount}
+                </span>
+              )}
+            </button>
+          </div>
+
           <button
             onClick={() => setSourceOpen(true)}
             className="flex w-full items-center gap-2 rounded-xl border border-line/70 bg-surface-2/60 px-2.5 py-2 text-left transition-colors hover:border-accent/40"
@@ -221,67 +221,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="lg:pl-[240px]">
-        <header className="sticky top-0 z-30 border-b border-line/60 bg-bg/85 backdrop-blur-xl">
-          <div className="flex h-[62px] items-center gap-3 px-4 lg:h-[72px] lg:px-6">
-            <div className="flex size-8 items-center justify-center rounded-full border border-accent bg-accent-soft text-accent lg:hidden">
-              <Plane className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="hidden text-[9px] font-bold uppercase tracking-[0.16em] text-subtle sm:block">
-                {meta.eyebrow}
-              </p>
-              <h1 className="truncate text-[17px] font-bold leading-tight text-ink lg:text-[19px]">
-                {meta.title}
-              </h1>
-            </div>
-
-            <div className="hidden items-center gap-2 md:flex">
-              <button
-                onClick={() => setSourceOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-line/70 bg-surface/70 px-2.5 py-1.5 text-[10px] font-bold transition-colors hover:border-accent/40"
-                style={{ color: source.color }}
-              >
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ backgroundColor: source.color }}
-                />
-                {source.badge}
-              </button>
-              <IconButton
-                label="Refresh telemetry"
-                onClick={refreshData}
-                disabled={syncing}
-              >
-                <RefreshCw
-                  className={cn("size-4", syncing && "animate-spin")}
-                />
-              </IconButton>
-            </div>
-
-            <button
-              onClick={() => setNotificationsOpen(true)}
-              aria-label="Notifications"
-              className="relative flex size-9 items-center justify-center rounded-xl border border-line/70 bg-surface/70 text-muted transition-colors hover:border-accent/50 hover:text-accent"
-            >
-              <Bell className="size-4" />
-              {unreadAlertCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-[#F59E0B] px-1 text-[9px] font-bold leading-4 text-[#070E17]">
-                  {unreadAlertCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setAccountOpen(true)}
-              aria-label="Account and settings"
-              className="flex size-9 items-center justify-center rounded-full border border-accent/45 bg-surface-2 text-[11px] font-bold text-accent transition-colors hover:border-accent"
-            >
-              {account.avatarInitial}
-            </button>
-          </div>
-        </header>
-
-        <main className="min-h-[calc(100vh-72px)] pb-20 lg:pb-0">
+        <main className="min-h-screen pb-20 lg:pb-0">
           {children}
         </main>
       </div>
@@ -309,6 +249,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        <button
+          onClick={() => setNotificationsOpen(true)}
+          className="relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-semibold text-subtle transition-colors hover:text-accent"
+        >
+          <Bell className="size-4" />
+          Alerts
+          {unreadAlertCount > 0 && (
+            <span className="absolute right-[22%] top-1 flex min-w-4 items-center justify-center rounded-full bg-[#F59E0B] px-1 text-[9px] font-bold leading-4 text-[#070E17]">
+              {unreadAlertCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setAccountOpen(true)}
+          className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-semibold text-subtle transition-colors hover:text-accent"
+        >
+          <span className="flex size-4 items-center justify-center rounded-full border border-accent/45 bg-surface-2 text-[8px] font-bold text-accent">
+            {account.avatarInitial}
+          </span>
+          Account
+        </button>
       </nav>
 
       <NotificationsDialog

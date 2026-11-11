@@ -541,11 +541,6 @@ function AirportWeatherPane({
             <p className="flex items-center gap-1.5">
               <Droplets className="size-3 text-subtle" /> Humidity: {live.humidity}%
             </p>
-            {live.metarRaw && (
-              <p className="mt-1 rounded-md bg-surface px-1.5 py-1 font-mono text-[8px] leading-relaxed text-subtle">
-                {live.metarRaw}
-              </p>
-            )}
           </div>
         </>
       ) : (

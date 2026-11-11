@@ -1,19 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../src/config.js";
 import { AeroDataBoxProvider } from "../src/providers/aerodatabox.js";
+import { AeroDataBoxClient } from "../src/providers/aero-client.js";
+import { ProviderCache } from "../src/lib/provider-cache.js";
 
 const DIRECT_KEY = "direct-aerodatabox-key-1234567890";
 
 function createProvider(
   overrides: Partial<Record<string, string>> = {},
 ): AeroDataBoxProvider {
+  const config = loadConfig({
+    NODE_ENV: "test",
+    AERODATABOX_API_KEY: DIRECT_KEY,
+    AERODATABOX_API_HOST: "api.aerodatabox.com",
+    ...overrides,
+  });
+  // Fresh cache per provider keeps these HTTP-shape tests independent.
   return new AeroDataBoxProvider(
-    loadConfig({
-      NODE_ENV: "test",
-      AERODATABOX_API_KEY: DIRECT_KEY,
-      AERODATABOX_API_HOST: "api.aerodatabox.com",
-      ...overrides,
-    }),
+    config,
+    new AeroDataBoxClient(config, new ProviderCache()),
   );
 }
 

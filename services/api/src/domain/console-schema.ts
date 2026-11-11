@@ -157,6 +157,12 @@ export const dataProvenanceSchema = z.object({
   source: z.literal("AERODATABOX"),
   fetchedAt: z.string(),
   attribution: z.literal("AeroDataBox"),
+  /** True when the response came from the shared provider cache. */
+  cached: z.boolean().optional(),
+  /** True when the cached response is past its fresh window. */
+  stale: z.boolean().optional(),
+  /** Age of the cached payload in whole seconds. */
+  cacheAgeSeconds: z.number().optional(),
 });
 
 export const consoleSearchResponseSchema = z.object({
@@ -193,6 +199,192 @@ export const consoleAirportSearchResponseSchema = z.object({
   status: z.number(),
   airports: z.array(airportNodeSchema),
   ...dataProvenanceSchema.shape,
+});
+
+// ── Flight operating dates ──────────────────────────────────────────────────
+
+export const consoleFlightDatesResponseSchema = z.object({
+  mode: z.string(),
+  status: z.number(),
+  dates: z.array(z.string()),
+  ...dataProvenanceSchema.shape,
+});
+
+// ── Flight delay statistics ─────────────────────────────────────────────────
+
+export const consoleDelayStatSchema = z.object({
+  airportIcao: z.string().nullable(),
+  class: z.string().nullable(),
+  scheduledHourUtc: z.number().nullable(),
+  medianDelay: z.string().nullable(),
+  delayIndex: z.number().nullable(),
+  numConsideredFlights: z.number().nullable(),
+  brackets: z.array(
+    z.object({
+      delayedFrom: z.string().nullable(),
+      delayedTo: z.string().nullable(),
+      num: z.number().nullable(),
+      percentage: z.number().nullable(),
+    }),
+  ),
+  percentiles: z.array(
+    z.object({
+      percentile: z.number().nullable(),
+      delay: z.string().nullable(),
+    }),
+  ),
+  fromUtc: z.string().nullable(),
+  toUtc: z.string().nullable(),
+});
+
+export const consoleFlightDelaysResponseSchema = z.object({
+  mode: z.string(),
+  status: z.number(),
+  delays: z
+    .object({
+      number: z.string().nullable(),
+      origins: z.array(consoleDelayStatSchema),
+      destinations: z.array(consoleDelayStatSchema),
+    })
+    .nullable(),
+  ...dataProvenanceSchema.shape,
+});
+
+// ── Aircraft details ────────────────────────────────────────────────────────
+
+export const consoleAircraftSchema = z.object({
+  reg: z.string(),
+  active: z.boolean().nullable(),
+  airlineName: z.string().nullable(),
+  iataType: z.string().nullable(),
+  icaoCode: z.string().nullable(),
+  model: z.string().nullable(),
+  numSeats: z.number().nullable(),
+  ageYears: z.number().nullable(),
+  firstFlightDate: z.string().nullable(),
+  deliveryDate: z.string().nullable(),
+  engineType: z.string().nullable(),
+  numEngines: z.number().nullable(),
+  isFreighter: z.boolean().nullable(),
+  image: z
+    .object({
+      url: z.string(),
+      webUrl: z.string().nullable(),
+      author: z.string().nullable(),
+      license: z.string().nullable(),
+      attributions: z.array(z.string()).nullable(),
+    })
+    .nullable(),
+});
+
+export const consoleAircraftResponseSchema = z.object({
+  mode: z.string(),
+  status: z.number(),
+  aircraft: consoleAircraftSchema.nullable(),
+  ...dataProvenanceSchema.shape,
+});
+
+// ── Airport reference data ──────────────────────────────────────────────────
+
+export const consoleAirportInfoSchema = z.object({
+  iata: z.string(),
+  icao: z.string(),
+  name: z.string(),
+  city: z.string(),
+  country: z.string(),
+  countryName: z.string().nullable(),
+  continent: z.string().nullable(),
+  /** Empty when the provider did not report a timezone. Never "UTC". */
+  timezone: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  elevationFeet: z.number().nullable(),
+  localTime: z.string().nullable(),
+  urls: z.record(z.string(), z.string()),
+  runways: z.array(
+    z.object({
+      name: z.string().nullable(),
+      trueHdg: z.number().nullable(),
+      lengthFeet: z.number().nullable(),
+      widthFeet: z.number().nullable(),
+      surface: z.string().nullable(),
+      isClosed: z.boolean().nullable(),
+      hasLighting: z.boolean().nullable(),
+    }),
+  ),
+});
+
+export const consoleAirportInfoResponseSchema = z.object({
+  mode: z.string(),
+  status: z.number(),
+  airport: consoleAirportInfoSchema.nullable(),
+  ...dataProvenanceSchema.shape,
+});
+
+export const feedStatusSchema = z.enum([
+  "Down",
+  "Degraded",
+  "OKPartial",
+  "OK",
+  "Unknown",
+  "Unavailable",
+]);
+
+export const consoleAirportCoverageResponseSchema = z.object({
+  mode: z.string(),
+  status: z.number(),
+  coverage: z
+    .object({
+      iata: z.string(),
+      icao: z.string(),
+      schedules: feedStatusSchema,
+      liveUpdates: feedStatusSchema,
+      adsb: feedStatusSchema,
+    })
+    .nullable(),
+  ...dataProvenanceSchema.shape,
+});
+
+// ── Forward schedule (published operating dates) ────────────────────────────
+
+export const routeScheduleStatusSchema = z.enum([
+  "verified",
+  "partial",
+  "unavailable",
+]);
+
+export const scheduledFlightSchema = z.object({
+  ident: z.string(),
+  identIata: z.string().nullable(),
+  actualIdent: z.string().nullable(),
+  actualIdentIata: z.string().nullable(),
+  aircraftType: z.string().nullable(),
+  origin: z.string(),
+  destination: z.string(),
+  /** Scheduled gate departure, provider timezone (Zulu for AeroAPI). */
+  scheduledOut: z.string(),
+  /** Scheduled gate arrival, provider timezone (Zulu for AeroAPI). */
+  scheduledIn: z.string().nullable(),
+  /** Operating date derived from `scheduledOut` in the provider time basis. */
+  serviceDate: z.string(),
+});
+
+export const routeScheduleResponseSchema = z.object({
+  status: routeScheduleStatusSchema,
+  /** Provider id, or "none" when no schedule provider is configured. */
+  source: z.string(),
+  attribution: z.string().nullable(),
+  fetchedAt: z.string(),
+  timeBasis: z.enum(["utc"]).nullable(),
+  validFrom: z.string().nullable(),
+  validTo: z.string().nullable(),
+  flights: z.array(scheduledFlightSchema),
+  /** Why the schedule is partial/unavailable. Never omitted silently. */
+  reason: z.string().nullable(),
+  omittedFlights: z.number().int().nonnegative(),
+  cached: z.boolean().optional(),
+  stale: z.boolean().optional(),
+  cacheAgeSeconds: z.number().optional(),
 });
 
 export { errorResponseSchema } from "./schemas.js";

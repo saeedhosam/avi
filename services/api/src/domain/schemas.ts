@@ -65,6 +65,8 @@ export const providerMetaSchema = z.object({
   source: z.enum(["live", "cached", "not_configured", "quota_fallback"]),
   fetchedAt: z.string(),
   cached: z.boolean(),
+  stale: z.boolean().optional(),
+  cacheAgeSeconds: z.number().optional(),
   attribution: z.string(),
 });
 

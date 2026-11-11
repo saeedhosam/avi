@@ -5,11 +5,14 @@ import type { UsageTracker } from "../lib/usage.js";
 import type { UserQuotaService } from "../lib/user-quota.js";
 import type { ConsoleFlightProvider } from "../providers/console-flights.js";
 import {
+  consoleAirportCoverageResponseSchema,
+  consoleAirportInfoResponseSchema,
   consoleAirportSearchResponseSchema,
   consoleFidsResponseSchema,
   consoleRoutesResponseSchema,
   errorResponseSchema,
 } from "../domain/console-schema.js";
+import { sendProviderOutcomeError } from "../lib/provider-outcome.js";
 import {
   reserveProviderQuota,
   refundProviderQuota,
@@ -360,6 +363,139 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           return reply.code(502).send({
             error: "provider_failure",
             message: "Airport search is temporarily unavailable.",
+          });
+        }
+      },
+    );
+
+    app.get(
+      "/v1/airports/:code/info",
+      {
+        schema: {
+          tags: ["airports"],
+          summary: "Airport reference data (runways, timezone, local time)",
+          params: fidsParams,
+          response: {
+            200: consoleAirportInfoResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+            429: errorResponseSchema,
+            502: errorResponseSchema,
+            503: errorResponseSchema,
+          },
+        },
+        config: PROVIDER_RATE_LIMIT,
+      },
+      async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send(BUDGET_EXHAUSTED);
+        }
+        const code = request.params.code.trim().toUpperCase();
+        if (!IATA_PATTERN.test(code)) {
+          return reply.code(400).send({
+            error: "invalid_iata_code",
+            message: "Use a 3-letter IATA airport code.",
+          });
+        }
+        const units = options.config.AERODATABOX_UNITS_PER_FLIGHT;
+        if (!(await reserveProviderQuota(request, reply, options.userQuota, units))) {
+          return;
+        }
+        try {
+          const outcome = await options.consoleFlights.lookupAirportInfo(code);
+          if (options.consoleFlights.charged(outcome)) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          } else {
+            await refundProviderQuota(request, options.userQuota, units);
+          }
+          if (outcome.status === 204) {
+            return reply.code(503).send({
+              error: "airport_info_unavailable",
+              message:
+                "The provider returned no airport reference data for that code.",
+            });
+          }
+          if (sendProviderOutcomeError(reply, outcome.mode, "airport_info")) return;
+          if (!outcome.airport) {
+            return reply.code(404).send({
+              error: "airport_not_found",
+              message: "No airport reference data is available for that code.",
+            });
+          }
+          reply.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+          return outcome;
+        } catch (error) {
+          await refundProviderQuota(request, options.userQuota, units);
+          request.log.warn({ err: error }, "airport info lookup failed");
+          return reply.code(502).send({
+            error: "provider_failure",
+            message: "Airport reference data is temporarily unavailable.",
+          });
+        }
+      },
+    );
+
+    app.get(
+      "/v1/airports/:code/coverage",
+      {
+        schema: {
+          tags: ["airports"],
+          summary: "Provider feed coverage reported for the airport",
+          params: fidsParams,
+          response: {
+            200: consoleAirportCoverageResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+            429: errorResponseSchema,
+            502: errorResponseSchema,
+            503: errorResponseSchema,
+          },
+        },
+        config: PROVIDER_RATE_LIMIT,
+      },
+      async (request, reply) => {
+        if (options.usage.overBudget) {
+          return reply.code(429).send(BUDGET_EXHAUSTED);
+        }
+        const code = request.params.code.trim().toUpperCase();
+        if (!IATA_PATTERN.test(code)) {
+          return reply.code(400).send({
+            error: "invalid_iata_code",
+            message: "Use a 3-letter IATA airport code.",
+          });
+        }
+        const units = options.config.AERODATABOX_UNITS_PER_FLIGHT;
+        if (!(await reserveProviderQuota(request, reply, options.userQuota, units))) {
+          return;
+        }
+        try {
+          const outcome = await options.consoleFlights.lookupAirportCoverage(code);
+          if (options.consoleFlights.charged(outcome)) {
+            options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
+          } else {
+            await refundProviderQuota(request, options.userQuota, units);
+          }
+          if (outcome.status === 204) {
+            return reply.code(503).send({
+              error: "airport_coverage_unavailable",
+              message: "The provider returned no feed coverage for that airport.",
+            });
+          }
+          if (sendProviderOutcomeError(reply, outcome.mode, "airport_coverage")) return;
+          if (!outcome.coverage) {
+            return reply.code(404).send({
+              error: "airport_coverage_not_found",
+              message: "No feed coverage is reported for that airport.",
+            });
+          }
+          reply.header("Cache-Control", "public, max-age=120, stale-while-revalidate=300");
+          return outcome;
+        } catch (error) {
+          await refundProviderQuota(request, options.userQuota, units);
+          request.log.warn({ err: error }, "airport coverage lookup failed");
+          return reply.code(502).send({
+            error: "provider_failure",
+            message: "Airport feed coverage is temporarily unavailable.",
           });
         }
       },

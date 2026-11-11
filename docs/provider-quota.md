@@ -18,9 +18,18 @@ so per-IP rate limits were nearly useless. This pass introduces:
 | ------------------------------------ | -------- | ------- |
 | `GET /v1/flights/search`             | required | 2 units |
 | `GET /v1/flights/lookup`             | required | 2 units |
+| `GET /v1/flights/dates`              | required | 2 units |
+| `GET /v1/flights/:number/delays`     | required | 2 units |
 | `GET /v1/airports/:code/flights`     | required | 2 units |
 | `GET /v1/airports/:code/routes`      | required | 6 units |
+| `GET /v1/airports/:code/info`        | required | 2 units |
+| `GET /v1/airports/:code/coverage`    | required | 2 units |
 | `GET /v1/airports/search`            | required | 2 units |
+| `GET /v1/aircraft/:reg`              | required | 2 units |
+| `GET /v1/routes/:origin/:destination/schedule` | required | 6 units (refunded when unavailable) |
+
+Units are reserved before the provider call and refunded whenever the cache or
+an error outcome means the provider was not charged.
 
 - Config: `PROVIDER_AUTH_MODE=log|enforce` (defaults to `log`).
 - Identity: Supabase `GET /auth/v1/user`, cached for 60 s by token digest.
@@ -33,6 +42,10 @@ so per-IP rate limits were nearly useless. This pass introduces:
 
 Quota `429` copy never mentions infrastructure; it frames it as plan/guest
 limits and points to sign-in/upgrade.
+
+Provider responses are cached in a shared two-tier cache so replicas do not
+each pay for the same query. See `docs/provider-cache.md` for TTLs, stale
+semantics, and the rule that errors/204/404 are never cached.
 
 ## Web (`apps/web`)
 

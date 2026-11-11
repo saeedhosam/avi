@@ -151,7 +151,6 @@ export interface RealtimeAirportWeather {
   visibility: string;
   humidity: number;
   pressureInHg: number;
-  metarRaw: string;
   flightCategory: FlightCategory;
 }
 

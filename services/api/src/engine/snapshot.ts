@@ -52,6 +52,12 @@ export interface WatchSnapshot {
   dataSource?: "AERODATABOX";
   fetchedAt?: string;
   cached?: boolean;
+  /** ISO time the provider last reported a status (not the merge time). */
+  statusUpdatedAt?: string;
+  /** ISO time the provider last reported a delay. */
+  delayUpdatedAt?: string;
+  /** ISO time the provider observed the current telemetry fix, when supplied. */
+  telemetryObservedAt?: string;
   terminalDeparture?: string;
   gateDeparture?: string;
   terminalArrival?: string;
@@ -278,6 +284,7 @@ export function mergeSnapshot(
   previous: WatchSnapshot,
   summary: FlightSummary,
   nowMs: number,
+  meta: { cached?: boolean } = {},
 ): WatchSnapshot {
   const snapshot: WatchSnapshot = {
     ...previous,
@@ -298,6 +305,9 @@ export function mergeSnapshot(
     snapshot.status = summary.status;
     snapshot.statusReported = true;
     snapshot.statusRaw = summary.statusRaw;
+    // Record when the provider reported this status. A later omission must
+    // not make an old verified status look freshly confirmed.
+    snapshot.statusUpdatedAt = new Date(nowMs).toISOString();
   } else {
     // Preserve the last verified status when this poll did not report one.
     if (!snapshot.status) snapshot.status = summary.status;
@@ -339,6 +349,7 @@ export function mergeSnapshot(
     snapshot.delayMinutes = summary.delayMinutes;
     snapshot.delayReported = true;
     snapshot.delaySource = summary.delaySource;
+    snapshot.delayUpdatedAt = new Date(nowMs).toISOString();
     // Only a provider-supplied reason is a fact. FlightSummary currently has
     // no reason field, so this remains null rather than inventing one.
     snapshot.delayReason = null;
@@ -349,7 +360,7 @@ export function mergeSnapshot(
   }
   snapshot.dataSource = "AERODATABOX";
   snapshot.fetchedAt = new Date(nowMs).toISOString();
-  snapshot.cached = false;
+  snapshot.cached = meta.cached ?? false;
 
   const scheduled = timeHHmm(summary.scheduledDeparture);
   if (scheduled) {
@@ -425,6 +436,9 @@ export function mergeSnapshot(
       distanceRemainingNm: remainingNm,
       etaMinutesRemaining: etaMinutes,
     };
+    // Preserve the provider's observation time only when it reported one. A
+    // missing timestamp stays unknown rather than borrowing `nowMs`.
+    snapshot.telemetryObservedAt = summary.telemetry.updatedAt ?? undefined;
   } else if (summary.telemetry.hasLiveLocation === false) {
     // No live fix this cycle. Clear measured values instead of leaving old
     // altitude/speed/ETA numbers looking current.
@@ -443,6 +457,8 @@ export function mergeSnapshot(
       distanceRemainingNm: 0,
       etaMinutesRemaining: 0,
     };
+    // The previous fix is no longer current; do not keep its observation time.
+    snapshot.telemetryObservedAt = undefined;
   }
   snapshot.telemetry = telemetry;
   return snapshot;

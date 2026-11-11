@@ -334,6 +334,43 @@ describe("mergeSnapshot", () => {
     expect(merged.telemetry?.stale).toBe(true);
     expect(merged.telemetry?.progressPercent).toBe(0);
   });
+
+  it("records field-level provenance only for values the provider reported", () => {
+    const nowMs = Date.parse("2026-11-09T12:00:00Z");
+    const merged = mergeSnapshot(baseSnapshot(), baseSummary(), nowMs, {
+      cached: true,
+    });
+    expect(merged.statusUpdatedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(merged.delayUpdatedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(merged.telemetryObservedAt).toBe("2026-11-09T00:00:00Z");
+    expect(merged.fetchedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(merged.cached).toBe(true);
+  });
+
+  it("keeps the observation time unknown when the provider omits it", () => {
+    const summary = baseSummary({
+      telemetry: {
+        ...baseSummary().telemetry,
+        updatedAt: null,
+      },
+    });
+    const merged = mergeSnapshot(baseSnapshot(), summary, 1234);
+    expect(merged.telemetryObservedAt).toBeUndefined();
+  });
+
+  it("does not advance status provenance when the provider omits a status", () => {
+    const previous = baseSnapshot({
+      statusReported: true,
+      statusUpdatedAt: "2026-11-08T00:00:00.000Z",
+    });
+    const merged = mergeSnapshot(
+      previous,
+      baseSummary({ statusReported: false, delayReported: false }),
+      Date.parse("2026-11-09T12:00:00Z"),
+    );
+    expect(merged.status).toBe(previous.status);
+    expect(merged.statusUpdatedAt).toBe("2026-11-08T00:00:00.000Z");
+  });
 });
 
 describe("diffAlerts", () => {

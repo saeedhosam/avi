@@ -343,10 +343,16 @@ export default function AirportsPage() {
                 {layout.terminalId}
               </span>
             )}
+            {airportNode.historical && (
+              <span className="rounded-md border border-delayed/40 bg-delayed/10 px-2 py-0.5 text-[10px] font-bold text-delayed">
+                Historical · closed
+              </span>
+            )}
           </h1>
           <p className="mt-0.5 text-xs text-muted">
             {airportNode.city}, {airportNode.country}
             {airportNode.timezone ? ` · ${airportNode.timezone}` : ""}
+            {airportNode.historical ? " · Historical · closed" : ""}
           </p>
         </div>
 
@@ -533,7 +539,7 @@ export default function AirportsPage() {
                 </div>
                 <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
                   <span>Timezone:</span>
-                  <span className="font-mono text-ink">{airportNode.timezone}</span>
+                  <span className="font-mono text-ink">{airportNode.timezone || "Not reported"}</span>
                 </div>
                 <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
                   <span>Hub Carriers:</span>
@@ -705,7 +711,7 @@ export default function AirportsPage() {
               <MetricTile
                 label="Coordinates"
                 value={`${airportNode.latitude.toFixed(2)}°, ${airportNode.longitude.toFixed(2)}°`}
-                sub={airportNode.timezone}
+                sub={airportNode.timezone || "Timezone not reported"}
               />
               <MetricTile
                 label="Catalog Reference"
@@ -1018,7 +1024,9 @@ export default function AirportsPage() {
                         )}
                       </div>
                       <p className="text-[10px] text-muted">
-                        {airport.city}, {airport.country} · {airport.timezone}
+                        {airport.city}, {airport.country}
+                        {airport.timezone ? ` · ${airport.timezone}` : ""}
+                        {airport.historical ? " · historical" : ""}
                       </p>
                     </div>
                     <ChevronRight className="size-3.5 text-subtle" />

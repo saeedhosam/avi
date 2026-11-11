@@ -3,14 +3,31 @@ import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { EngineStats, WatchEngine } from "../engine/watch-engine.js";
 import { AeroDataBoxProvider } from "../providers/aerodatabox.js";
-import { EngineStatusStore, engineStatusStoreFor } from "../lib/engine-status.js";
+import { EngineStatusStore } from "../lib/engine-status.js";
+import type { ProviderCache } from "../lib/provider-cache.js";
+import type { ScheduleService } from "../providers/schedule.js";
 
 interface StatusOptions {
   config: AppConfig;
   provider: AeroDataBoxProvider;
   engine?: WatchEngine | null;
   engineStatus?: EngineStatusStore | null;
+  cache?: ProviderCache | null;
+  schedule?: ScheduleService | null;
 }
+
+const cacheStatsSchema = z.object({
+  backend: z.enum(["redis", "process"]),
+  enabled: z.boolean(),
+  shared: z.boolean(),
+  hits: z.number(),
+  staleHits: z.number(),
+  misses: z.number(),
+  sharedHits: z.number(),
+  stores: z.number(),
+  errors: z.number(),
+  entries: z.number(),
+});
 
 const statusResponse = z.object({
   service: z.literal("avi-api"),
@@ -20,7 +37,12 @@ const statusResponse = z.object({
     aerodatabox: z.enum(["configured", "not_configured"]),
     weather: z.literal("open-meteo"),
     supabase: z.enum(["configured", "not_configured"]),
+    schedule: z.object({
+      provider: z.string(),
+      configured: z.boolean(),
+    }),
   }),
+  cache: cacheStatsSchema,
   map: z.object({
     style: z.literal("positron"),
     tileProvider: z.literal("openfreemap"),
@@ -77,6 +99,9 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
           ? await options.engineStatus.read()
           : null;
 
+      const cacheStats = options.cache?.stats();
+      const schedule = options.schedule;
+
       return {
         service: "avi-api" as const,
         version: process.env.npm_package_version ?? "0.1.0",
@@ -90,6 +115,22 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
             options.config.SUPABASE_URL && options.config.SUPABASE_SECRET_KEY
               ? ("configured" as const)
               : ("not_configured" as const),
+          schedule: {
+            provider: schedule?.id ?? "none",
+            configured: schedule?.configured ?? false,
+          },
+        },
+        cache: {
+          backend: cacheStats?.backend ?? "process",
+          enabled: cacheStats?.enabled ?? false,
+          shared: cacheStats?.backend === "redis",
+          hits: cacheStats?.hits ?? 0,
+          staleHits: cacheStats?.staleHits ?? 0,
+          misses: cacheStats?.misses ?? 0,
+          sharedHits: cacheStats?.sharedHits ?? 0,
+          stores: cacheStats?.stores ?? 0,
+          errors: cacheStats?.errors ?? 0,
+          entries: cacheStats?.entries ?? 0,
         },
         map: {
           style: "positron" as const,

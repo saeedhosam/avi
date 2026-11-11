@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   inferRegionFromCoords,
+  mapAirportCoverage,
+  mapConsoleAircraft,
+  mapConsoleAirportInfo,
   mapConsoleFids,
   mapConsoleFlight,
+  mapFlightDates,
+  mapFlightDelays,
   type AeroFlightDto,
 } from "../src/providers/console-flights.js";
 import { loadConfig } from "../src/config.js";
 import { ConsoleFlightProvider } from "../src/providers/console-flights.js";
+import { AeroDataBoxClient } from "../src/providers/aero-client.js";
+import { ProviderCache, type ProviderCacheRedis } from "../src/lib/provider-cache.js";
 
 const departureDto: AeroFlightDto = {
   number: "AA 100",
@@ -134,5 +141,202 @@ describe("ConsoleFlightProvider", () => {
     const outcome = await configuredProvider.lookupAirportRoutes("CAI");
     expect(outcome.status).toBe(204);
     expect(outcome.routes).toEqual([]);
+  });
+});
+
+function fakeRedis(): ProviderCacheRedis {
+  const store = new Map<string, string>();
+  return {
+    get: async (key) => store.get(key) ?? null,
+    set: async (key, value, _mode, _ttl, nx) => {
+      if (nx === "NX" && store.has(key)) return null;
+      store.set(key, value);
+      return "OK";
+    },
+    del: async (key) => (store.delete(key) ? 1 : 0),
+    ping: async () => "PONG",
+    on: () => {},
+  };
+}
+
+const cachedConfig = loadConfig({
+  NODE_ENV: "test",
+  LOG_LEVEL: "silent",
+  AERODATABOX_API_KEY: "direct-aerodatabox-key-1234567890",
+});
+
+function providerWithCache(cache: ProviderCache): ConsoleFlightProvider {
+  return new ConsoleFlightProvider(
+    cachedConfig,
+    new AeroDataBoxClient(cachedConfig, cache),
+  );
+}
+
+describe("new console provider endpoints", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("serves a second replica's board lookup from the shared cache", async () => {
+    const redis = fakeRedis();
+    const replicaA = providerWithCache(new ProviderCache({ redis }));
+    const replicaB = providerWithCache(new ProviderCache({ redis }));
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ departures: [departureDto], arrivals: [] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = await replicaA.lookupAirportFids("JFK");
+    const second = await replicaB.lookupAirportFids("JFK");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(first.flights).toHaveLength(1);
+    expect(second.cached).toBe(true);
+    expect(second.flights).toHaveLength(1);
+    expect(second.fetchedAt).toBe(first.fetchedAt);
+  });
+
+  it("maps published operating dates and drops invalid entries", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify(["2026-11-09", "2026-11-08", "not-a-date", "2026-11-08"]),
+          { status: 200 },
+        ),
+      ),
+    );
+    const provider = providerWithCache(new ProviderCache());
+    const outcome = await provider.lookupFlightDates("BA117");
+    expect(outcome.mode).toBe("LIVE_AERODATABOX");
+    expect(outcome.dates).toEqual(["2026-11-08", "2026-11-09"]);
+  });
+
+  it("preserves missing delay-statistic fields as null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            number: "BA117",
+            origins: [{ airportIcao: "EGLL", medianDelay: "00:05:00" }],
+            destinations: [],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const provider = providerWithCache(new ProviderCache());
+    const outcome = await provider.lookupFlightDelays("BA117");
+    expect(outcome.delays?.number).toBe("BA117");
+    expect(outcome.delays?.origins[0]).toMatchObject({
+      airportIcao: "EGLL",
+      medianDelay: "00:05:00",
+      delayIndex: null,
+      numConsideredFlights: null,
+    });
+    expect(outcome.delays?.destinations).toEqual([]);
+  });
+
+  it("treats a malformed delay payload as an error, not an empty result", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ unexpected: true }), { status: 200 }),
+      ),
+    );
+    const provider = providerWithCache(new ProviderCache());
+    const outcome = await provider.lookupFlightDelays("BA117");
+    expect(outcome.mode).toBe("ERROR");
+    expect(outcome.delays).toBeNull();
+  });
+
+  it("maps aircraft data and preserves unknown fields as null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            reg: "G-XLEA",
+            model: "Boeing 777",
+            image: { url: "https://example.test/g-xlea.jpg" },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const provider = providerWithCache(new ProviderCache());
+    const outcome = await provider.lookupAircraft("G-XLEA");
+    expect(outcome.aircraft).toMatchObject({
+      reg: "G-XLEA",
+      model: "Boeing 777",
+      active: null,
+      numSeats: null,
+      image: { url: "https://example.test/g-xlea.jpg" },
+    });
+  });
+
+  it("does not invent a UTC timezone when the provider omits one", () => {
+    const airport = mapConsoleAirportInfo(
+      {
+        iata: "JFK",
+        icao: "KJFK",
+        fullName: "John F. Kennedy International",
+        location: { lat: 40.6413, lon: -73.7781 },
+      },
+      "JFK",
+    );
+    expect(airport?.timezone).toBe("");
+    expect(airport?.runways).toEqual([]);
+    expect(airport?.localTime).toBeNull();
+  });
+
+  it("reports Unknown feed coverage rather than assuming OK", () => {
+    const coverage = mapAirportCoverage(
+      { flightSchedulesFeed: { status: "OK" } },
+      "JFK",
+      "KJFK",
+    );
+    expect(coverage).toEqual({
+      iata: "JFK",
+      icao: "KJFK",
+      schedules: "OK",
+      liveUpdates: "Unknown",
+      adsb: "Unknown",
+    });
+  });
+
+  it("returns NOT_FOUND coverage when the catalog has no ICAO code", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = providerWithCache(new ProviderCache());
+    const outcome = await provider.lookupAirportCoverage("QQQ");
+    expect(outcome.mode).toBe("NOT_FOUND");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("pure mappers", () => {
+  it("returns null for non-array flight-date payloads", () => {
+    expect(mapFlightDates({ unexpected: true })).toBeNull();
+  });
+
+  it("maps delay percentile entries even when one field is missing", () => {
+    const delays = mapFlightDelays({
+      number: "BA117",
+      origins: [{ delayPercentiles: [{ percentile: 50 }, { delay: "00:10:00" }] }],
+      destinations: [],
+    });
+    expect(delays?.origins[0]?.percentiles).toEqual([
+      { percentile: 50, delay: null },
+      { percentile: null, delay: "00:10:00" },
+    ]);
+  });
+
+  it("returns null aircraft when the provider omits the registration", () => {
+    expect(mapConsoleAircraft({ model: "Boeing 777" })).toBeNull();
   });
 });

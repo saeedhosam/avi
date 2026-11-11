@@ -165,3 +165,50 @@ export interface ConsoleRouteStat {
   dailyFlights: number | null;
   operators: RouteOperator[];
 }
+
+// ── Forward schedule (published operating dates) ────────────────────────────
+
+export type RouteScheduleStatus = "verified" | "partial" | "unavailable";
+
+export interface ScheduledFlight {
+  ident: string;
+  identIata: string | null;
+  actualIdent: string | null;
+  actualIdentIata: string | null;
+  aircraftType: string | null;
+  origin: string;
+  destination: string;
+  /** Scheduled gate departure in the provider's time basis. */
+  scheduledOut: string;
+  /** Scheduled gate arrival in the provider's time basis. */
+  scheduledIn: string | null;
+  /** Operating date in the provider's time basis. */
+  serviceDate: string;
+}
+
+/**
+ * A forward schedule for one route.
+ *
+ * `status: "unavailable"` is a real state, not an empty schedule: clients must
+ * render "schedule unavailable" and never infer operating days.
+ */
+export interface RouteSchedule {
+  status: RouteScheduleStatus;
+  /** Provider id, or "none" when no schedule provider is configured. */
+  source: string;
+  attribution: string | null;
+  fetchedAt: string;
+  /** Time basis of the schedule timestamps. */
+  timeBasis: "utc" | null;
+  /** First operating date covered (inclusive), when the source supplied one. */
+  validFrom: string | null;
+  /** Last operating date covered (inclusive), when the source supplied one. */
+  validTo: string | null;
+  flights: ScheduledFlight[];
+  /** Why the schedule is partial/unavailable. */
+  reason: string | null;
+  omittedFlights: number;
+  cached?: boolean;
+  stale?: boolean;
+  cacheAgeSeconds?: number;
+}

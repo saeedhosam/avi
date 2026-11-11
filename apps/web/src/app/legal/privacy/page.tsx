@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: { absolute: "Privacy Policy · Avi" },
 };
 
-const UPDATE = "November 7, 2026";
+const UPDATE = "November 11, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -57,6 +57,10 @@ export default function PrivacyPage() {
           <p><strong className="text-ink">Device-local data</strong> — your watchlist cache, recent searches,
             and theme preference are also stored in your browser&apos;s local storage on your device.
             It never leaves your device beyond the cloud sync described above.</p>
+          <p><strong className="text-ink">Reference and illustrative content</strong> — the bundled
+            airport catalog, terminal layouts, and seat maps are reference material shipped with the
+            app. They are not live measurements, are not attributed to you, and are not used for
+            profiling.</p>
           <p><strong className="text-ink">Payment data</strong> — handled entirely by Polar Software, Inc.
             (our Merchant of Record). Avi does not receive or store card numbers or payment details.</p>
         </Section>
@@ -99,7 +103,7 @@ export default function PrivacyPage() {
         <Section title="6. Retention">
           <ul className="ml-4 list-disc space-y-1">
             <li>Account, watchlist, and alert data: kept while your account is active. You can delete everything yourself at any time from Account → Delete account &amp; data, or by emailing us.</li>
-            <li>Cached flight snapshots: automatically purged after <strong className="text-ink">7 days</strong> (see Terms), refreshed whenever the live data engine updates a watched flight.</li>
+            <li>Cached flight snapshots: automatically purged after <strong className="text-ink">7 days</strong> (see Terms), refreshed whenever the live data engine updates a watched flight. Browser-local cached records created before retrieval timestamps were introduced are kept only on your device, are labelled &quot;age unknown&quot;, and are never presented as fresh. Clear your browser&apos;s site data to remove them immediately.</li>
             <li>Server log files: short-lived and never linked to your account.</li>
           </ul>
         </Section>

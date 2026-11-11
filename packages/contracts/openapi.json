@@ -60,6 +60,284 @@
         }
       }
     },
+    "/readyz": {
+      "get": {
+        "summary": "Readiness probe (provider, Supabase, and cache reachability)",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "degraded"
+                      ]
+                    },
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "avi-api"
+                      ]
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "configured",
+                            "required",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "supabase": {
+                          "type": "object",
+                          "properties": {
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "configured",
+                            "required",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "cache": {
+                          "type": "object",
+                          "properties": {
+                            "backend": {
+                              "type": "string",
+                              "enum": [
+                                "redis",
+                                "process"
+                              ]
+                            },
+                            "shared": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "backend",
+                            "shared",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "schedule": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "configured": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "configured"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "supabase",
+                        "cache",
+                        "schedule"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "service",
+                    "version",
+                    "checks",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "degraded"
+                      ]
+                    },
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "avi-api"
+                      ]
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "configured",
+                            "required",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "supabase": {
+                          "type": "object",
+                          "properties": {
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "configured",
+                            "required",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "cache": {
+                          "type": "object",
+                          "properties": {
+                            "backend": {
+                              "type": "string",
+                              "enum": [
+                                "redis",
+                                "process"
+                              ]
+                            },
+                            "shared": {
+                              "type": "boolean"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "backend",
+                            "shared",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "schedule": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "configured": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "configured"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "supabase",
+                        "cache",
+                        "schedule"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "service",
+                    "version",
+                    "checks",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/status": {
       "get": {
         "summary": "Service and provider configuration status",
@@ -108,12 +386,81 @@
                             "configured",
                             "not_configured"
                           ]
+                        },
+                        "schedule": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "configured": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "configured"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
                         "aerodatabox",
                         "weather",
-                        "supabase"
+                        "supabase",
+                        "schedule"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "cache": {
+                      "type": "object",
+                      "properties": {
+                        "backend": {
+                          "type": "string",
+                          "enum": [
+                            "redis",
+                            "process"
+                          ]
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "shared": {
+                          "type": "boolean"
+                        },
+                        "hits": {
+                          "type": "number"
+                        },
+                        "staleHits": {
+                          "type": "number"
+                        },
+                        "misses": {
+                          "type": "number"
+                        },
+                        "sharedHits": {
+                          "type": "number"
+                        },
+                        "stores": {
+                          "type": "number"
+                        },
+                        "errors": {
+                          "type": "number"
+                        },
+                        "entries": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "backend",
+                        "enabled",
+                        "shared",
+                        "hits",
+                        "staleHits",
+                        "misses",
+                        "sharedHits",
+                        "stores",
+                        "errors",
+                        "entries"
                       ],
                       "additionalProperties": false
                     },
@@ -231,6 +578,7 @@
                     "version",
                     "environment",
                     "providers",
+                    "cache",
                     "map",
                     "watchEngine",
                     "timestamp"
@@ -296,6 +644,12 @@
                               "LANDED",
                               "CANCELLED"
                             ]
+                          },
+                          "statusReported": {
+                            "type": "boolean"
+                          },
+                          "statusRaw": {
+                            "type": "string"
                           },
                           "statusNote": {
                             "type": "string"
@@ -418,6 +772,17 @@
                           "delayMinutes": {
                             "type": "number"
                           },
+                          "delayReported": {
+                            "type": "boolean"
+                          },
+                          "delaySource": {
+                            "type": "string",
+                            "enum": [
+                              "provider",
+                              "derived",
+                              "unknown"
+                            ]
+                          },
                           "telemetry": {
                             "type": "object",
                             "properties": {
@@ -471,6 +836,8 @@
                           "airline",
                           "airlineCode",
                           "status",
+                          "statusReported",
+                          "statusRaw",
                           "statusNote",
                           "origin",
                           "destination",
@@ -485,6 +852,8 @@
                           "baggageCarousel",
                           "aircraft",
                           "delayMinutes",
+                          "delayReported",
+                          "delaySource",
                           "telemetry",
                           "source",
                           "updatedAt"
@@ -509,6 +878,12 @@
                         },
                         "cached": {
                           "type": "boolean"
+                        },
+                        "stale": {
+                          "type": "boolean"
+                        },
+                        "cacheAgeSeconds": {
+                          "type": "number"
                         },
                         "attribution": {
                           "type": "string"
@@ -555,7 +930,53 @@
               }
             }
           },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -807,11 +1228,28 @@
                               "CANCELLED"
                             ]
                           },
+                          "statusReported": {
+                            "type": "boolean"
+                          },
+                          "statusRaw": {
+                            "type": "string"
+                          },
                           "statusNote": {
                             "type": "string"
                           },
                           "delayMinutes": {
                             "type": "number"
+                          },
+                          "delayReported": {
+                            "type": "boolean"
+                          },
+                          "delaySource": {
+                            "type": "string",
+                            "enum": [
+                              "provider",
+                              "derived",
+                              "unknown"
+                            ]
                           },
                           "delayReason": {
                             "nullable": true,
@@ -845,15 +1283,19 @@
                                 "type": "string"
                               },
                               "age": {
+                                "nullable": true,
                                 "type": "string"
                               },
                               "wifiAvailable": {
+                                "nullable": true,
                                 "type": "boolean"
                               },
                               "powerOutlets": {
+                                "nullable": true,
                                 "type": "boolean"
                               },
                               "seatLayout": {
+                                "nullable": true,
                                 "type": "string"
                               }
                             },
@@ -935,6 +1377,9 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "isDerived": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -989,6 +1434,12 @@
                           },
                           "customNotes": {
                             "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "fetchedAt": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -1005,8 +1456,12 @@
                           "arrivalTimeEstimated",
                           "arrivalTimeActual",
                           "status",
+                          "statusReported",
+                          "statusRaw",
                           "statusNote",
                           "delayMinutes",
+                          "delayReported",
+                          "delaySource",
                           "delayReason",
                           "terminalDeparture",
                           "gateDeparture",
@@ -1020,11 +1475,38 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
                     }
                   },
                   "required": [
                     "mode",
-                    "flights"
+                    "flights",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
                   ],
                   "additionalProperties": false
                 }
@@ -1054,7 +1536,982 @@
               }
             }
           },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/flights/dates": {
+      "get": {
+        "summary": "Published operating dates for a flight number",
+        "tags": [
+          "flights"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 12
+            },
+            "in": "query",
+            "name": "number",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "dates": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "dates",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/flights/{number}/delays": {
+      "get": {
+        "summary": "Historical delay statistics for a flight number",
+        "tags": [
+          "flights"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 12
+            },
+            "in": "path",
+            "name": "number",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "delays": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "origins": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "airportIcao": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "class": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "scheduledHourUtc": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "medianDelay": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "delayIndex": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "numConsideredFlights": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "brackets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "delayedFrom": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "delayedTo": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "num": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    },
+                                    "percentage": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "delayedFrom",
+                                    "delayedTo",
+                                    "num",
+                                    "percentage"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "percentiles": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "percentile": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    },
+                                    "delay": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "percentile",
+                                    "delay"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "fromUtc": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "toUtc": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "airportIcao",
+                              "class",
+                              "scheduledHourUtc",
+                              "medianDelay",
+                              "delayIndex",
+                              "numConsideredFlights",
+                              "brackets",
+                              "percentiles",
+                              "fromUtc",
+                              "toUtc"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "destinations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "airportIcao": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "class": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "scheduledHourUtc": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "medianDelay": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "delayIndex": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "numConsideredFlights": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "brackets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "delayedFrom": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "delayedTo": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "num": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    },
+                                    "percentage": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "delayedFrom",
+                                    "delayedTo",
+                                    "num",
+                                    "percentage"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "percentiles": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "percentile": {
+                                      "nullable": true,
+                                      "type": "number"
+                                    },
+                                    "delay": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "percentile",
+                                    "delay"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "fromUtc": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "toUtc": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "airportIcao",
+                              "class",
+                              "scheduledHourUtc",
+                              "medianDelay",
+                              "delayIndex",
+                              "numConsideredFlights",
+                              "brackets",
+                              "percentiles",
+                              "fromUtc",
+                              "toUtc"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "origins",
+                        "destinations"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "delays",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/aircraft/{reg}": {
+      "get": {
+        "summary": "Aircraft reference data by registration",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 12
+            },
+            "in": "path",
+            "name": "reg",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "aircraft": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "reg": {
+                          "type": "string"
+                        },
+                        "active": {
+                          "nullable": true,
+                          "type": "boolean"
+                        },
+                        "airlineName": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "iataType": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "icaoCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "model": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "numSeats": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "ageYears": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "firstFlightDate": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "deliveryDate": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "engineType": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "numEngines": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "isFreighter": {
+                          "nullable": true,
+                          "type": "boolean"
+                        },
+                        "image": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "webUrl": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "author": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "license": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "attributions": {
+                              "nullable": true,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "webUrl",
+                            "author",
+                            "license",
+                            "attributions"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "reg",
+                        "active",
+                        "airlineName",
+                        "iataType",
+                        "icaoCode",
+                        "model",
+                        "numSeats",
+                        "ageYears",
+                        "firstFlightDate",
+                        "deliveryDate",
+                        "engineType",
+                        "numEngines",
+                        "isFreighter",
+                        "image"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "aircraft",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -1298,11 +2755,28 @@
                               "CANCELLED"
                             ]
                           },
+                          "statusReported": {
+                            "type": "boolean"
+                          },
+                          "statusRaw": {
+                            "type": "string"
+                          },
                           "statusNote": {
                             "type": "string"
                           },
                           "delayMinutes": {
                             "type": "number"
+                          },
+                          "delayReported": {
+                            "type": "boolean"
+                          },
+                          "delaySource": {
+                            "type": "string",
+                            "enum": [
+                              "provider",
+                              "derived",
+                              "unknown"
+                            ]
                           },
                           "delayReason": {
                             "nullable": true,
@@ -1336,15 +2810,19 @@
                                 "type": "string"
                               },
                               "age": {
+                                "nullable": true,
                                 "type": "string"
                               },
                               "wifiAvailable": {
+                                "nullable": true,
                                 "type": "boolean"
                               },
                               "powerOutlets": {
+                                "nullable": true,
                                 "type": "boolean"
                               },
                               "seatLayout": {
+                                "nullable": true,
                                 "type": "string"
                               }
                             },
@@ -1426,6 +2904,9 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "isDerived": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -1480,6 +2961,12 @@
                           },
                           "customNotes": {
                             "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "fetchedAt": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -1496,8 +2983,12 @@
                           "arrivalTimeEstimated",
                           "arrivalTimeActual",
                           "status",
+                          "statusReported",
+                          "statusRaw",
                           "statusNote",
                           "delayMinutes",
+                          "delayReported",
+                          "delaySource",
                           "delayReason",
                           "terminalDeparture",
                           "gateDeparture",
@@ -1511,11 +3002,55 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    },
+                    "window": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "mode",
-                    "flights"
+                    "flights",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
                   ],
                   "additionalProperties": false
                 }
@@ -1545,7 +3080,76 @@
               }
             }
           },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -1633,6 +3237,7 @@
                             "type": "number"
                           },
                           "dailyFlights": {
+                            "nullable": true,
                             "type": "number"
                           },
                           "operators": {
@@ -1664,12 +3269,56 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    },
+                    "statisticsWindowDays": {
+                      "type": "number",
+                      "enum": [
+                        7
+                      ]
+                    },
+                    "note": {
+                      "type": "string"
+                    },
+                    "omittedRoutes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
                     "mode",
                     "status",
-                    "routes"
+                    "routes",
+                    "source",
+                    "fetchedAt",
+                    "attribution",
+                    "statisticsWindowDays",
+                    "note",
+                    "omittedRoutes"
                   ],
                   "additionalProperties": false
                 }
@@ -1699,7 +3348,76 @@
               }
             }
           },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -1818,12 +3536,39 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
                     }
                   },
                   "required": [
                     "mode",
                     "status",
-                    "airports"
+                    "airports",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
                   ],
                   "additionalProperties": false
                 }
@@ -1853,7 +3598,895 @@
               }
             }
           },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/airports/{code}/info": {
+      "get": {
+        "summary": "Airport reference data (runways, timezone, local time)",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "in": "path",
+            "name": "code",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "airport": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "iata": {
+                          "type": "string"
+                        },
+                        "icao": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "country": {
+                          "type": "string"
+                        },
+                        "countryName": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "continent": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "latitude": {
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "type": "number"
+                        },
+                        "elevationFeet": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "localTime": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "urls": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "runways": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "trueHdg": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "lengthFeet": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "widthFeet": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "surface": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "isClosed": {
+                                "nullable": true,
+                                "type": "boolean"
+                              },
+                              "hasLighting": {
+                                "nullable": true,
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "trueHdg",
+                              "lengthFeet",
+                              "widthFeet",
+                              "surface",
+                              "isClosed",
+                              "hasLighting"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "iata",
+                        "icao",
+                        "name",
+                        "city",
+                        "country",
+                        "countryName",
+                        "continent",
+                        "timezone",
+                        "latitude",
+                        "longitude",
+                        "elevationFeet",
+                        "localTime",
+                        "urls",
+                        "runways"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "airport",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/airports/{code}/coverage": {
+      "get": {
+        "summary": "Provider feed coverage reported for the airport",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "in": "path",
+            "name": "code",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "number"
+                    },
+                    "coverage": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "iata": {
+                          "type": "string"
+                        },
+                        "icao": {
+                          "type": "string"
+                        },
+                        "schedules": {
+                          "type": "string",
+                          "enum": [
+                            "Down",
+                            "Degraded",
+                            "OKPartial",
+                            "OK",
+                            "Unknown",
+                            "Unavailable"
+                          ]
+                        },
+                        "liveUpdates": {
+                          "type": "string",
+                          "enum": [
+                            "Down",
+                            "Degraded",
+                            "OKPartial",
+                            "OK",
+                            "Unknown",
+                            "Unavailable"
+                          ]
+                        },
+                        "adsb": {
+                          "type": "string",
+                          "enum": [
+                            "Down",
+                            "Degraded",
+                            "OKPartial",
+                            "OK",
+                            "Unknown",
+                            "Unavailable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "iata",
+                        "icao",
+                        "schedules",
+                        "liveUpdates",
+                        "adsb"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "AERODATABOX"
+                      ]
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "type": "string",
+                      "enum": [
+                        "AeroDataBox"
+                      ]
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "status",
+                    "coverage",
+                    "source",
+                    "fetchedAt",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/routes/{origin}/{destination}/schedule": {
+      "get": {
+        "summary": "Published forward schedule for a route",
+        "tags": [
+          "airports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "in": "query",
+            "name": "date",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 21
+            },
+            "in": "query",
+            "name": "days",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4
+            },
+            "in": "path",
+            "name": "origin",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4
+            },
+            "in": "path",
+            "name": "destination",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "verified",
+                        "partial",
+                        "unavailable"
+                      ]
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "attribution": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "fetchedAt": {
+                      "type": "string"
+                    },
+                    "timeBasis": {
+                      "nullable": true,
+                      "type": "string",
+                      "enum": [
+                        "utc"
+                      ]
+                    },
+                    "validFrom": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "validTo": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "flights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ident": {
+                            "type": "string"
+                          },
+                          "identIata": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actualIdent": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actualIdentIata": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "aircraftType": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "origin": {
+                            "type": "string"
+                          },
+                          "destination": {
+                            "type": "string"
+                          },
+                          "scheduledOut": {
+                            "type": "string"
+                          },
+                          "scheduledIn": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "serviceDate": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "ident",
+                          "identIata",
+                          "actualIdent",
+                          "actualIdentIata",
+                          "aircraftType",
+                          "origin",
+                          "destination",
+                          "scheduledOut",
+                          "scheduledIn",
+                          "serviceDate"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reason": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "omittedFlights": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    },
+                    "stale": {
+                      "type": "boolean"
+                    },
+                    "cacheAgeSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "source",
+                    "attribution",
+                    "fetchedAt",
+                    "timeBasis",
+                    "validFrom",
+                    "validTo",
+                    "flights",
+                    "reason",
+                    "omittedFlights"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Default Response",
             "content": {
               "application/json": {

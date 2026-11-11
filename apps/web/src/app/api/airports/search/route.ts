@@ -98,6 +98,31 @@ export async function GET(request: Request) {
       { status: 502 },
     );
   }
+  if (mode === "NOT_FOUND") {
+    return NextResponse.json(
+      {
+        mode,
+        status,
+        airports: [],
+        error: "The provider returned no airport search results.",
+        ...provenance(),
+      },
+      { status: 404 },
+    );
+  }
+  if (status === 204) {
+    return NextResponse.json(
+      {
+        mode: "NO_DATA",
+        status,
+        airports: [],
+        error:
+          "The provider returned no airport search data. This is not evidence that no airports match.",
+        ...provenance(),
+      },
+      { status: 503 },
+    );
+  }
   if (data != null && !Array.isArray(data.items)) {
     return NextResponse.json(
       {

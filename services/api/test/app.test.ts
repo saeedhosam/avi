@@ -76,3 +76,95 @@ describe("flight routes", () => {
     await exhausted.close();
   });
 });
+
+describe("readiness and cache status", () => {
+  it("reports readiness checks including the cache backend", async () => {
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "ready",
+      service: "avi-api",
+      checks: {
+        cache: { backend: "process", shared: false, ok: true },
+        schedule: { provider: "none", configured: false },
+      },
+    });
+  });
+
+  it("exposes cache counters and schedule configuration in status", async () => {
+    const response = await app.inject({ method: "GET", url: "/v1/status" });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.cache).toMatchObject({
+      backend: "process",
+      enabled: true,
+    });
+    expect(body.providers.schedule).toEqual({
+      provider: "none",
+      configured: false,
+    });
+  });
+});
+
+describe("new provider routes", () => {
+  it("reports schedules as unavailable instead of synthesizing days", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/routes/JFK/LHR/schedule",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "unavailable",
+      source: "none",
+      reason: "no_schedule_provider_configured",
+      flights: [],
+      validFrom: null,
+    });
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("validates schedule route codes", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/routes/XX/YY/schedule",
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("invalid_iata_code");
+  });
+
+  it("fails explicitly for flight dates when the provider is unconfigured", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/flights/dates?number=BA117",
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
+  });
+
+  it("fails explicitly for flight delays when the provider is unconfigured", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/flights/BA117/delays",
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
+  });
+
+  it("fails explicitly for aircraft details when the provider is unconfigured", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/aircraft/G-XLEA",
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
+  });
+
+  it("fails explicitly for airport info when the provider is unconfigured", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/airports/JFK/info",
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
+  });
+});

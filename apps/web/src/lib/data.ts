@@ -12,14 +12,29 @@ export type GlobalAirportNode = AirportNode & {
    * and must not be presented as one.
    */
   destCount?: number;
+  /** True for airports that no longer accept commercial traffic. */
+  historical?: boolean;
 };
 
 /**
  * Global reference data covering worldwide commercial airports. This is
  * reference data only: live route and schedule data always comes from the
  * provider.
+ *
+ * The bundled catalog no longer stores timezone abbreviations such as
+ * "CEST (UTC+2)": those become wrong across DST boundaries and are not IANA
+ * identifiers. Timezones are omitted (empty string) and only provider-reported
+ * IANA zones are shown as fact.
  */
-export const routeAirports = globalAirportsJson as GlobalAirportNode[];
+const referenceAirports = globalAirportsJson as unknown as Array<
+  Omit<GlobalAirportNode, "timezone"> & { timezone?: string }
+>;
+export const routeAirports: GlobalAirportNode[] = referenceAirports.map(
+  (airport) => ({
+    ...airport,
+    timezone: airport.timezone ?? "",
+  }),
+);
 export const terminalLayouts =
   terminalLayoutsJson as unknown as AirportTerminalLayout[];
 

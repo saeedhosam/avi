@@ -2,7 +2,8 @@
 
 Last updated: 2026-11-11  
 Branch: `main`  
-Status: Phase 1 (web/API + partial Android) committed; Phase 2 not started.
+Status: Phase 1 committed; Phase 2 gateway work in progress (shared cache, new
+provider endpoints, readiness, schedule adapter). Android cleanup still open.
 
 This file is the handoff note for the next engineer/agent. Read it before changing
 flight, route, schedule, weather, terminal, or aircraft data.
@@ -100,6 +101,14 @@ Relevant files:
 - `apps/web/src/app/api/airports/[code]/flights/route.ts`
 - `services/api/src/providers/console-flights.ts`
 - `services/api/src/routes/console-airports.ts`
+- `services/api/src/providers/schedule.ts` (forward-schedule seam)
+- `docs/provider-cache.md`
+
+A forward schedule is now exposed at
+`GET /v1/routes/:origin/:destination/schedule`. It returns
+`status: verified | partial | unavailable` plus an explicit validity window;
+with `SCHEDULE_PROVIDER=none` it returns `unavailable` with
+`reason: no_schedule_provider_configured`. It is not wired into the UI yet.
 
 Removed files (do not restore without provenance/licence review):
 
@@ -159,6 +168,20 @@ Removed files (do not restore without provenance/licence review):
 - Source banner distinguishes live response, provider-ready/no-data, quota
   paused, and offline saved flights.
 - Share text no longer invents “ATC Flow” or zero ETA.
+- Provider responses use a two-tier read-through cache (process + Redis) with
+  payload hashes, explicit stale markers, and no caching of errors/204/404.
+- Gateway now serves `flights/dates`, `flights/:number/delays`,
+  `airports/:code/info`, `airports/:code/coverage`, and `aircraft/:reg`, so the
+  web proxies no longer fall back to direct provider calls for those.
+- `/readyz` checks provider/Supabase configuration and cache reachability;
+  `/v1/status` exposes cache counters and schedule-provider state.
+- Engine snapshots carry `statusUpdatedAt`, `delayUpdatedAt`, and
+  `telemetryObservedAt` in addition to `fetchedAt`/`cached`.
+- Flight status meta and console outcomes expose `cached`, `stale`, and
+  `cacheAgeSeconds`.
+- `packages/contracts/openapi.json` is regenerated and CI fails when it drifts.
+- Web's direct-provider fallback now distinguishes `NOT_FOUND` from a live
+  response and no longer substitutes `UTC` or a number-derived airline code.
 
 ### Android (partial, but significant)
 
@@ -191,73 +214,67 @@ Removed files (do not restore without provenance/licence review):
 
 ## 5. Remaining work — prioritized
 
-### P0 — Durable server-side cache
+### P0 — Durable server-side cache (done)
 
-Current provider caches are in-process `TtlCache` inside:
+Implemented as a two-tier read-through cache (`services/api/src/lib/provider-cache.ts`):
+per-process L1 plus Redis L2 shared by all replicas, keyed by provider/endpoint/
+normalized query, with `fetchedAt`, `freshUntil`, `expiresAt`, source,
+attribution, and a payload hash.
 
-- `services/api/src/lib/cache.ts`
-- `services/api/src/providers/console-flights.ts`
-- `services/api/src/providers/aerodatabox.ts`
+- Read-through is wired into both providers via
+  `services/api/src/providers/aero-client.ts`.
+- TTL policy: flight status 45 s, board 60 s, routes 6 h, search 10 min,
+  dates 6 h, delays 30 min, aircraft 6 h, airport info 24 h, coverage 10 min,
+  schedule 6 h (`PROVIDER_TTL_MS`).
+- Stale-while-revalidate is labelled (`stale`, `cacheAgeSeconds`) and uses a
+  Redis lock so one replica refreshes.
+- `NOT_FOUND`, `INVALID_REQUEST`, `ERROR`, `QUOTA_FALLBACK`, `204`, malformed
+  payloads, and unavailable schedules are never cached.
+- `/v1/status` exposes cache counters; `/readyz` pings the cache.
+- Details: `docs/provider-cache.md`.
 
-Multiple gateway instances do not share cache state, so they can duplicate
-provider spend and show different freshness.
+Historical context (the problem this replaced): provider caches used to be
+in-process `TtlCache` maps, so replicas duplicated provider spend and showed
+different freshness.
 
-Needed:
+### P0 — Real forward schedule source (adapter + endpoint done; live credentials pending)
 
-- A Postgres-backed cache table (for example `provider_cache`) keyed by provider,
-  endpoint, normalized query, and a payload hash.
-- Store `fetched_at`, `expires_at`, `source`, `attribution`, and the response
-  payload.
-- Read-through in `ConsoleFlightProvider` / `AeroDataBoxProvider`.
-- A documented TTL policy per endpoint:
-  - flight status: very short (30–60 s; provider rules)
-  - airport board: 60 s or provider-permitted
-  - route stats: 6–24 h
-  - airport search: 10 min
-- Stale-while-revalidate where safe, but never present stale data without an
-  age marker.
-- Do not cache `NOT_FOUND`, `INVALID_REQUEST`, `ERROR`, `QUOTA_FALLBACK`, or
-  malformed payloads as valid empty data.
+`services/api/src/providers/schedule.ts` defines the provider seam and
+implements FlightAware AeroAPI published schedules:
+`GET /schedules/{start}/{end}` with origin/destination filters, Zulu times, up
+to 3 weeks per request, response mapped to `ScheduledFlight` with
+`serviceDate` and `timeBasis: "utc"`.
 
-Acceptance criteria:
+`GET /v1/routes/:origin/:destination/schedule` returns
+`verified | partial | unavailable` plus `validFrom`/`validTo` and explicit
+failure reasons. With `SCHEDULE_PROVIDER=none` (default) it reports
+`unavailable`; nothing is synthesized. To activate, set
+`SCHEDULE_PROVIDER=flightaware` and `FLIGHTAWARE_API_KEY` with a commercial
+AeroAPI plan. Do not add the calendar UI until that source is live and tested.
 
-- Two API replicas hit the provider only once for a fresh cached query.
-- `/v1/status` or response metadata exposes cache age/source.
-- Tests cover hit/miss/expiry and malformed payloads.
+Remaining design note: persisting schedules into a normalized
+`route_scheduled_flights` table is optional until caching/UI needs it.
 
-### P0 — Real forward schedule source
-
-The route page cannot show operating weekdays because AeroDataBox daily route
-stats do not contain them. The temporary behavior is explicit:
+The route page still cannot show operating weekdays because AeroDataBox daily
+route stats do not contain them. The temporary behavior remains explicit:
 
 - trailing 7-day route stats
 - current board departures
 - no calendar
 
-To restore a truthful weekly timetable, integrate one of:
+Other schedule options considered:
 
-1. **FlightAware AeroAPI schedules** — OAG-sourced, up to 3 weeks per request,
-   ~1 year future. Cost is per result set; check the current plan and commercial
-   terms.
+1. **FlightAware AeroAPI schedules** — implemented adapter; OAG-sourced, up to
+   3 weeks per request, ~1 year future. Commercial terms apply.
 2. **OAG Schedules API** — authoritative effective dates and
    `legDaysOfOperation`, but enterprise pricing/contract.
 3. **AeroDataBox flight-number date endpoints** — possible fallback for specific
    flight numbers, but 12-hour FIDS window and coverage limits make it a poor
    primary schedule source.
 
-Recommended design:
-
-- New gateway endpoint, e.g. `GET /v1/routes/:origin/:destination/schedule`.
-- Provider adapter interface so AeroDataBox/FlightAware/OAG can be swapped.
-- Normalized table:
-  `route_scheduled_flights(origin, destination, carrier, flight_number,
-  service_date, dep_local, arr_local, aircraft, source, fetched_at,
-  valid_from, valid_to)`.
-- Return `status: verified | partial | unavailable`, `source`, `fetchedAt`,
-  `validFrom`, `validTo`, and exact dates/flights.
-- UI renders a calendar only inside `validFrom..validTo`.
-- If unavailable, show frequency-only or no timetable; never synthesize days.
-- Coverage check before claiming a route does not operate.
+The endpoint returns `status: verified | partial | unavailable`, `source`,
+`fetchedAt`, `validFrom`, `validTo`, and exact dates/flights. The UI must render
+a calendar only inside `validFrom..validTo`, and never synthesize days.
 
 Do not add a schedule UI until the source is live and tested.
 
@@ -289,22 +306,28 @@ Still to address:
 
 ### P1 — Engine / database integrity
 
-- Add field-level provenance to `WatchSnapshot`: `statusUpdatedAt`,
-  `delayUpdatedAt`, `telemetryObservedAt`, `fetchedAt`, `cached`.
-- Do not let a provider omission overwrite a previously verified value.
-- Decide whether clients may write engine-owned columns
-  (`next_poll_at`, `poll_priority`, `flight_date`, `flight_id`). Current grants
-  allow authenticated table-wide writes. Add a trigger/column grants or RLS
-  restriction.
-- Add a readiness endpoint that checks provider configuration, Supabase, Redis,
-  and cache reachability. `/healthz` is liveness only.
-- Consider an explicit `UNKNOWN` status in the shared contract instead of the
-  `statusReported` flag. If added, update web, Android, iOS, and gateway schemas
-  together.
+- **Done:** `WatchSnapshot` now carries `statusUpdatedAt`, `delayUpdatedAt`,
+  `telemetryObservedAt`, `fetchedAt`, and `cached`. An omitted status/delay does
+  not advance its timestamp, and telemetry observation time is only recorded
+  when the provider supplies it.
+- **Done:** provider omissions never overwrite a previously verified value
+  (`mergeSnapshot` preserves status/delay; tests cover it).
+- **Done:** engine-owned columns (`next_poll_at`, `poll_priority`,
+  `flight_date`, `flight_id`) are protected by column grants and the
+  `preserve_watchlist_server_fields` trigger
+  (`supabase/migrations/20261109000100_protect_engine_poll_state.sql`).
+- **Done:** `/readyz` checks provider configuration, Supabase configuration, and
+  cache reachability. `/healthz` remains liveness only.
+- Still open: consider an explicit `UNKNOWN` status in the shared contract
+  instead of the `statusReported` flag. If added, update web, Android, iOS, and
+  gateway schemas together.
 
 ### P2 — Tests
 
-- Browser/E2E tests for:
+- **Done:** API tests cover cache hit/miss/expiry/stale/hash-mismatch, cross-
+  replica sharing, malformed gateway payloads, schedule mapping/failure modes,
+  readiness/status metadata, and the new provider routes.
+- Still open: browser/E2E tests for:
   - route page with no schedule data
   - provider 400/404/204/429/502/503
   - unreported status/delay
@@ -312,13 +335,10 @@ Still to address:
   - weather unavailable
   - unknown airport
   - gate with no departures
-- API tests for:
-  - cache hit/miss/expiry
-  - malformed gateway payloads
-  - FIDS empty board not covering jobs
+- Still open: API tests for:
+  - FIDS empty board not covering jobs (partially covered)
   - `next_poll_at IS NULL` settled-row exclusion (partially covered)
-  - schedule adapter (once added)
-- Android instrumentation/UI tests for:
+- Still open: Android instrumentation/UI tests for:
   - Room v6 → v7 migration
   - reference airports never shown as delayed/live
   - weather unavailable card
@@ -327,23 +347,38 @@ Still to address:
 
 ### P2 — Contract / data hygiene
 
-- Regenerate `packages/contracts/openapi.json` and add a CI diff check.
-  Current spec is missing `/v1/me` and billing routes.
+- **Done:** `packages/contracts/openapi.json` regenerated and a CI step fails
+  when it drifts (`pnpm --filter @avi/api openapi && git diff --exit-code`).
 - Reference data:
-  - `apps/web/src/data/global-airports.json` has `UTC` for most airports and
-    historical `destCount`. Use IANA timezones or omit timezone/DST claims.
-  - It includes closed airports (e.g. TXL/SXF). Mark historical or remove.
-  - `packages/catalog/airports.json` and terminal layouts lack source/as-of
-    metadata.
-  - Terminal layouts contain illustrative gate/wait-time data; keep labeled.
+  - **Done:** `apps/web/src/data/global-airports.json` no longer stores
+    timezone abbreviations/DST claims; the loader normalizes missing zones to
+    empty and only provider-reported IANA zones are shown as fact.
+  - **Done:** TXL/SXF/THF are marked `historical` and the airport page labels
+    them “Historical · closed”. The undated `destCount` remains labelled as a
+    catalog reference count.
+  - **Done:** `packages/catalog/PROVENANCE.md` records that the catalog’s
+    upstream source/as-of date are unverified and that it is reference-only.
+  - Terminal layouts still contain illustrative gate/wait-time data; keep
+    labeled (already labelled in the airports UI).
 - Weather:
-  - Open-Meteo is a model, not METAR. Do not call it METAR anywhere.
+  - **Done (web):** removed the leftover `metarRaw` field and its renderer;
+    Open-Meteo is presented only as a model forecast.
+  - **Open (Android):** `RealtimeAirportRepository.kt` still contains
+    METAR-like fixtures; clean up with the Android pass.
   - If real METAR is required, integrate a METAR/TAF provider with attribution.
 - Legal/privacy:
-  - Web now purges timestamped cached flights after 7 days, but untimestamped
-    legacy rows remain. Either purge them or update the policy wording.
-  - Disclose reference/illustrative datasets (airport catalog, terminal layouts,
-    seatmaps) in Terms/Privacy.
+  - **Done:** Privacy/Terms now disclose that pre-timestamp browser-local
+    records are retained only on-device and labelled “age unknown”, and
+    disclose the reference/illustrative airport, terminal, and seatmap data.
+  - **Done:** removed the remaining web “METAR” naming.
+
+### P2 — Web UI layout
+
+- **Done:** restored the pre-pull layout the user preferred: no sticky top
+  bar; page titles/eyebrows no longer render in a header. Refresh and Alerts
+  live in the sidebar utility row; the mobile bottom bar includes Alerts and
+  Account. No WIP feature widgets (aircraft photos, delay panels, coverage
+  badges, operating-date hints) were restored with it.
 
 ### P3 — iOS live integration
 
@@ -380,6 +415,10 @@ not consume the gateway. Add:
 - `services/api/src/engine/snapshot.ts` — merge/provenance/alerts
 - `services/api/src/engine/watch-engine.ts` — FIDS/per-flight refresh
 - `services/api/src/lib/supabase-server.ts` — watchlist cache/adoption
+- `services/api/src/lib/provider-cache.ts` — shared two-tier provider cache
+- `services/api/src/providers/aero-client.ts` — shared AeroDataBox HTTP/cache client
+- `services/api/src/providers/schedule.ts` — forward schedule providers
+- `services/api/src/routes/health.ts` — `/healthz` and `/readyz`
 
 ### Contracts
 
@@ -416,8 +455,8 @@ cd apps/android
 
 Current expected results:
 
-- Web: 25 tests
-- API: 95 tests
+- Web: 27 tests
+- API: 142 tests
 - Android: 20 unit tests
 - Web/API production builds pass
 
@@ -445,20 +484,30 @@ If a change makes any of these fail, fix the test or the code before merging.
   layouts, and seatmaps are not live and must remain labeled as such.
 - **Debug-only simulation** in Android (`simulateRealtimeEvent`) must never be
   enabled in release.
+- **Provider cache failures are misses, never data.** Only parsed 2xx payloads
+  are stored; 204/400/404/429/network/malformed outcomes are re-fetched and
+  returned with their explicit state.
+- **Schedules require a live provider.** `SCHEDULE_PROVIDER=none` is the
+  default and the endpoint reports `unavailable`; never synthesize operating
+  days from route statistics.
 
 ---
 
 ## 9. Definition of done for the next phase
 
-1. A durable cache prevents duplicate provider spend across gateway instances.
-2. A forward schedule source returns exact operating dates with a validity
-   window, or the UI explicitly says it is unavailable.
+1. **Done:** a durable cache prevents duplicate provider spend across gateway
+   instances.
+2. **Adapter + endpoint done:** a forward schedule source returns exact
+   operating dates with a validity window, or the endpoint explicitly says it
+   is unavailable. Activating it requires FlightAware AeroAPI credentials; no
+   UI until then.
 3. No production UI path can display an invented status, delay, gate, weather
    value, route day, frequency, duration, or seat availability.
-4. Every displayed provider value has source + retrieval time.
+4. Every displayed provider value has source + retrieval time (and now cache
+   age/stale markers when cached).
 5. Android no longer uses demo fixtures for production airport/weather metadata.
 6. Room migration and Android UI states are verified on a device/emulator.
 7. Browser E2E tests cover unavailable/stale/partial states.
-8. OpenAPI is regenerated and checked in CI.
+8. **Done:** OpenAPI is regenerated and checked in CI.
 9. `pnpm typecheck && pnpm lint && pnpm test && pnpm build` and Android
    compile/tests pass.

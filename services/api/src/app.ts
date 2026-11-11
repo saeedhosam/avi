@@ -23,9 +23,13 @@ import { consoleAirportRoutes } from "./routes/console-airports.js";
 import { meRoutes } from "./routes/me.js";
 import { billingRoutes } from "./routes/billing.js";
 import { AeroDataBoxProvider } from "./providers/aerodatabox.js";
+import { AeroDataBoxClient } from "./providers/aero-client.js";
+import { createScheduleProvider, ScheduleService } from "./providers/schedule.js";
+import { providerCacheFor } from "./lib/provider-cache.js";
 import { healthRoutes } from "./routes/health.js";
 import { flightRoutes } from "./routes/flights.js";
 import { statusRoutes } from "./routes/status.js";
+import { scheduleRoutes } from "./routes/schedules.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -75,8 +79,20 @@ export async function buildApp(config: AppConfig) {
     transform: jsonSchemaTransform,
   });
 
-  const provider = new AeroDataBoxProvider(config);
-  const consoleFlights = new ConsoleFlightProvider(config);
+  const cache = providerCacheFor(config);
+  const provider = new AeroDataBoxProvider(
+    config,
+    new AeroDataBoxClient(config, cache),
+  );
+  const consoleFlights = new ConsoleFlightProvider(
+    config,
+    new AeroDataBoxClient(config, cache),
+  );
+  const schedule = new ScheduleService(
+    createScheduleProvider(config, cache, {
+      warn: (message) => app.log.warn(message),
+    }),
+  );
   const supabaseServer = new SupabaseServer(config);
   const usage = new UsageTracker(config.UNIT_BUDGET_PER_MONTH);
   const userQuota = new UserQuotaService(
@@ -112,11 +128,25 @@ export async function buildApp(config: AppConfig) {
     engine.register(app);
   }
 
-  await app.register(healthRoutes);
-  await app.register(statusRoutes, { config, provider, engine, engineStatus });
+  await app.register(healthRoutes, {
+    config,
+    cache,
+    provider,
+    supabaseServer,
+    schedule,
+  });
+  await app.register(statusRoutes, {
+    config,
+    provider,
+    engine,
+    engineStatus,
+    cache,
+    schedule,
+  });
   await app.register(flightRoutes, { provider, usage, userQuota, config });
   await app.register(consoleFlightRoutes, { consoleFlights, usage, userQuota, config });
   await app.register(consoleAirportRoutes, { consoleFlights, usage, userQuota, config });
+  await app.register(scheduleRoutes, { schedule, usage, userQuota, config });
   if (supabaseServer.ready) {
     await app.register(meRoutes, { supabaseServer, usage, userQuota, billingProvider: config.BILLING_PROVIDER });
   }

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: { absolute: "Terms of Service · Avi" },
 };
 
-const UPDATE = "November 7, 2026";
+const UPDATE = "November 11, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -49,6 +49,12 @@ export default function TermsPage() {
             operations, flight planning, or aircrew use. Always rely on your airline and official
             channels for operational decisions. Flight, gate, delay, and baggage data come from
             third parties and may be incomplete or inaccurate.
+          </p>
+          <p>
+            Some content is explicitly <strong className="text-ink">reference or illustrative</strong>:
+            the bundled airport catalog, indoor terminal layouts and walking estimates, and aircraft
+            seat maps. They are not live measurements and must not be relied on for wayfinding, seat
+            availability, or operational decisions.
           </p>
         </Section>
 
@@ -108,7 +114,9 @@ export default function TermsPage() {
             Our handling of your personal data is described in the{" "}
             <Link className="text-accent underline" href="/legal/privacy">Privacy Policy</Link>.
             Cached flight data is stored no longer than the provider terms permit (7 days) and is
-            automatically purged.
+            automatically purged. Browser-local records that predate retrieval timestamps are kept
+            only on your device, labelled &quot;age unknown&quot;, and are never shown as fresh; you can
+            clear them at any time through your browser&apos;s site-data settings.
           </p>
         </Section>
 
