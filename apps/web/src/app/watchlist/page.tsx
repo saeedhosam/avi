@@ -21,7 +21,15 @@ export default function WatchlistPage() {
     markAllAlertsRead,
     refreshData,
     syncing,
+    offlineMode,
+    aeroConfigured,
+    dataSourceMode,
   } = useApp();
+  const monitoringActive =
+    !offlineMode &&
+    aeroConfigured &&
+    (dataSourceMode === "LIVE_AERODATABOX" ||
+      dataSourceMode === "CONFIGURED_IDLE");
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6">
@@ -66,12 +74,26 @@ export default function WatchlistPage() {
             <div className="flex items-center gap-2">
               <BellRing className="size-4 text-accent" />
               <p className="text-[11px] font-semibold text-ink">
-                Live alerts active · Gate, delay, boarding & baggage updates
+                {monitoringActive
+                  ? "Live alerts enabled · checks run when the provider allows"
+                  : "Monitoring paused · showing saved flight records"}
               </p>
             </div>
-            <span className="flex items-center gap-1 text-[9px] font-bold text-landed">
-              <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-              WATCHING
+            <span
+              className={cn(
+                "flex items-center gap-1 text-[9px] font-bold",
+                monitoringActive ? "text-landed" : "text-delayed",
+              )}
+            >
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  monitoringActive
+                    ? "animate-pulse-dot bg-landed"
+                    : "bg-delayed",
+                )}
+              />
+              {monitoringActive ? "MONITORING" : "PAUSED"}
             </span>
           </div>
 

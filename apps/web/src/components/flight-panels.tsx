@@ -105,9 +105,11 @@ export function FlightTimelineView({
 
 export function AircraftInfoCard({
   aircraft,
+  airlineCode,
   className,
 }: {
   aircraft: AircraftInfo;
+  airlineCode?: string;
   className?: string;
 }) {
   return (
@@ -130,7 +132,7 @@ export function AircraftInfoCard({
         <div>
           <p className="text-sm font-bold text-ink">{aircraft.model}</p>
           <p className="text-[11px] text-muted">
-            Airframe age: {aircraft.age}
+            Airframe age: {aircraft.age ?? "Not reported"}
           </p>
         </div>
       </div>
@@ -150,11 +152,13 @@ export function AircraftInfoCard({
         <div className="flex items-start gap-2">
           <Armchair className="mt-0.5 size-3.5 shrink-0 text-accent-2" />
           <p className="text-[10px] font-medium leading-relaxed text-muted">
-            {aircraft.seatLayout}
+            {aircraft.seatLayout ?? "Seat layout not reported by the provider."}
           </p>
         </div>
         <Link
-          href={`/airplanes?model=${encodeURIComponent(aircraft.model)}`}
+          href={`/airplanes?model=${encodeURIComponent(aircraft.model)}${
+            airlineCode ? `&airline=${encodeURIComponent(airlineCode)}` : ""
+          }`}
           className="ml-2 flex shrink-0 items-center gap-1 rounded border border-accent/30 bg-accent-soft px-2 py-0.5 text-[9px] font-bold text-accent transition-colors hover:bg-accent/25"
         >
           View seatmap <ChevronRight className="size-3" />
@@ -171,7 +175,7 @@ function AmenityPill({
 }: {
   icon: React.ReactNode;
   label: string;
-  available: boolean;
+  available: boolean | null;
 }) {
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2 px-2 py-1.5">
@@ -182,7 +186,7 @@ function AmenityPill({
           available ? "text-ink" : "text-subtle",
         )}
       >
-        {label}
+        {available == null ? `${label}: not reported` : label}
       </span>
     </div>
   );
@@ -206,7 +210,7 @@ export function RouteProgress({
       ? 1
       : status === "SCHEDULED" || status === "CANCELLED"
         ? 0
-        : Math.min(0.95, Math.max(0.05, progress));
+        : Math.min(0.98, Math.max(0, progress));
 
   return (
     <div className={cn("flex items-center gap-3", className)}>

@@ -297,8 +297,7 @@ export function TerminalMap({
                 fontSize={7}
                 fontWeight={800}
               >
-                {selected!.walkTimeFromSecurityMinutes} min walk ·{" "}
-                {selected!.walkDistanceMeters} m
+                Illustrative route · distances not reported
               </text>
             </g>
           )}

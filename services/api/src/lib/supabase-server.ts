@@ -293,6 +293,8 @@ export class SupabaseServer {
     const seen = new Set<string>();
     for (const filter of [
       `next_poll_at=lte.${nowIso}`,
+      // Adoption only. Settled rows also have next_poll_at=null, but they
+      // carry a non-null poll_priority, so they must not be re-adopted.
       "next_poll_at=is.null&poll_priority=is.null",
     ] as const) {
       const query = [

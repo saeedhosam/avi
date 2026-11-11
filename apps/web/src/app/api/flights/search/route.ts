@@ -51,13 +51,13 @@ export async function GET(request: Request) {
   // quota accounting. Falls back to the direct provider when unreachable.
   const gatewayResult = await gatewayFetchJson<{
     mode: string;
-    flights: Flight[];
+    flights?: unknown;
+    error?: string;
   }>(datePath, request.headers.get("authorization"));
-  if (gatewayResult) {
-    if (
-      gatewayResult.mode === "LIVE_AERODATABOX" ||
-      gatewayResult.mode === "QUOTA_FALLBACK"
-    ) {
+  if (gatewayResult && Array.isArray(gatewayResult.flights)) {
+    // Only verified live data is cached. Quota fallbacks are explicit errors
+    // and must never be replayed as if they were a successful lookup.
+    if (gatewayResult.mode === "LIVE_AERODATABOX") {
       if (searchCache.size >= SEARCH_CACHE_MAX) {
         const oldest = searchCache.keys().next().value;
         if (oldest) searchCache.delete(oldest);
@@ -66,6 +66,27 @@ export async function GET(request: Request) {
         expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
         body: JSON.stringify(gatewayResult),
       });
+    }
+    if (gatewayResult.mode === "QUOTA_FALLBACK") {
+      return NextResponse.json(
+        {
+          mode: gatewayResult.mode,
+          flights: [],
+          error:
+            "Live flight lookups are paused until the provider quota resets.",
+        },
+        { status: 429 },
+      );
+    }
+    if (gatewayResult.mode === "NOT_CONFIGURED") {
+      return NextResponse.json(
+        {
+          mode: gatewayResult.mode,
+          flights: [],
+          error: "Live flight data is not configured.",
+        },
+        { status: 503 },
+      );
     }
     return NextResponse.json(gatewayResult);
   }
@@ -90,41 +111,77 @@ export async function GET(request: Request) {
     : `/flights/number/${cleaned}?withAircraftImage=false&withLocation=true`;
   const { data, status, mode } = await fetchAeroJson<AeroFlightDto[]>(path);
 
-  if (!data) {
-    // `ERROR` (bad gateway / timeout) previously returned 200 with no
-    // flights, which the UI reported as "No live flights found". Make the
-    // failure explicit so the error banner tells the truth.
-    const unreachable = mode === "ERROR" || (status === 0 && mode !== "NOT_CONFIGURED");
+  if (mode === "QUOTA_FALLBACK") {
     return NextResponse.json(
       {
         mode,
         status,
         flights: [],
-        ...(unreachable
-          ? { error: "The live flight provider is temporarily unreachable." }
-          : {}),
+        error: "Live flight lookups are paused until the provider quota resets.",
       },
-      { status: unreachable ? 502 : 200 },
+      { status: 429 },
+    );
+  }
+  if (mode === "NOT_CONFIGURED") {
+    return NextResponse.json(
+      {
+        mode,
+        status,
+        flights: [],
+        error: "Live flight data is not configured.",
+      },
+      { status: 503 },
+    );
+  }
+  if (mode === "ERROR" || status === 0) {
+    return NextResponse.json(
+      {
+        mode,
+        status,
+        flights: [],
+        error: "The live flight provider is temporarily unreachable.",
+      },
+      { status: 502 },
+    );
+  }
+  if (data != null && !Array.isArray(data)) {
+    return NextResponse.json(
+      {
+        mode: "ERROR",
+        status,
+        flights: [],
+        error: "The live flight provider returned an unexpected payload.",
+      },
+      { status: 502 },
+    );
+  }
+  if (status === 400 || status === 404) {
+    return NextResponse.json(
+      { mode, status, flights: [] },
+      { status: 200 },
     );
   }
 
-  const flights = data
+  const fetchedAt = new Date().toISOString();
+  const flights = (data ?? [])
     .map((dto) => mapAeroFlight(dto))
     .filter((flight): flight is Flight => Boolean(flight))
-    .filter((flight) => !rawDate || flight.flightDate === rawDate);
+    .filter((flight) => !rawDate || flight.flightDate === rawDate)
+    .map((flight) => ({
+      ...flight,
+      source: "aerodatabox",
+      fetchedAt,
+    }));
 
-  // Only cache durable outcomes: live data and quota fallback. Errors and
-  // "not configured" stay uncached so configuration changes apply at once.
-  if (mode === "LIVE_AERODATABOX" || mode === "QUOTA_FALLBACK") {
-    if (searchCache.size >= SEARCH_CACHE_MAX) {
-      const oldest = searchCache.keys().next().value;
-      if (oldest) searchCache.delete(oldest);
-    }
-    searchCache.set(cacheKey, {
-      expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
-      body: JSON.stringify({ mode, flights }),
-    });
+  // Only verified live data is cached.
+  if (searchCache.size >= SEARCH_CACHE_MAX) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest) searchCache.delete(oldest);
   }
+  searchCache.set(cacheKey, {
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+    body: JSON.stringify({ mode, status, flights }),
+  });
 
-  return NextResponse.json({ mode, flights });
+  return NextResponse.json({ mode, status, flights });
 }

@@ -103,11 +103,6 @@ export function classifyHaul(distanceKm: number): HaulCategory {
   return "LONG_HAUL";
 }
 
-export function estimateDurationMinutes(distanceKm: number) {
-  const cruise = (distanceKm / 815) * 60;
-  return Math.max(45, Math.round(cruise + 32));
-}
-
 export function geodesicDistanceKm(
   lat1: number,
   lon1: number,
@@ -384,6 +379,16 @@ export function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+/** True only when an ISO timestamp is parseable and within maxAgeMs. */
+export function isFreshTimestamp(
+  iso: string | null | undefined,
+  maxAgeMs = 15 * 60_000,
+): boolean {
+  if (!iso) return false;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) && Date.now() - ms <= maxAgeMs;
 }
 
 export function timeAgo(timestamp: number) {

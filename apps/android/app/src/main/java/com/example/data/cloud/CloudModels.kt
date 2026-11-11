@@ -28,7 +28,9 @@ data class CloudTrackedFlight(
      * dates occupies two independent rows (web migration 20261106000200).
      */
     fun watchRowId(): String {
-        val compact = (id.ifBlank { flightNumber }).replace(" ", "").uppercase()
+        // The flight id now already contains the operating date; always derive
+        // from the flight number so the date is appended exactly once.
+        val compact = (flightNumber.ifBlank { id }).replace(" ", "").uppercase()
         return flightDate?.takeIf { it.isNotBlank() }?.let { "$compact-$it" } ?: compact
     }
 }

@@ -288,7 +288,12 @@ fun FlightDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
+                            StatusBadge(
+                                status = flight.status,
+                                delayMinutes = flight.delayMinutes,
+                                statusReported = flight.statusReported,
+                                delayReported = flight.delayReported
+                            )
 
                             if (flight.delayReason != null) {
                                 Text(

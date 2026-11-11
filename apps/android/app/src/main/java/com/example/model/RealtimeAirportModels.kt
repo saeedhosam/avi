@@ -15,7 +15,9 @@ data class RealtimeAirportWeather(
     val humidity: Int,
     val pressureInHg: Double = 29.92,
     val metarRaw: String = "",
-    val flightCategory: FlightCategory = FlightCategory.VFR
+    val flightCategory: FlightCategory = FlightCategory.VFR,
+    /** False when these values are placeholders, not an observation. */
+    val reported: Boolean = false
 )
 
 data class RealtimeAirportInfo(
@@ -30,6 +32,8 @@ data class RealtimeAirportInfo(
     val longitude: Double,
     val elevationFeet: Int,
     val operationalStatus: String, // e.g. "Normal Operations", "Ground Delay (35m)"
+    /** False when operational status/delay were not reported by a provider. */
+    val statusReported: Boolean = false,
     val isDelayed: Boolean,
     val delayMinutes: Int,
     val delayReason: String? = null,

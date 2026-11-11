@@ -50,8 +50,10 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
           response: {
             200: consoleSearchResponseSchema,
             400: errorResponseSchema,
+            404: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
+            503: errorResponseSchema,
           },
         },
         config: PROVIDER_RATE_LIMIT,
@@ -97,15 +99,39 @@ export const consoleFlightRoutes: FastifyPluginAsyncZod<ConsoleFlightOptions> =
             // Nothing was charged to the provider; give the caller their quota back.
             await refundProviderQuota(request, options.userQuota, units);
           }
-          // Fail honestly when the provider is down/invalid — the previous
-          // web behavior hid outages as HTTP 200 with `flights: []`.
-          if (outcome.mode === "ERROR" || (outcome.mode === "NOT_CONFIGURED" && outcome.status === 0)) {
-            if (outcome.mode === "ERROR") {
-              return reply.code(502).send({
-                error: "provider_unreachable",
-                message: "The live flight provider is temporarily unreachable.",
-              });
-            }
+          // Fail honestly when the provider is down, unconfigured, or out of
+          // quota. Returning HTTP 200 with an empty list would be
+          // indistinguishable from a verified "no flights" result.
+          if (outcome.mode === "NOT_FOUND") {
+            return reply.code(404).send({
+              error: "flight_not_found",
+              message: "The provider has no flight matching that number and date.",
+            });
+          }
+          if (outcome.mode === "INVALID_REQUEST") {
+            return reply.code(400).send({
+              error: "invalid_provider_request",
+              message: "The provider rejected that flight query.",
+            });
+          }
+          if (outcome.mode === "NOT_CONFIGURED") {
+            return reply.code(503).send({
+              error: "provider_not_configured",
+              message: "Live flight data is not configured.",
+            });
+          }
+          if (outcome.mode === "QUOTA_FALLBACK") {
+            return reply.code(429).send({
+              error: "provider_quota_exhausted",
+              message:
+                "Live flight lookups are paused until the provider quota resets.",
+            });
+          }
+          if (outcome.mode === "ERROR") {
+            return reply.code(502).send({
+              error: "provider_unreachable",
+              message: "The live flight provider is temporarily unreachable.",
+            });
           }
           reply.header(
             "Cache-Control",

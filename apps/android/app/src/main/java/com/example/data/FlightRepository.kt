@@ -364,6 +364,7 @@ class FlightRepository(private val context: Context) {
             CachedFlightEntity(
                 id = flight.id,
                 flightNumber = flight.flightNumber,
+                flightDate = flight.flightDate,
                 airline = flight.airline,
                 airlineCode = flight.airlineCode,
                 originCode = flight.origin.code,
@@ -470,6 +471,7 @@ class FlightRepository(private val context: Context) {
                     Flight(
                         id = entity.id,
                         flightNumber = entity.flightNumber,
+                        flightDate = entity.flightDate,
                         airline = entity.airline,
                         airlineCode = entity.airlineCode,
                         origin = Airport(
@@ -480,7 +482,8 @@ class FlightRepository(private val context: Context) {
                             timezone = baseOrigin.timezone,
                             latitude = baseOrigin.latitude,
                             longitude = baseOrigin.longitude,
-                            weather = baseOrigin.weather
+                            weather = AirportWeather(0, 0, "", "", "", 0),
+                            weatherReported = false
                         ),
                         destination = Airport(
                             code = entity.destCode,
@@ -490,15 +493,18 @@ class FlightRepository(private val context: Context) {
                             timezone = baseDest.timezone,
                             latitude = baseDest.latitude,
                             longitude = baseDest.longitude,
-                            weather = baseDest.weather
+                            weather = AirportWeather(0, 0, "", "", "", 0),
+                            weatherReported = false
                         ),
                         departureTimeScheduled = entity.departureTimeScheduled,
                         departureTimeEstimated = entity.departureTimeEstimated,
                         arrivalTimeScheduled = entity.arrivalTimeScheduled,
                         arrivalTimeEstimated = entity.arrivalTimeEstimated,
                         status = parsedStatus,
+                        statusReported = entity.status.isNotBlank(),
                         statusNote = entity.statusNote,
                         delayMinutes = entity.delayMinutes,
+                        delayReported = entity.delayMinutes > 0,
                         delayReason = entity.delayReason,
                         terminalDeparture = entity.terminalDeparture,
                         gateDeparture = entity.gateDeparture,
@@ -509,14 +515,14 @@ class FlightRepository(private val context: Context) {
                         aircraft = AircraftInfo(
                             model = entity.aircraftModel,
                             registration = entity.aircraftRegistration,
-                            age = "Not reported",
-                            wifiAvailable = false,
-                            powerOutlets = false,
-                            seatLayout = "Not reported by the live feed"
+                            age = null,
+                            wifiAvailable = null,
+                            powerOutlets = null,
+                            seatLayout = null
                         ),
                         telemetry = FlightTelemetry(
-                            currentLatitude = baseOrigin.latitude,
-                            currentLongitude = baseOrigin.longitude,
+                            currentLatitude = 0.0,
+                            currentLongitude = 0.0,
                             altitudeFeet = entity.altitudeFeet,
                             groundSpeedKnots = entity.groundSpeedKnots,
                             headingDegrees = entity.headingDegrees,

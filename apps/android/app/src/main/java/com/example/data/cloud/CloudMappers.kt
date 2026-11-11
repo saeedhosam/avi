@@ -32,8 +32,10 @@ fun CloudFlightSnapshot.toFlight(): Flight = Flight(
     arrivalTimeEstimated = arrivalTimeEstimated,
     arrivalTimeActual = arrivalTimeActual,
     status = runCatching { FlightStatus.valueOf(status) }.getOrDefault(FlightStatus.SCHEDULED),
+    statusReported = statusReported && status.isNotBlank(),
     statusNote = statusNote,
     delayMinutes = delayMinutes,
+    delayReported = delayReported,
     delayReason = delayReason,
     terminalDeparture = terminalDeparture,
     gateDeparture = gateDeparture,
@@ -74,7 +76,9 @@ fun CloudFlightSnapshot.toFlight(): Flight = Flight(
     },
     isFavorite = isFavorite,
     isTracked = isTracked,
-    customNotes = customNotes
+    customNotes = customNotes,
+    source = source,
+    fetchedAt = fetchedAt
 )
 
 fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
@@ -98,7 +102,8 @@ fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
             wind = origin.weather.wind,
             visibility = origin.weather.visibility,
             humidity = origin.weather.humidity
-        )
+        ),
+        weatherReported = origin.weatherReported
     ),
     destination = CloudAirportSnapshot(
         code = destination.code,
@@ -115,7 +120,8 @@ fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
             wind = destination.weather.wind,
             visibility = destination.weather.visibility,
             humidity = destination.weather.humidity
-        )
+        ),
+        weatherReported = destination.weatherReported
     ),
     departureTimeScheduled = departureTimeScheduled,
     departureTimeEstimated = departureTimeEstimated,
@@ -124,8 +130,10 @@ fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
     arrivalTimeEstimated = arrivalTimeEstimated,
     arrivalTimeActual = arrivalTimeActual,
     status = status.name,
+    statusReported = statusReported,
     statusNote = statusNote,
     delayMinutes = delayMinutes,
+    delayReported = delayReported,
     delayReason = delayReason,
     terminalDeparture = terminalDeparture,
     gateDeparture = gateDeparture,
@@ -165,7 +173,9 @@ fun Flight.toCloudSnapshot(): CloudFlightSnapshot = CloudFlightSnapshot(
     },
     isFavorite = isFavorite,
     isTracked = isTracked,
-    customNotes = customNotes
+    customNotes = customNotes,
+    source = source,
+    fetchedAt = fetchedAt
 )
 
 fun CloudFlightSnapshot.toJsonObject(): JsonObject =
@@ -186,5 +196,6 @@ fun CloudAirportSnapshot.toAirport(): Airport = Airport(
         wind = weather.wind,
         visibility = weather.visibility,
         humidity = weather.humidity
-    )
+    ),
+    weatherReported = weatherReported
 )

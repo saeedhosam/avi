@@ -137,32 +137,24 @@ class AirportConnectionsRepository(context: Context) {
                 destNode.latitude, destNode.longitude
             )
             val distNm = GeodesicRouteCalculator.kmToNm(distKm)
-            val durationMin = GeodesicRouteCalculator.estimateDurationMinutes(distKm)
-            val dailyFlights = route.dailyFlights.coerceAtLeast(1)
+            // The route-statistics endpoint does not report flight duration.
+            val durationMin = 0
+            val durationText = "Not reported"
+            val dailyFlights = route.dailyFlights.coerceAtLeast(0)
 
-            val operators = route.operators.orEmpty().mapIndexedNotNull { idx, op ->
+            // AeroDataBox reports operators and a route-level daily average.
+            // It does not report per-carrier flight numbers, frequencies, or
+            // aircraft, so those fields stay empty/zero (unknown in the UI).
+            val operators = route.operators.orEmpty().mapNotNull { op ->
                 val airlineCode = op.code.takeIf { it.isNotBlank() }?.uppercase(Locale.ROOT)
-                    ?: return@mapIndexedNotNull null
-                val airlineName = op.name.takeIf { it.isNotBlank() } ?: "$airlineCode Airlines"
-                val baseFlightNum = 100 + ((origin.iata.hashCode() + destNode.iata.hashCode() + idx * 37) and 0x1FF)
+                    ?: return@mapNotNull null
+                val airlineName = op.name.takeIf { it.isNotBlank() } ?: "Not reported"
                 OperatingCarrierRoute(
                     airlineCode = airlineCode,
                     airlineName = airlineName,
-                    flightNumbers = listOf("$airlineCode $baseFlightNum", "$airlineCode ${baseFlightNum + 1}"),
-                    dailyFrequencies = (dailyFlights / (route.operators.size.coerceAtLeast(1))).coerceAtLeast(1),
-                    aircraftTypes = listOf(if (distKm > 3500) "Boeing 787-9" else "Airbus A320neo")
-                )
-            }.ifEmpty {
-                val defaultAirlineCode = origin.hubAirlines.firstOrNull()?.take(2)?.uppercase(Locale.ROOT) ?: "MS"
-                val defaultAirlineName = origin.hubAirlines.firstOrNull() ?: "Flag Carrier"
-                listOf(
-                    OperatingCarrierRoute(
-                        airlineCode = defaultAirlineCode,
-                        airlineName = defaultAirlineName,
-                        flightNumbers = listOf("$defaultAirlineCode 701"),
-                        dailyFrequencies = dailyFlights,
-                        aircraftTypes = listOf("Airbus A321neo")
-                    )
+                    flightNumbers = emptyList(),
+                    dailyFrequencies = 0,
+                    aircraftTypes = emptyList()
                 )
             }
 
@@ -173,11 +165,11 @@ class AirportConnectionsRepository(context: Context) {
                 distanceKm = distKm,
                 distanceNm = distNm,
                 estimatedDurationMinutes = durationMin,
-                durationFormatted = GeodesicRouteCalculator.formatDuration(durationMin),
+                durationFormatted = durationText,
                 haulCategory = GeodesicRouteCalculator.classifyHaul(distKm),
                 dailyFlightsCount = dailyFlights,
                 hasDepartures = true,
-                hasArrivals = true,
+                hasArrivals = false,
                 operatingCarriers = operators,
                 isLiveVerified = true
             )
@@ -211,22 +203,15 @@ class AirportConnectionsRepository(context: Context) {
         catalog: List<DirectFlightConnection>,
         live: List<DirectFlightConnection>
     ): List<DirectFlightConnection> {
-        val byDest = catalog.associateBy { it.destination.iata }.toMutableMap()
-        for (liveRoute in live) {
-            val existing = byDest[liveRoute.destination.iata]
-            if (existing != null) {
-                val mergedCarriers = (liveRoute.operatingCarriers + existing.operatingCarriers)
-                    .distinctBy { it.airlineCode }
-                byDest[liveRoute.destination.iata] = existing.copy(
-                    dailyFlightsCount = maxOf(existing.dailyFlightsCount, liveRoute.dailyFlightsCount),
-                    operatingCarriers = mergedCarriers,
-                    isLiveVerified = true
-                )
-            } else {
-                byDest[liveRoute.destination.iata] = liveRoute
-            }
+        // If a live response exists, use it alone. Mixing catalog frequencies
+        // and carriers into live rows would make invented fields look verified.
+        if (live.isNotEmpty()) {
+            return live.sortedByDescending { it.dailyFlightsCount }
         }
-        return byDest.values.sortedByDescending { it.dailyFlightsCount }
+        // Catalog rows remain explicitly marked as not live.
+        return catalog
+            .map { it.copy(isLiveVerified = false) }
+            .sortedByDescending { it.dailyFlightsCount }
     }
 
     private fun mergeCachedIntoCatalog(
@@ -1301,36 +1286,8 @@ object GlobalRouteCatalog {
             }
         }
 
-        // 2. If user pivoted to a secondary hub that only had 1-2 explicit trunk lines,
-        // connect it to key regional & global hubs so pivoting is always rich and interactive
-        if (matchedSpecs.size < 8) {
-            val existingDests = matchedSpecs.map { it.destIata }.toMutableSet()
-            existingDests.add(code)
-            val fallbackHubCodes = listOf("CAI", "LHR", "DXB", "IST", "FRA", "CDG", "DOH", "JFK", "SIN", "AMS", "MAD", "ATH")
-            for (hubCode in fallbackHubCodes) {
-                if (hubCode !in existingDests) {
-                    val hubNode = getAirport(hubCode)
-                    val airlineName = origin.hubAirlines.firstOrNull()
-                        ?: hubNode.hubAirlines.firstOrNull()
-                        ?: "Global Airways"
-                    val airlineCode = airlineName.take(2).uppercase(Locale.ROOT)
-                    val num = 200 + ((code.hashCode() + hubCode.hashCode()) and 0xFF)
-                    matchedSpecs.add(
-                        RouteSpec(
-                            originIata = code,
-                            destIata = hubCode,
-                            dailyFlights = 2,
-                            carriers = listOf(
-                                carrier(airlineCode, airlineName, listOf("$airlineCode $num"), 2, "Boeing 787-9")
-                            )
-                        )
-                    )
-                    existingDests.add(hubCode)
-                }
-                if (matchedSpecs.size >= 12) break
-            }
-        }
-
+        // No synthetic routes are added when the reference catalog is sparse.
+        // An incomplete reference network is preferable to invented services.
         return matchedSpecs
             .distinctBy { it.destIata }
             .map { spec ->

@@ -91,7 +91,7 @@ fun AircraftInfoCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Airframe Age: ${aircraft.age}",
+                        text = "Airframe Age: ${aircraft.age ?: "Not reported"}",
                         color = TextMuted,
                         fontSize = 12.sp
                     )
@@ -142,7 +142,7 @@ fun AircraftInfoCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = aircraft.seatLayout,
+                        text = aircraft.seatLayout ?: "Seat layout not reported",
                         color = TextMuted,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
@@ -157,7 +157,7 @@ fun AircraftInfoCard(
 private fun AmenityPill(
     icon: ImageVector,
     label: String,
-    available: Boolean,
+    available: Boolean?,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -174,12 +174,12 @@ private fun AmenityPill(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (available) StatusLanded else TextSubtle,
+                tint = if (available == true) StatusLanded else TextSubtle,
                 modifier = Modifier.size(14.dp)
             )
             Text(
-                text = label,
-                color = if (available) TextWhite else TextSubtle,
+                text = if (available == null) "$label: not reported" else label,
+                color = if (available == true) TextWhite else TextSubtle,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )

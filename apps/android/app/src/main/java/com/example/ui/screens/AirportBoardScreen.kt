@@ -422,7 +422,12 @@ private fun AirportBoardRow(
 
             // Status Badge
             Box(modifier = Modifier.weight(1.15f)) {
-                StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
+                StatusBadge(
+                    status = flight.status,
+                    delayMinutes = flight.delayMinutes,
+                    statusReported = flight.statusReported,
+                    delayReported = flight.delayReported
+                )
             }
         }
     }

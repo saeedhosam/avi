@@ -82,6 +82,8 @@ function baseSummary(overrides: Partial<FlightSummary> = {}): FlightSummary {
     airline: "British Airways",
     airlineCode: "BA",
     status: "DEPARTED",
+    statusReported: true,
+    statusRaw: "Departed",
     statusNote: "En route",
     origin: {
       code: "JFK",
@@ -112,6 +114,8 @@ function baseSummary(overrides: Partial<FlightSummary> = {}): FlightSummary {
     baggageCarousel: "7",
     aircraft: { model: "Boeing 777", registration: "G-XLEA" },
     delayMinutes: 0,
+    delayReported: true,
+    delaySource: "derived",
     telemetry: {
       hasLiveLocation: true,
       latitude: 46.0,
@@ -269,6 +273,47 @@ describe("mergeSnapshot", () => {
     expect(merged.timeline).toEqual([]);
   });
 
+  it("preserves a verified status when the provider does not report one", () => {
+    const previous = baseSnapshot({
+      status: "CANCELLED",
+      statusReported: true,
+      statusRaw: "Canceled",
+    });
+    const merges = mergeSnapshot(
+      previous,
+      baseSummary({ statusReported: false, statusRaw: "" }),
+      1234,
+    );
+    expect(merges.status).toBe("CANCELLED");
+    expect(merges.statusReported).toBe(true);
+  });
+
+  it("preserves a reported delay instead of resetting it to zero", () => {
+    const previous = baseSnapshot({
+      delayMinutes: 35,
+      delayReported: true,
+      delaySource: "derived",
+    });
+    const merged = mergeSnapshot(
+      previous,
+      baseSummary({ delayReported: false, delayMinutes: 0 }),
+      1234,
+    );
+    expect(merged.delayMinutes).toBe(35);
+    expect(merged.delayReported).toBe(true);
+    expect(merged.delayReason).toBeNull();
+  });
+
+  it("refuses to merge a summary from another operating date", () => {
+    const previous = baseSnapshot({ flightDate: "2026-11-08" });
+    const merged = mergeSnapshot(
+      previous,
+      baseSummary({ scheduledDeparture: "2026-11-09 18:30-05:00" }),
+      1234,
+    );
+    expect(merged).toEqual(previous);
+  });
+
   it("does not fabricate a live position when none is reported", () => {
     const summary = baseSummary({
       telemetry: {
@@ -283,7 +328,10 @@ describe("mergeSnapshot", () => {
     });
     const merged = mergeSnapshot(baseSnapshot(), summary, 1234);
     expect(merged.telemetry?.hasLiveLocation).toBe(false);
-    expect(merged.telemetry?.currentLatitude).toBe(40.6413);
+    // No live fix: measured values are cleared rather than retained as if
+    // they were current.
+    expect(merged.telemetry?.currentLatitude).toBe(0);
+    expect(merged.telemetry?.stale).toBe(true);
     expect(merged.telemetry?.progressPercent).toBe(0);
   });
 });
@@ -347,8 +395,8 @@ describe("alertKey + matchesJob", () => {
     expect(matchesJob(baseSummary({ scheduledDeparture: "2026-11-09 18:30-05:00" }), job)).toBe(false);
   });
 
-  it("accepts legacy rows without a flight date", () => {
-    expect(matchesJob(baseSummary(), { ...job, flightDate: null })).toBe(true);
+  it("rejects rows without a flight date instead of substituting another day", () => {
+    expect(matchesJob(baseSummary(), { ...job, flightDate: null })).toBe(false);
   });
 });
 
@@ -511,6 +559,9 @@ describe("SupabaseServer", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, options] = fetchMock.mock.calls[0]!;
     expect(String(url)).toContain("/rest/v1/watchlist_items?next_poll_at=lte.");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+      "next_poll_at=is.null&poll_priority=is.null",
+    );
     expect((options as RequestInit).headers).toMatchObject({
       Authorization: "Bearer sb_secret_test",
       Prefer: "return=minimal",

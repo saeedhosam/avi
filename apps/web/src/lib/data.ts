@@ -7,45 +7,19 @@ import type {
 } from "./types";
 
 export type GlobalAirportNode = AirportNode & {
+  /**
+   * Reference count from the bundled catalog. This is not a live route count
+   * and must not be presented as one.
+   */
   destCount?: number;
 };
 
-const EXTRA_AIRPORTS: GlobalAirportNode[] = [
-  {
-    iata: "HMB",
-    icao: "HESG",
-    name: "Sohag International Airport",
-    city: "Sohag",
-    country: "Egypt",
-    region: "MENA",
-    latitude: 26.3328,
-    longitude: 31.7371,
-    timezone: "EEST (UTC+3)",
-    hubAirlines: ["Air Cairo"],
-    destCount: 12,
-  },
-  {
-    iata: "MED",
-    icao: "OEMA",
-    name: "Prince Mohammad bin Abdulaziz International Airport",
-    city: "Medina",
-    country: "Saudi Arabia",
-    region: "MENA",
-    latitude: 24.5534,
-    longitude: 39.7051,
-    timezone: "AST (UTC+3)",
-    hubAirlines: ["Saudia", "Flynas", "Air Cairo"],
-    destCount: 42,
-  },
-];
-
 /**
- * Global reference data covering worldwide commercial airports.
+ * Global reference data covering worldwide commercial airports. This is
+ * reference data only: live route and schedule data always comes from the
+ * provider.
  */
-export const routeAirports = [
-  ...EXTRA_AIRPORTS,
-  ...(globalAirportsJson as GlobalAirportNode[]),
-];
+export const routeAirports = globalAirportsJson as GlobalAirportNode[];
 export const terminalLayouts =
   terminalLayoutsJson as unknown as AirportTerminalLayout[];
 

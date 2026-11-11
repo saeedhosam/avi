@@ -24,6 +24,8 @@ export type FlightDataMode =
   | "LIVE_AERODATABOX"
   | "QUOTA_FALLBACK"
   | "NOT_CONFIGURED"
+  | "NOT_FOUND"
+  | "INVALID_REQUEST"
   | "ERROR";
 
 export type ConsoleOutcome<T> = {
@@ -33,6 +35,12 @@ export type ConsoleOutcome<T> = {
   /** True when the provider answered from its in-process cache (no unit spend). */
   cached?: boolean;
 };
+
+export interface DataProvenance {
+  source: "AERODATABOX";
+  fetchedAt: string;
+  attribution: "AeroDataBox";
+}
 
 export function hasValidConsoleAeroKey(key: string | undefined): boolean {
   const value = key?.trim();
@@ -152,8 +160,11 @@ export class ConsoleFlightProvider {
       if (response.status === 429) {
         return { data: null, status: 429, mode: "QUOTA_FALLBACK" };
       }
-      if (response.status === 400 || response.status === 404) {
-        return { data: null, status: response.status, mode: "LIVE_AERODATABOX" };
+      if (response.status === 400) {
+        return { data: null, status: response.status, mode: "INVALID_REQUEST" };
+      }
+      if (response.status === 404) {
+        return { data: null, status: response.status, mode: "NOT_FOUND" };
       }
       if (!response.ok) {
         return { data: null, status: response.status, mode: "ERROR" };
@@ -169,10 +180,20 @@ export class ConsoleFlightProvider {
   async lookupFlight(
     rawNumber: string,
     date?: string,
-  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }> {
+  ): Promise<{
+    mode: FlightDataMode;
+    status: number;
+    flights: Flight[];
+    cached?: boolean;
+  } & DataProvenance> {
     const flightNumber = rawNumber.replace(/\s+/g, "").toUpperCase();
     const cacheKey = `lookup:${flightNumber}|${date ?? "any"}`;
-    const cached = this.flightCache.get<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }>(cacheKey);
+    const cached = this.flightCache.get<{
+      mode: FlightDataMode;
+      status: number;
+      flights: Flight[];
+      cached?: boolean;
+    } & DataProvenance>(cacheKey);
     if (cached) return { ...cached, cached: true };
 
     const path = date
@@ -180,12 +201,36 @@ export class ConsoleFlightProvider {
       : `/flights/number/${flightNumber}?withAircraftImage=false&withLocation=true`;
     const { data, status, mode } = await this.fetchJson<AeroFlightDto[]>(path);
 
+    if (data != null && !Array.isArray(data)) {
+      return {
+        mode: "ERROR",
+        status,
+        flights: [],
+        source: "AERODATABOX" as const,
+        fetchedAt: new Date().toISOString(),
+        attribution: "AeroDataBox" as const,
+      };
+    }
+
+    const fetchedAt = new Date().toISOString();
     const flights = (data ?? [])
       .map((dto) => mapConsoleFlight(dto))
       .filter((flight): flight is Flight => Boolean(flight))
-      .filter((flight) => !date || flight.flightDate === date);
+      .filter((flight) => !date || flight.flightDate === date)
+      .map((flight) => ({
+        ...flight,
+        source: "aerodatabox",
+        fetchedAt,
+      }));
 
-    const outcome = { mode, status, flights };
+    const outcome = {
+      mode,
+      status,
+      flights,
+      source: "AERODATABOX" as const,
+      fetchedAt,
+      attribution: "AeroDataBox" as const,
+    };
     // Cache durable outcomes only; errors and "not configured" stay uncached
     // so configuration changes apply at once.
     if (mode === "LIVE_AERODATABOX" || mode === "QUOTA_FALLBACK") {
@@ -196,14 +241,44 @@ export class ConsoleFlightProvider {
 
   async lookupAirportFids(
     code: string,
-  ): Promise<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }> {
+  ): Promise<{
+    mode: FlightDataMode;
+    status: number;
+    flights: Flight[];
+    cached?: boolean;
+    window: { from: string; to: string };
+  } & DataProvenance> {
     const cacheKey = `fids:${code}`;
-    const cached = this.fidsCache.get<{ mode: FlightDataMode; status: number; flights: Flight[]; cached?: boolean }>(cacheKey);
+    const cached = this.fidsCache.get<{
+      mode: FlightDataMode;
+      status: number;
+      flights: Flight[];
+      cached?: boolean;
+      window: { from: string; to: string };
+    } & DataProvenance>(cacheKey);
     if (cached) return { ...cached, cached: true };
 
+    const windowStart = new Date(Date.now() - 120 * 60_000).toISOString();
+    const windowEnd = new Date(Date.now() + 720 * 60_000).toISOString();
     const { data, status, mode } = await this.fetchJson<AeroFidsResponseDto>(
-      `/flights/airports/iata/${code}?direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
+      `/flights/airports/iata/${code}?offsetMinutes=-120&durationMinutes=720&direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
     );
+    if (
+      data != null &&
+      (typeof data !== "object" ||
+        (!Array.isArray(data.departures) && !Array.isArray(data.arrivals)))
+    ) {
+      return {
+        mode: "ERROR",
+        status,
+        flights: [],
+        source: "AERODATABOX" as const,
+        fetchedAt: new Date().toISOString(),
+        attribution: "AeroDataBox" as const,
+        window: { from: windowStart, to: windowEnd },
+      };
+    }
+    const fetchedAt = new Date().toISOString();
     const mapped = (data ?? { departures: [], arrivals: [] });
     const all = mapConsoleFids(code, mapped);
     const departures = all
@@ -212,7 +287,20 @@ export class ConsoleFlightProvider {
     const arrivals = all
       .filter((flight) => flight.destination.code === code)
       .slice(0, 100);
-    const outcome = { mode, status, flights: [...departures, ...arrivals] };
+    const flights = [...departures, ...arrivals].map((flight) => ({
+      ...flight,
+      source: "aerodatabox",
+      fetchedAt,
+    }));
+    const outcome = {
+      mode,
+      status,
+      flights,
+      source: "AERODATABOX" as const,
+      fetchedAt,
+      attribution: "AeroDataBox" as const,
+      window: { from: windowStart, to: windowEnd },
+    };
     if (mode === "LIVE_AERODATABOX" || mode === "QUOTA_FALLBACK") {
       this.fidsCache.set(cacheKey, outcome, 60_000);
     }
@@ -221,9 +309,25 @@ export class ConsoleFlightProvider {
 
   async lookupAirportRoutes(
     code: string,
-  ): Promise<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[]; cached?: boolean }> {
+  ): Promise<{
+    mode: FlightDataMode;
+    status: number;
+    routes: ConsoleRouteStat[];
+    cached?: boolean;
+    statisticsWindowDays: 7;
+    note: string;
+    omittedRoutes: number;
+  } & DataProvenance> {
     const cacheKey = `routes:${code}`;
-    const cached = this.routesCache.get<{ mode: FlightDataMode; status: number; routes: ConsoleRouteStat[]; cached?: boolean }>(cacheKey);
+    const cached = this.routesCache.get<{
+      mode: FlightDataMode;
+      status: number;
+      routes: ConsoleRouteStat[];
+      cached?: boolean;
+      statisticsWindowDays: 7;
+      note: string;
+      omittedRoutes: number;
+    } & DataProvenance>(cacheKey);
     if (cached) return { ...cached, cached: true };
 
     const { data, status, mode } = await this.fetchJson<{
@@ -234,32 +338,71 @@ export class ConsoleFlightProvider {
       }>;
     }>(`/airports/iata/${code}/stats/routes/daily`);
 
-    const routes = (data?.routes ?? [])
+    if (data != null && !Array.isArray(data.routes)) {
+      return {
+        mode: "ERROR",
+        status,
+        routes: [],
+        source: "AERODATABOX" as const,
+        fetchedAt: new Date().toISOString(),
+        attribution: "AeroDataBox" as const,
+        statisticsWindowDays: 7 as const,
+        note: "AeroDataBox returned an unexpected route-statistics payload.",
+        omittedRoutes: 0,
+      };
+    }
+
+    const rawRoutes = data?.routes ?? [];
+    const omittedRoutes = rawRoutes.filter(
+      (route) =>
+        !route.destination?.iata ||
+        route.destination.location?.lat == null ||
+        route.destination.location?.lon == null,
+    ).length;
+    const routes = rawRoutes
       .filter(
         (route) =>
           route.destination?.iata &&
           route.destination.location?.lat != null &&
           route.destination.location?.lon != null,
       )
-      .map<ConsoleRouteStat>((route) => ({
-        destination: route.destination!.iata!,
-        destinationName: route.destination?.name,
-        city: route.destination?.municipalityName,
-        country: route.destination?.countryCode,
-        icao: route.destination?.icao,
-        timezone: route.destination?.timeZone,
-        latitude: route.destination!.location!.lat!,
-        longitude: route.destination!.location!.lon!,
-        dailyFlights: Math.max(1, Math.round(route.averageDailyFlights ?? 1)),
-        operators: (route.operators ?? [])
-          .filter((operator) => operator.iata || operator.name)
-          .map((operator) => ({
-            code: operator.iata ?? operator.name?.slice(0, 2).toUpperCase() ?? "",
-            name: operator.name ?? operator.iata ?? "",
-          })),
-      }));
+      .map<ConsoleRouteStat>((route) => {
+        const daily = route.averageDailyFlights;
+        return {
+          destination: route.destination!.iata!,
+          destinationName: route.destination?.name,
+          city: route.destination?.municipalityName,
+          country: route.destination?.countryCode,
+          icao: route.destination?.icao,
+          timezone: route.destination?.timeZone,
+          latitude: route.destination!.location!.lat!,
+          longitude: route.destination!.location!.lon!,
+          // Never turn a missing average into a fabricated "1 flight/day".
+          dailyFlights:
+            typeof daily === "number" && Number.isFinite(daily) && daily > 0
+              ? Math.round(daily * 10) / 10
+              : null,
+          operators: (route.operators ?? [])
+            .filter((operator) => operator.iata || operator.name)
+            .map((operator) => ({
+              code: operator.iata ?? "",
+              name: operator.name ?? operator.iata ?? "",
+            })),
+        };
+      });
 
-    const outcome = { mode, status, routes };
+    const fetchedAt = new Date().toISOString();
+    const outcome = {
+      mode,
+      status,
+      routes,
+      source: "AERODATABOX" as const,
+      fetchedAt,
+      attribution: "AeroDataBox" as const,
+      statisticsWindowDays: 7 as const,
+      note: "AeroDataBox daily route statistics cover the previous 7 days. They are not a forward schedule.",
+      omittedRoutes,
+    };
     if (mode === "LIVE_AERODATABOX") {
       // Daily route stats are stable; cache them for six hours.
       this.routesCache.set(cacheKey, outcome, 6 * 60 * 60_000);
@@ -269,14 +412,41 @@ export class ConsoleFlightProvider {
 
   async searchAirports(
     q: string,
-  ): Promise<{ mode: FlightDataMode; status: number; airports: AirportNode[]; cached?: boolean }> {
+  ): Promise<{
+    mode: FlightDataMode;
+    status: number;
+    airports: AirportNode[];
+    cached?: boolean;
+    source: "AERODATABOX";
+    fetchedAt: string;
+    attribution: "AeroDataBox";
+  }> {
     const cacheKey = `airports-search:${q}`;
-    const cached = this.airportsCache.get<{ mode: FlightDataMode; status: number; airports: AirportNode[]; cached?: boolean }>(cacheKey);
+    const cached = this.airportsCache.get<{
+      mode: FlightDataMode;
+      status: number;
+      airports: AirportNode[];
+      cached?: boolean;
+      source: "AERODATABOX";
+      fetchedAt: string;
+      attribution: "AeroDataBox";
+    }>(cacheKey);
     if (cached) return { ...cached, cached: true };
 
     const { data, status, mode } = await this.fetchJson<{
       items?: AeroAirportDto[];
     }>(`/airports/search/term?q=${encodeURIComponent(q)}&limit=20`);
+
+    if (data != null && !Array.isArray(data.items)) {
+      return {
+        mode: "ERROR",
+        status,
+        airports: [],
+        source: "AERODATABOX",
+        fetchedAt: new Date().toISOString(),
+        attribution: "AeroDataBox",
+      };
+    }
 
     const airports: AirportNode[] = (data?.items ?? [])
       .filter(
@@ -297,11 +467,18 @@ export class ConsoleFlightProvider {
         ),
         latitude: item.location!.lat!,
         longitude: item.location!.lon!,
-        timezone: item.timeZone ?? "UTC",
+        timezone: item.timeZone ?? "",
         hubAirlines: [],
       }));
 
-    const outcome = { mode, status, airports };
+    const outcome = {
+      mode,
+      status,
+      airports,
+      source: "AERODATABOX" as const,
+      fetchedAt: new Date().toISOString(),
+      attribution: "AeroDataBox" as const,
+    };
     if (mode === "LIVE_AERODATABOX") {
       this.airportsCache.set(cacheKey, outcome, 10 * 60_000);
     }

@@ -37,22 +37,33 @@ const WMO_CONDITIONS: Record<number, string> = {
 };
 
 export function conditionFromWmo(code: number | null | undefined) {
-  return WMO_CONDITIONS[code ?? 0] ?? "Fair / Clear";
+  if (code == null) return "Not reported";
+  return WMO_CONDITIONS[code] ?? "Unknown condition";
 }
 
 export function determineFlightCategory(
   visibilityMeters: number | null | undefined,
   wmoCode: number | null | undefined,
 ) {
-  const visMiles = (visibilityMeters ?? 16000) / 1609.34;
-  const code = wmoCode ?? 0;
-  if (visMiles < 3 || [45, 48, 65, 95, 96, 99].includes(code)) {
+  // Without visibility or a weather code there is no honest flight category.
+  if (visibilityMeters == null && wmoCode == null) return "Not reported";
+  const visMiles =
+    visibilityMeters != null ? visibilityMeters / 1609.34 : null;
+  const code = wmoCode ?? null;
+  if (
+    (visMiles != null && visMiles < 3) ||
+    (code != null && [45, 48, 65, 95, 96, 99].includes(code))
+  ) {
     return "IFR (Instrument Flight Rules)";
   }
-  if (visMiles < 5 || [51, 53, 55, 61, 63, 71, 73, 80, 81].includes(code)) {
+  if (
+    (visMiles != null && visMiles < 5) ||
+    (code != null && [51, 53, 55, 61, 63, 71, 73, 80, 81].includes(code))
+  ) {
     return "MVFR (Marginal VFR)";
   }
-  return "VFR (Visual Flight Rules)";
+  if (visMiles != null) return "VFR (Visual Flight Rules)";
+  return "Not reported";
 }
 
 function parseArrivalHour(arrivalTime: string) {
@@ -63,19 +74,8 @@ function parseArrivalHour(arrivalTime: string) {
   return Math.min(23, Math.max(0, hour));
 }
 
-function crosswindFor(code: string) {
-  const map: Record<string, number> = {
-    SFO: 16,
-    LHR: 14,
-    ORD: 18,
-    HND: 11,
-    JFK: 12,
-    DXB: 7,
-    CAI: 9,
-    CDG: 10,
-  };
-  return map[code] ?? 8;
-}
+// Crosswind, runway visual range, and operational arrival notices are not
+// exposed by Open-Meteo. They are reported as unavailable rather than guessed.
 
 function packingAdviceFor(
   tempC: number,
@@ -139,51 +139,65 @@ export function mapOpenMeteoToForecast(
   airport: Airport,
   arrivalTime: string,
   data: OpenMeteoPayload,
+  arrivalDate?: string,
 ): DestinationArrivalForecast {
   const arrivalHour = parseArrivalHour(arrivalTime);
-  const hourlyTimes = data.hourly?.time ?? [];
-  let arrivalIndex = hourlyTimes.findIndex((time) => {
+  const hourly = data.hourly;
+  const current = data.current;
+  if (
+    !current ||
+    current.temperature_2m == null ||
+    current.relative_humidity_2m == null ||
+    current.wind_speed_10m == null ||
+    current.wind_direction_10m == null ||
+    current.visibility == null ||
+    current.weather_code == null ||
+    !hourly?.time?.length ||
+    !hourly.temperature_2m?.length ||
+    !hourly.precipitation_probability?.length ||
+    !hourly.weather_code?.length ||
+    !hourly.wind_speed_10m?.length
+  ) {
+    throw new Error("Open-Meteo returned incomplete forecast fields.");
+  }
+
+  const arrivalIndex = hourly.time.findIndex((time) => {
+    if (arrivalDate && !time.startsWith(arrivalDate)) return false;
     const hour = Number(time.slice(11, 13));
     return hour === arrivalHour;
   });
-  if (arrivalIndex < 0) arrivalIndex = 0;
-
-  const hourlyTemps = data.hourly?.temperature_2m ?? [];
-  const hourlyPrecip = data.hourly?.precipitation_probability ?? [];
-  const hourlyCodes = data.hourly?.weather_code ?? [];
-  const hourlyWind = data.hourly?.wind_speed_10m ?? [];
+  if (arrivalIndex < 0) {
+    throw new Error("Open-Meteo has no hourly forecast for the arrival time.");
+  }
 
   const hourlyForecast: HourlyForecast[] = [];
   for (let offset = -1; offset <= 5; offset += 1) {
-    const index = Math.min(
-      Math.max(0, arrivalIndex + offset),
-      Math.max(0, hourlyTimes.length - 1),
-    );
-    if (!hourlyTimes.length) break;
-    const tempC = Math.round(hourlyTemps[index] ?? data.current?.temperature_2m ?? airport.weather.tempC);
+    const index = arrivalIndex + offset;
+    if (index < 0 || index >= hourly.time.length) continue;
+    const tempC = hourly.temperature_2m[index];
+    const precip = hourly.precipitation_probability[index];
+    const code = hourly.weather_code[index];
+    const wind = hourly.wind_speed_10m[index];
+    if (
+      tempC == null ||
+      precip == null ||
+      code == null ||
+      wind == null
+    ) {
+      throw new Error("Open-Meteo returned an incomplete hourly row.");
+    }
     hourlyForecast.push({
-      time:
-        hourlyTimes[index]?.slice(11, 16) ??
-        `${String(arrivalHour).padStart(2, "0")}:00`,
-      tempC,
+      time: hourly.time[index].slice(11, 16),
+      tempC: Math.round(tempC),
       tempF: Math.round((tempC * 9) / 5 + 32),
-      condition: conditionFromWmo(hourlyCodes[index]),
-      precipProbabilityPercent: Math.round(hourlyPrecip[index] ?? 0),
-      windSpeedKnots: Math.round(hourlyWind[index] ?? 10),
+      condition: conditionFromWmo(code),
+      precipProbabilityPercent: Math.round(precip),
+      windSpeedKnots: Math.round(wind),
       isArrivalTarget: offset === 0,
     });
   }
-
   if (!hourlyForecast.length) {
-    hourlyForecast.push({
-      time: arrivalTime,
-      tempC: airport.weather.tempC,
-      tempF: airport.weather.tempF,
-      condition: airport.weather.condition,
-      precipProbabilityPercent: 10,
-      windSpeedKnots: 10,
-      isArrivalTarget: true,
-    });
+    throw new Error("Open-Meteo has no usable hourly forecast.");
   }
 
   const dailyTimes = data.daily?.time ?? [];
@@ -191,40 +205,44 @@ export function mapOpenMeteoToForecast(
   const dailyMax = data.daily?.temperature_2m_max ?? [];
   const dailyMin = data.daily?.temperature_2m_min ?? [];
   const dailyPrecip = data.daily?.precipitation_probability_max ?? [];
-
-  const dailyForecast: DailyForecast[] = dailyTimes.slice(0, 4).map((date, index) => {
-    const high = Math.round(dailyMax[index] ?? airport.weather.tempC + 3);
-    const low = Math.round(dailyMin[index] ?? airport.weather.tempC - 4);
-    const precip = Math.round(dailyPrecip[index] ?? 0);
-    const condition = conditionFromWmo(dailyCodes[index]);
-    return {
-      dayName: formatDay(date, index),
-      dateString: new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
-      tempHighC: high,
-      tempHighF: Math.round((high * 9) / 5 + 32),
-      tempLowC: low,
-      tempLowF: Math.round((low * 9) / 5 + 32),
-      condition,
-      precipProbabilityPercent: precip,
-      packingTip: packingAdviceFor(low, precip, condition),
-    };
-  });
+  const dailyForecast: DailyForecast[] = dailyTimes
+    .slice(0, 4)
+    .flatMap((date, index) => {
+      const high = dailyMax[index];
+      const low = dailyMin[index];
+      const precip = dailyPrecip[index];
+      const code = dailyCodes[index];
+      if (high == null || low == null || precip == null || code == null) {
+        return [];
+      }
+      const condition = conditionFromWmo(code);
+      return [
+        {
+          dayName: formatDay(date, index),
+          dateString: new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+          tempHighC: Math.round(high),
+          tempHighF: Math.round((high * 9) / 5 + 32),
+          tempLowC: Math.round(low),
+          tempLowF: Math.round((low * 9) / 5 + 32),
+          condition,
+          precipProbabilityPercent: Math.round(precip),
+          packingTip: packingAdviceFor(low, precip, condition),
+        },
+      ];
+    });
 
   const target = hourlyForecast.find((hour) => hour.isArrivalTarget) ?? hourlyForecast[0];
-  const visibilityMeters = data.current?.visibility;
+  const visibilityMeters = current.visibility;
   const category = determineFlightCategory(
     visibilityMeters,
-    data.current?.weather_code,
+    current.weather_code,
   );
-  const crosswindKnots = crosswindFor(airport.code);
-  const windDirection = data.current?.wind_direction_10m ?? 270;
-  const windSpeed = Math.round(data.current?.wind_speed_10m ?? 10);
-  const humidity = Math.round(
-    data.current?.relative_humidity_2m ?? airport.weather.humidity,
-  );
+  const windDirection = Math.round(current.wind_direction_10m);
+  const windSpeed = Math.round(current.wind_speed_10m);
+  const humidity = Math.round(current.relative_humidity_2m);
   const precip = Math.round(target.precipProbabilityPercent);
   const condition = target.condition;
 
@@ -238,168 +256,55 @@ export function mapOpenMeteoToForecast(
     arrivalCondition: condition,
     precipitationChance: precip,
     windCondition: `${windSpeed} kt from ${windDirection}°`,
-    visibility:
-      visibilityMeters != null
-        ? `${(visibilityMeters / 1609.34).toFixed(1)} mi`
-        : airport.weather.visibility,
+    visibility: `${(visibilityMeters / 1609.34).toFixed(1)} mi`,
     humidity,
     hourlyForecast,
     dailyForecast,
     advisory: {
       flightCategory: category,
-      crosswindKnots,
-      crosswindRisk:
-        crosswindKnots >= 18
-          ? "Moderate crosswind caution"
-          : crosswindKnots >= 12
-            ? "Standard approach winds"
-            : "Light crosswinds · smooth final",
-      runwayVisualRange:
-        category.startsWith("IFR")
-          ? "RVR 1,800–2,600 ft"
-          : category.startsWith("MVFR")
-            ? "RVR 3,200–4,500 ft"
-            : "RVR > 6,000 ft",
-      arrivalNotice:
-        precip >= 60
-          ? "Expect reduced arrival spacing and possible gate holding during precipitation."
-          : category.startsWith("IFR")
-            ? "Low-visibility approach procedures active. Taxi-in may take longer than scheduled."
-            : "Normal arrival operations expected. Gate and baggage timing on profile.",
+      // Open-Meteo does not provide runway heading, crosswind components,
+      // RVR, or operational arrival notices. These stay unavailable.
+      crosswindKnots: null,
+      crosswindRisk: null,
+      runwayVisualRange: null,
+      arrivalNotice: null,
     },
-    packingAdvice: packingAdviceFor(
-      target.tempC,
-      precip,
-      condition,
-    ),
+    packingAdvice: packingAdviceFor(target.tempC, precip, condition),
     lastUpdated: Date.now(),
     isEstimated: false,
-  };
-}
-
-export function generateFallbackForecast(
-  airport: Airport,
-  arrivalTime: string,
-): DestinationArrivalForecast {
-  const arrivalHour = parseArrivalHour(arrivalTime);
-  const isNight = arrivalHour < 6 || arrivalHour > 21;
-  const adjustment = isNight ? -3 : 1;
-  const base = airport.weather;
-  const arrivalTempC = base.tempC + adjustment;
-  const arrivalTempF = Math.round((arrivalTempC * 9) / 5 + 32);
-  const conditionLower = base.condition.toLowerCase();
-  const precipChance = conditionLower.includes("rain") || conditionLower.includes("drizzle")
-    ? 75
-    : conditionLower.includes("thunder")
-      ? 90
-      : conditionLower.includes("fog")
-        ? 40
-        : conditionLower.includes("cloud")
-          ? 20
-          : 5;
-  const category = conditionLower.includes("thunder")
-    ? "IFR (Instrument Flight Rules)"
-    : conditionLower.includes("fog") || conditionLower.includes("rain")
-      ? "MVFR (Marginal VFR)"
-      : "VFR (Visual Flight Rules)";
-  const crosswind = crosswindFor(airport.code);
-
-  const hourlyForecast: HourlyForecast[] = Array.from({ length: 6 }, (_, index) => {
-    const hour = (arrivalHour + index - 1 + 24) % 24;
-    const temp = arrivalTempC + (index % 3) - 1;
-    return {
-      time: `${String(hour).padStart(2, "0")}:00`,
-      tempC: temp,
-      tempF: Math.round((temp * 9) / 5 + 32),
-      condition: base.condition,
-      precipProbabilityPercent: Math.max(0, precipChance - index * 4),
-      windSpeedKnots: 8 + index * 2,
-      isArrivalTarget: index === 1,
-    };
-  });
-
-  const dailyForecast: DailyForecast[] = Array.from({ length: 4 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() + index);
-    const high = base.tempC + 3 - index;
-    const low = base.tempC - 4 - index;
-    return {
-      dayName: index === 0 ? "Today" : date.toLocaleDateString("en-US", { weekday: "short" }),
-      dateString: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      tempHighC: high,
-      tempHighF: Math.round((high * 9) / 5 + 32),
-      tempLowC: low,
-      tempLowF: Math.round((low * 9) / 5 + 32),
-      condition: base.condition,
-      precipProbabilityPercent: precipChance,
-      packingTip: packingAdviceFor(low, precipChance, base.condition),
-    };
-  });
-
-  return {
-    airportCode: airport.code,
-    airportName: airport.name,
-    airportCity: airport.city,
-    arrivalTime,
-    arrivalTempC,
-    arrivalTempF,
-    arrivalCondition: base.condition,
-    precipitationChance: precipChance,
-    windCondition: base.wind,
-    visibility: base.visibility,
-    humidity: base.humidity,
-    hourlyForecast,
-    dailyForecast,
-    advisory: {
-      flightCategory: category,
-      crosswindKnots: crosswind,
-      crosswindRisk:
-        crosswind >= 18
-          ? "Moderate crosswind caution"
-          : crosswind >= 12
-            ? "Standard approach winds"
-            : "Light crosswinds · smooth final",
-      runwayVisualRange: category.startsWith("IFR")
-        ? "RVR 1,800–2,600 ft"
-        : "RVR > 6,000 ft",
-      arrivalNotice:
-        precipChance >= 60
-          ? "Precipitation may reduce arrival throughput. Monitor gate assignments."
-          : "Normal arrival operations expected.",
-    },
-    packingAdvice: packingAdviceFor(arrivalTempC, precipChance, base.condition),
-    lastUpdated: Date.now(),
-    // This path is used when the Open-Meteo call fails: it models conditions
-    // from cached values, so the UI must never present it as live data.
-    isEstimated: true,
   };
 }
 
 export async function fetchDestinationForecast(
   airport: Airport,
   arrivalTime: string,
+  arrivalDate?: string,
 ): Promise<DestinationArrivalForecast> {
-  try {
-    const params = new URLSearchParams({
-      lat: String(airport.latitude),
-      lon: String(airport.longitude),
-      code: airport.code,
-      name: airport.name,
-      city: airport.city,
-      country: airport.country,
-      arrival: arrivalTime,
-      tempC: String(airport.weather.tempC),
-      tempF: String(airport.weather.tempF),
-      condition: airport.weather.condition,
-      wind: airport.weather.wind,
-      visibility: airport.weather.visibility,
-      humidity: String(airport.weather.humidity),
-    });
-    const response = await fetch(`/api/weather?${params.toString()}`);
-    if (!response.ok) throw new Error("Weather request failed");
-    const data = (await response.json()) as { forecast: DestinationArrivalForecast };
-    return data.forecast;
-  } catch {
-    return generateFallbackForecast(airport, arrivalTime);
+  if (!/^\d{1,2}:\d{2}$/.test(arrivalTime)) {
+    throw new Error(
+      "The provider did not report a usable estimated arrival time, so no arrival forecast is shown.",
+    );
   }
+  const params = new URLSearchParams({
+    lat: String(airport.latitude),
+    lon: String(airport.longitude),
+    code: airport.code,
+    name: airport.name,
+    city: airport.city,
+    country: airport.country,
+    arrival: arrivalTime,
+    ...(arrivalDate ? { date: arrivalDate } : {}),
+  });
+  const response = await fetch(`/api/weather?${params.toString()}`, {
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as
+    | { forecast?: DestinationArrivalForecast; error?: string }
+    | null;
+  if (!response.ok || !data?.forecast) {
+    throw new Error(
+      data?.error ?? "Open-Meteo arrival weather is temporarily unavailable.",
+    );
+  }
+  return data.forecast;
 }

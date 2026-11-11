@@ -627,36 +627,57 @@ private fun RealtimeAirportCard(
                     }
                 }
 
-                // Flight Category Badge (VFR/MVFR/IFR)
-                val categoryColor = when (airport.weather.flightCategory) {
-                    FlightCategory.VFR -> StatusLanded
-                    FlightCategory.MVFR -> StatusDelayed
-                    FlightCategory.IFR -> StatusCancelled
-                }
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = categoryColor.copy(alpha = 0.2f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, categoryColor)
-                ) {
-                    Text(
-                        text = airport.weather.flightCategory.name,
-                        color = categoryColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                // Flight Category Badge (VFR/MVFR/IFR) only when observed.
+                if (airport.weather.reported) {
+                    val categoryColor = when (airport.weather.flightCategory) {
+                        FlightCategory.VFR -> StatusLanded
+                        FlightCategory.MVFR -> StatusDelayed
+                        FlightCategory.IFR -> StatusCancelled
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = categoryColor.copy(alpha = 0.2f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, categoryColor)
+                    ) {
+                        Text(
+                            text = airport.weather.flightCategory.name,
+                            color = categoryColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = TextSubtle.copy(alpha = 0.1f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TextSubtle.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = "WX N/R",
+                            color = TextSubtle,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Operational Status Bar
+            // Operational status is shown only when a provider reported it.
+            val statusColor = when {
+                !airport.statusReported -> TextSubtle
+                airport.isDelayed -> StatusCancelled
+                else -> StatusLanded
+            }
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = if (airport.isDelayed) StatusCancelled.copy(alpha = 0.15f) else StatusLanded.copy(alpha = 0.12f),
+                color = statusColor.copy(alpha = 0.12f),
                 border = androidx.compose.foundation.BorderStroke(
                     0.8.dp,
-                    if (airport.isDelayed) StatusCancelled.copy(alpha = 0.5f) else StatusLanded.copy(alpha = 0.4f)
+                    statusColor.copy(alpha = 0.4f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -666,14 +687,22 @@ private fun RealtimeAirportCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = if (airport.isDelayed) Icons.Default.Warning else Icons.Default.CheckCircle,
+                        imageVector = when {
+                            !airport.statusReported -> Icons.Default.Info
+                            airport.isDelayed -> Icons.Default.Warning
+                            else -> Icons.Default.CheckCircle
+                        },
                         contentDescription = null,
-                        tint = if (airport.isDelayed) StatusCancelled else StatusLanded,
+                        tint = statusColor,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = airport.operationalStatus,
-                        color = if (airport.isDelayed) StatusCancelled else StatusLanded,
+                        text = if (airport.statusReported) {
+                            airport.operationalStatus
+                        } else {
+                            "Status not reported"
+                        },
+                        color = statusColor,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -689,27 +718,47 @@ private fun RealtimeAirportCard(
             ) {
                 MetricColumn(
                     title = "Departures",
-                    value = "${airport.activeDeparturesCount} active",
+                    value = if (airport.statusReported) {
+                        "${airport.activeDeparturesCount} active"
+                    } else {
+                        "—"
+                    },
                     icon = Icons.Default.FlightTakeoff,
                     tint = RadarCyan
                 )
                 MetricColumn(
                     title = "Arrivals",
-                    value = "${airport.activeArrivalsCount} active",
+                    value = if (airport.statusReported) {
+                        "${airport.activeArrivalsCount} active"
+                    } else {
+                        "—"
+                    },
                     icon = Icons.Default.FlightLand,
                     tint = StatusLanded
                 )
                 MetricColumn(
                     title = "Weather",
-                    value = "${airport.weather.tempC}°C / ${airport.weather.tempF}°F",
+                    value = if (airport.weather.reported) {
+                        "${airport.weather.tempC}°C / ${airport.weather.tempF}°F"
+                    } else {
+                        "—"
+                    },
                     icon = Icons.Default.WbSunny,
                     tint = StatusDelayed
                 )
                 MetricColumn(
                     title = "On-Time",
-                    value = "${airport.onTimePercentage}%",
+                    value = if (airport.statusReported) {
+                        "${airport.onTimePercentage}%"
+                    } else {
+                        "—"
+                    },
                     icon = Icons.Default.Speed,
-                    tint = if (airport.onTimePercentage >= 90) StatusLanded else StatusDelayed
+                    tint = if (airport.statusReported && airport.onTimePercentage >= 90) {
+                        StatusLanded
+                    } else {
+                        TextSubtle
+                    }
                 )
             }
 
@@ -823,23 +872,20 @@ private fun AirportDetailModal(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "METAR TELEMETRY",
+                            text = "OPEN-METEO CURRENT CONDITIONS",
                             color = RadarCyan,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = airport.weather.metarRaw,
-                            color = TextWhite,
-                            fontSize = 12.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Condition: ${airport.weather.condition} · Wind: ${airport.weather.wind} · Vis: ${airport.weather.visibility}",
-                            color = TextMuted,
-                            fontSize = 11.sp
+                            text = if (airport.weather.reported) {
+                                "Condition: ${airport.weather.condition} · Wind: ${airport.weather.wind} · Vis: ${airport.weather.visibility}"
+                            } else {
+                                "Weather not reported. No model values are shown as observations."
+                            },
+                            color = if (airport.weather.reported) TextWhite else TextMuted,
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -860,7 +906,11 @@ private fun AirportDetailModal(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = airport.activeRunways.joinToString("  •  "),
+                            text = if (airport.statusReported && airport.activeRunways.isNotEmpty()) {
+                                airport.activeRunways.joinToString("  •  ")
+                            } else {
+                                "Not reported"
+                            },
                             color = TextWhite,
                             fontSize = 12.sp
                         )

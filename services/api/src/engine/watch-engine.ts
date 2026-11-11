@@ -363,10 +363,14 @@ export class WatchEngine {
           await this.persistSchedule(
             pending.flatMap((job) => job.rows),
           );
-          // Jobs handled by the board never re-enter the per-flight pass.
-          for (const job of group) fidsCovered.add(job);
+          // Only jobs with a verified matching summary are covered by the
+          // board. Unmatched jobs must fall through to the per-flight pass;
+          // an empty or partial board is not evidence that they were refreshed.
+          for (const job of group) {
+            if (!pending.includes(job)) fidsCovered.add(job);
+          }
           this.log.debug(
-            { origin, jobs: pending.length },
+            { origin, refreshed: group.length - pending.length, unmatched: pending.length },
             "watch engine refreshed via airport board",
           );
         } catch (error) {

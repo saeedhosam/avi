@@ -33,6 +33,32 @@ fun DestinationArrivalWeatherCard(
     forecast: DestinationArrivalForecast,
     modifier: Modifier = Modifier
 ) {
+    if (!forecast.dataAvailable) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, InstrumentBorder, RoundedCornerShape(18.dp)),
+            colors = CardDefaults.cardColors(containerColor = CockpitDark)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Destination Arrival Weather",
+                    color = TextWhite,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Forecast unavailable. No estimated weather was generated.",
+                    color = TextMuted,
+                    fontSize = 12.sp
+                )
+            }
+        }
+        return
+    }
+
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Hourly at Arrival, 1: 3-Day Outlook, 2: Airport Advisories
 
     Card(

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 data class CachedFlightEntity(
     @PrimaryKey val id: String,
     val flightNumber: String,
+    val flightDate: String? = null,
     val airline: String,
     val airlineCode: String,
     val originCode: String,

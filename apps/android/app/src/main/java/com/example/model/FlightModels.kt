@@ -34,16 +34,18 @@ data class Airport(
     val timezone: String,
     val latitude: Double,
     val longitude: Double,
-    val weather: AirportWeather
+    val weather: AirportWeather,
+    /** False when weather values are placeholders, not an observation. */
+    val weatherReported: Boolean = false
 )
 
 data class AircraftInfo(
     val model: String,
     val registration: String,
-    val age: String,
-    val wifiAvailable: Boolean = true,
-    val powerOutlets: Boolean = true,
-    val seatLayout: String = "3-Class (Business, Premium, Economy)"
+    val age: String? = null,
+    val wifiAvailable: Boolean? = null,
+    val powerOutlets: Boolean? = null,
+    val seatLayout: String? = null
 )
 
 // Single unified watchlist concept: any favorite is tracked too, so both
@@ -69,7 +71,10 @@ data class FlightTelemetry(
     val distanceCoveredNm: Int,
     val distanceRemainingNm: Int,
     val etaMinutesRemaining: Int,
-    val waypoints: List<Waypoint>
+    val waypoints: List<Waypoint>,
+    /** True only when the provider supplied a live aircraft position. */
+    val hasLiveLocation: Boolean = false,
+    val fetchedAt: String? = null
 )
 
 data class FlightTimelineEvent(
@@ -95,8 +100,12 @@ data class Flight(
     val arrivalTimeEstimated: String,
     val arrivalTimeActual: String? = null,
     val status: FlightStatus,
+    /** False when the provider did not report a status. */
+    val statusReported: Boolean = true,
     val statusNote: String = "",
     val delayMinutes: Int = 0,
+    /** False when no delay duration was reported. */
+    val delayReported: Boolean = true,
     val delayReason: String? = null,
     val terminalDeparture: String,
     val gateDeparture: String,
@@ -109,7 +118,9 @@ data class Flight(
     val timeline: List<FlightTimelineEvent>,
     val isFavorite: Boolean = false,
     val isTracked: Boolean = false,
-    val customNotes: String = ""
+    val customNotes: String = "",
+    val source: String? = null,
+    val fetchedAt: String? = null
 )
 
 enum class AlertType {

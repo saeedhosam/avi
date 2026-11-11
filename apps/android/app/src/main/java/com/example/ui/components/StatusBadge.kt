@@ -23,13 +23,16 @@ import com.example.model.FlightStatus
 fun StatusBadge(
     status: FlightStatus,
     modifier: Modifier = Modifier,
-    delayMinutes: Int = 0
+    delayMinutes: Int = 0,
+    statusReported: Boolean = true,
+    delayReported: Boolean = true
 ) {
     val badgeColor by animateColorAsState(targetValue = status.color, label = "badgeColor")
-    val text = if (status == FlightStatus.DELAYED && delayMinutes > 0) {
-        "+${delayMinutes}m Delayed"
-    } else {
-        status.label
+    val text = when {
+        !statusReported -> "Status not reported"
+        status == FlightStatus.DELAYED && delayReported && delayMinutes > 0 ->
+            "+${delayMinutes}m Delayed"
+        else -> status.label
     }
 
     Row(

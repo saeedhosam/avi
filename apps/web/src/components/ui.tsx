@@ -104,13 +104,30 @@ export function IconButton({
 
 export function StatusBadge({
   status,
+  statusReported = true,
   delayMinutes = 0,
+  delayReported = true,
   className,
 }: {
   status: FlightStatus;
+  statusReported?: boolean;
   delayMinutes?: number;
+  delayReported?: boolean;
   className?: string;
 }) {
+  if (!statusReported) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface-2 px-2 py-1 text-[11px] font-semibold leading-none text-subtle",
+          className,
+        )}
+      >
+        <span className="size-1.5 rounded-full bg-subtle" />
+        Status not reported
+      </span>
+    );
+  }
   const meta = STATUS_META[status];
   return (
     <span
@@ -131,7 +148,7 @@ export function StatusBadge({
         )}
         style={{ backgroundColor: meta.color }}
       />
-      {statusLabel(status, delayMinutes)}
+      {statusLabel(status, delayReported ? delayMinutes : 0)}
     </span>
   );
 }

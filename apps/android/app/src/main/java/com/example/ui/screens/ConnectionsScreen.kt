@@ -1266,7 +1266,11 @@ private fun SelectedRouteInspectorPanel(
                                         border = BorderStroke(1.dp, AeroBlue.copy(alpha = 0.45f))
                                     ) {
                                         Text(
-                                            text = "${route.dailyFlightsCount}x DAILY",
+                                            text = if (route.dailyFlightsCount > 0) {
+                                                "${route.dailyFlightsCount}x DAILY (7d avg)"
+                                            } else {
+                                                "FREQUENCY N/R"
+                                            },
                                             color = AeroBlue,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
@@ -1367,7 +1371,11 @@ private fun SelectedRouteInspectorPanel(
                                             }
                                             Column {
                                                 Text(
-                                                    text = "${carrier.airlineName} (${carrier.dailyFrequencies}x/d)",
+                                                    text = if (carrier.dailyFrequencies > 0) {
+                                                        "${carrier.airlineName} (${carrier.dailyFrequencies}x/d)"
+                                                    } else {
+                                                        "${carrier.airlineName} · frequency not reported"
+                                                    },
                                                     color = TextWhite,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -1375,7 +1383,12 @@ private fun SelectedRouteInspectorPanel(
                                                     softWrap = false
                                                 )
                                                 Text(
-                                                    text = "${carrier.flightNumbers.take(2).joinToString(", ")} · ${carrier.aircraftTypes.firstOrNull() ?: "Jet"}",
+                                                    text = listOfNotNull(
+                                                        carrier.flightNumbers.take(2)
+                                                            .joinToString(", ")
+                                                            .takeIf { it.isNotBlank() },
+                                                        carrier.aircraftTypes.firstOrNull()
+                                                    ).joinToString(" · ").ifBlank { "Flight number/aircraft not reported" },
                                                     color = TextMuted,
                                                     fontSize = 9.sp,
                                                     maxLines = 1,

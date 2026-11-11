@@ -13,7 +13,7 @@ function createSeat(
     recline: number;
     isExitRow?: boolean;
     isBulkhead?: boolean;
-    status?: "AVAILABLE" | "OCCUPIED" | "SELECTED" | "BLOCKED";
+    status?: "AVAILABLE" | "OCCUPIED" | "SELECTED" | "BLOCKED" | "UNKNOWN";
     extraFeatures?: SeatFeature[];
     rating?: "GOOD" | "STANDARD" | "CAUTION";
     notes?: string;
@@ -57,7 +57,8 @@ function createSeat(
     isMiddle,
     isExitRow: options.isExitRow,
     isBulkhead: options.isBulkhead,
-    status: options.status ?? (Math.random() > 0.4 ? "AVAILABLE" : "OCCUPIED"),
+    // Seat inventory is not connected. Never generate availability.
+    status: options.status ?? "UNKNOWN",
     pitchInches: options.pitch,
     widthInches: options.width,
     reclineInches: options.recline,
@@ -599,14 +600,18 @@ export const AIRCRAFT_PRESETS: AircraftCabinSpec[] = [
   buildQatarA350(),
 ];
 
-export function getAircraftById(id: string): AircraftCabinSpec {
+export function getAircraftById(id: string): AircraftCabinSpec | null {
   return (
     AIRCRAFT_PRESETS.find((spec) => spec.id.toLowerCase() === id.toLowerCase()) ??
-    AIRCRAFT_PRESETS[0]
+    null
   );
 }
 
-export function findAircraft(airlineCode?: string, model?: string): AircraftCabinSpec {
+export function findAircraft(
+  airlineCode?: string,
+  model?: string,
+): AircraftCabinSpec | null {
+  if (!airlineCode && !model) return null;
   if (airlineCode) {
     const code = airlineCode.toUpperCase();
     const matched = AIRCRAFT_PRESETS.find((a) => a.airlineCode === code);
@@ -614,7 +619,9 @@ export function findAircraft(airlineCode?: string, model?: string): AircraftCabi
       if (model) {
         const cleanModel = model.toLowerCase();
         const modelMatch = AIRCRAFT_PRESETS.find(
-          (a) => a.airlineCode === code && a.aircraftModel.toLowerCase().includes(cleanModel),
+          (a) =>
+            a.airlineCode === code &&
+            a.aircraftModel.toLowerCase().includes(cleanModel),
         );
         if (modelMatch) return modelMatch;
       }
@@ -628,5 +635,5 @@ export function findAircraft(airlineCode?: string, model?: string): AircraftCabi
     );
     if (match) return match;
   }
-  return AIRCRAFT_PRESETS[0];
+  return null;
 }

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   classifyHaul,
   clamp,
-  estimateDurationMinutes,
   flightDateLabel,
   formatDuration,
   geodesicDistanceKm,
@@ -46,15 +45,6 @@ describe("Web Utils", () => {
       expect(classifyHaul(1500)).toBe("MEDIUM_HAUL");
       expect(classifyHaul(4000)).toBe("MEDIUM_HAUL");
       expect(classifyHaul(4001)).toBe("LONG_HAUL");
-    });
-  });
-
-  describe("estimateDurationMinutes", () => {
-    it("computes reasonable duration with minimum floor", () => {
-      expect(estimateDurationMinutes(100)).toBe(45); // clamped to floor 45 min
-      const transat = estimateDurationMinutes(5500);
-      expect(transat).toBeGreaterThan(400);
-      expect(transat).toBeLessThan(500);
     });
   });
 

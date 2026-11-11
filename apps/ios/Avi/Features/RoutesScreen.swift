@@ -50,6 +50,13 @@ public struct RoutesScreen: View {
             AviTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                Text("Sample route data — not live. Use the web app for verified provider data.")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AviTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
                 // Search Field
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")

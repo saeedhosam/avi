@@ -129,7 +129,10 @@ export function AirportGroundsMap({
           <span className="font-mono text-accent">Z{currentZoom}</span>
         </div>
         <div className="hidden rounded-lg border border-line/80 bg-surface/90 px-2.5 py-1 font-mono text-[9px] text-muted shadow-lg backdrop-blur sm:block">
-          {airport.latitude.toFixed(4)}°N, {airport.longitude.toFixed(4)}°E
+          {Math.abs(airport.latitude).toFixed(4)}°
+          {airport.latitude >= 0 ? "N" : "S"},{" "}
+          {Math.abs(airport.longitude).toFixed(4)}°
+          {airport.longitude >= 0 ? "E" : "W"}
         </div>
       </div>
 

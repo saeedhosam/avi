@@ -56,8 +56,12 @@ data class ConsoleFlightDto(
     val arrivalTimeEstimated: String = "",
     val arrivalTimeActual: String? = null,
     val status: String = "",
+    val statusReported: Boolean = true,
+    val statusRaw: String = "",
     val statusNote: String = "",
     val delayMinutes: Int = 0,
+    val delayReported: Boolean = true,
+    val delaySource: String = "unknown",
     val delayReason: String? = null,
     val terminalDeparture: String = "",
     val gateDeparture: String = "",
@@ -68,7 +72,9 @@ data class ConsoleFlightDto(
     val aircraft: ConsoleAircraftDto? = null,
     val telemetry: ConsoleTelemetryDto? = null,
     val timeline: List<ConsoleTimelineDto> = emptyList(),
-    val customNotes: String = ""
+    val customNotes: String = "",
+    val source: String? = null,
+    val fetchedAt: String? = null
 )
 
 @JsonClass(generateAdapter = false)
@@ -80,7 +86,8 @@ data class ConsoleAirportDto(
     val timezone: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
-    val weather: ConsoleAirportWeatherDto? = null
+    val weather: ConsoleAirportWeatherDto? = null,
+    val weatherReported: Boolean = false
 )
 
 @JsonClass(generateAdapter = false)
@@ -167,12 +174,13 @@ data class ConsoleRouteOperator(
 fun ConsoleAirportDto.toDomainAirport(): Airport = Airport(
     code = code,
     name = name.ifBlank { code },
-    city = city.ifBlank { code },
+    city = city.ifBlank { "" },
     country = country,
-    timezone = timezone.ifBlank { "UTC" },
+    timezone = timezone,
     latitude = latitude,
     longitude = longitude,
-    weather = weather.toDomainWeather()
+    weather = weather.toDomainWeather(),
+    weatherReported = weatherReported
 )
 
 private fun ConsoleAirportWeatherDto?.toDomainWeather(): AirportWeather = AirportWeather(
@@ -208,8 +216,10 @@ fun ConsoleFlightDto.toDomainFlight(): Flight? {
         arrivalTimeEstimated = arrivalTimeEstimated,
         arrivalTimeActual = arrivalTimeActual,
         status = mapConsoleStatus(status),
+        statusReported = statusReported,
         statusNote = statusNote,
         delayMinutes = delayMinutes,
+        delayReported = delayReported,
         delayReason = delayReason,
         terminalDeparture = terminalDeparture,
         gateDeparture = gateDeparture,
@@ -228,7 +238,9 @@ fun ConsoleFlightDto.toDomainFlight(): Flight? {
                 description = event.description
             )
         },
-        customNotes = customNotes
+        customNotes = customNotes,
+        source = source,
+        fetchedAt = fetchedAt
     )
 }
 
@@ -253,5 +265,6 @@ private fun ConsoleTelemetryDto?.toDomainTelemetry(): FlightTelemetry = FlightTe
     distanceCoveredNm = this?.distanceCoveredNm ?: 0,
     distanceRemainingNm = this?.distanceRemainingNm ?: 0,
     etaMinutesRemaining = this?.etaMinutesRemaining ?: 0,
-    waypoints = emptyList()
+    waypoints = emptyList(),
+    hasLiveLocation = this?.hasLiveLocation ?: false
 )

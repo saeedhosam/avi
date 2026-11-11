@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   inferRegionFromCoords,
   mapConsoleFids,
@@ -48,7 +48,7 @@ describe("console flight mapping (parity with the web client)", () => {
   it("maps a departure DTO with schedule, delay, gates, and operating date", () => {
     const flight = mapConsoleFlight(departureDto);
     expect(flight).not.toBeNull();
-    expect(flight!.id).toBe("AA100");
+    expect(flight!.id).toBe("AA100-2026-11-08");
     expect(flight!.flightDate).toBe("2026-11-08");
     expect(flight!.flightNumber).toBe("AA 100");
     expect(flight!.airline).toBe("American Airlines");
@@ -76,11 +76,15 @@ describe("console flight mapping (parity with the web client)", () => {
     expect(flights[0]!.origin.code).toBe("JFK");
   });
 
-  it("builds a timeline with gate assignment events", () => {
+  it("does not invent gate-assignment timeline events", () => {
     const flight = mapConsoleFlight(departureDto)!;
     const titles = flight.timeline.map((event) => event.title);
     expect(titles).toContain("Scheduled departure");
-    expect(titles).toContain("Departure gate assigned");
+    expect(titles).not.toContain("Departure gate assigned");
+    expect(flight.statusReported).toBe(true);
+    expect(flight.statusRaw).toBe("Delayed");
+    // The provider does not report a delay reason.
+    expect(flight.delayReason).toBeNull();
   });
 
   it("infers the same regions as the web catalog helper", () => {
@@ -106,5 +110,29 @@ describe("ConsoleFlightProvider", () => {
     );
     expect(unconfigured.configured).toBe(false);
     expect(configuredProvider.configured).toBe(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does not report a provider 404 as live empty data", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 404 })),
+    );
+    const outcome = await configuredProvider.lookupAirportRoutes("XXX");
+    expect(outcome.mode).toBe("NOT_FOUND");
+    expect(outcome.routes).toEqual([]);
+  });
+
+  it("does not report a provider 204 as a verified route list", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
+    const outcome = await configuredProvider.lookupAirportRoutes("CAI");
+    expect(outcome.status).toBe(204);
+    expect(outcome.routes).toEqual([]);
   });
 });

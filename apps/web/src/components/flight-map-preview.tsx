@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Fullscreen, LocateFixed, MapPinned, Minimize2 } from "lucide-react";
 import type { Flight } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, isFreshTimestamp } from "@/lib/utils";
 
 /** MapLibre is heavy; load it only when a map is actually on screen. */
 const FlightMap = dynamic(() => import("./flight-map").then((m) => m.FlightMap), {
@@ -30,6 +30,9 @@ export function FlightMapPreview({
   hideControls?: boolean;
 }) {
   const [recenterSignal, setRecenterSignal] = useState(0);
+  const isLive =
+    Boolean(flight.telemetry.hasLiveLocation) &&
+    isFreshTimestamp(flight.fetchedAt);
 
   return (
     <div
@@ -76,7 +79,7 @@ export function FlightMapPreview({
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-md border border-line/60 bg-surface/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted shadow-sm backdrop-blur">
         <MapPinned className="size-3 text-accent" />
-        Live flight map
+        {isLive ? "Live flight map" : "Route map · position not reported"}
       </div>
     </div>
   );

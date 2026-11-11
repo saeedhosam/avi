@@ -42,7 +42,7 @@ export default function AirplanesPage() {
   const [aircraftPickerOpen, setAircraftPickerOpen] = useState(false);
   const [seatSearch, setSeatSearch] = useState("");
 
-  const aircraft = useMemo<AircraftCabinSpec>(
+  const aircraft = useMemo<AircraftCabinSpec | null>(
     () => getAircraftById(selectedAircraftId),
     [selectedAircraftId],
   );
@@ -64,13 +64,14 @@ export default function AirplanesPage() {
   }, []);
 
   const visibleRows = useMemo(() => {
+    if (!aircraft) return [];
     if (activeCabinFilter === "ALL") return aircraft.rows;
     return aircraft.rows.filter((r) => r.cabin === activeCabinFilter);
   }, [aircraft, activeCabinFilter]);
 
   const handleSeatSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!seatSearch.trim()) return;
+    if (!seatSearch.trim() || !aircraft) return;
     const clean = seatSearch.trim().toUpperCase();
     for (const r of aircraft.rows) {
       const match = r.seats.find((s) => s.id === clean);
@@ -83,16 +84,47 @@ export default function AirplanesPage() {
     }
   };
 
+  if (!aircraft) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <Panel className="p-6 text-center">
+          <p className="text-sm font-bold text-ink">Seatmap unavailable</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Avi does not have an illustrative configuration for this aircraft.
+            No substitute aircraft is shown.
+          </p>
+          <Link href="/airports" className="mt-3 inline-block">
+            <Button size="sm" variant="outline">
+              Back to airports
+            </Button>
+          </Link>
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-[1680px] px-4 py-4 lg:px-6">
+      <div className="mb-3 flex items-start gap-2 rounded-xl border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
+        <Info className="mt-0.5 size-3.5 shrink-0 text-delayed" />
+        <span>
+          This page is an illustrative aircraft and seat configuration reference.
+          It is not tied to your flight, and seat availability, Wi-Fi, and
+          passenger reviews are not live data.
+        </span>
+      </div>
+
       {/* Top Header */}
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="label-caps text-accent">Aircraft Cabin Radar & Seat Configuration</p>
           <h2 className="mt-1 flex items-center gap-2 text-xl font-black tracking-tight text-ink">
             {aircraft.airlineName} {aircraft.aircraftModel}
-            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-bold text-accent">
-              {aircraft.tailNumberSample}
+            <span
+              className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-bold text-accent"
+              title="Sample registration, not this flight's aircraft"
+            >
+              SAMPLE · {aircraft.tailNumberSample}
             </span>
             <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 text-[8px] font-bold text-subtle">
               {aircraft.totalSeats} SEATS
@@ -124,7 +156,7 @@ export default function AirplanesPage() {
         <aside className="space-y-2.5">
           {/* Quick Aircraft Switcher Card */}
           <Panel className="p-3">
-            <p className="label-caps text-subtle">Selected Fleet Airplane</p>
+            <p className="label-caps text-subtle">Illustrative aircraft configuration</p>
             <button
               onClick={() => setAircraftPickerOpen(true)}
               className="mt-1.5 flex w-full items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-left transition-colors hover:border-accent/40"
@@ -244,22 +276,20 @@ export default function AirplanesPage() {
           {/* Seat Map Legend */}
           <Panel className="p-3">
             <p className="label-caps text-subtle">Seat Legend</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] text-muted">
-              <div className="flex items-center gap-1.5">
-                <div className="size-3.5 rounded-sm border border-emerald-500/50 bg-emerald-500/20" />
-                <span>Available</span>
+            <div className="mt-2 space-y-2 text-[9px] text-muted">
+              <div className="rounded-lg border border-delayed/30 bg-delayed/10 px-2 py-1.5 text-[9px] leading-relaxed text-muted">
+                Seat availability is <strong>not connected</strong>. This is an
+                illustrative cabin configuration, not live inventory.
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="size-3.5 rounded-sm border border-line bg-surface-3 opacity-60" />
-                <span>Occupied</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="size-3.5 rounded-sm border border-amber-500/60 bg-amber-500/25" />
-                <span>Exit / Extra Space</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="size-3.5 rounded-sm border-2 border-accent bg-accent/40 shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
-                <span>Selected</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="size-3.5 rounded-sm border border-amber-500/60 bg-amber-500/25" />
+                  <span>Exit / Extra Space</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="size-3.5 rounded-sm border-2 border-accent bg-accent/40 shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
+                  <span>Selected</span>
+                </div>
               </div>
             </div>
           </Panel>
@@ -272,13 +302,13 @@ export default function AirplanesPage() {
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold text-accent">CABIN SEATMAP</span>
                 <span className="text-[10px] text-muted">
-                  Click any seat to inspect pitch, width, recline, and passenger reviews
+                  Illustrative reference configuration — not live seat availability
                 </span>
               </div>
               {mySeatId && (
                 <div className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent-soft px-2 py-0.5 text-[9px] font-bold text-accent">
                   <Check className="size-3" />
-                  Your seat: {mySeatId}
+                  Selected: {mySeatId}
                 </div>
               )}
             </div>
@@ -352,7 +382,6 @@ export default function AirplanesPage() {
                               const isSelected = selectedSeat?.id === seat.id;
                               const isMySeat = mySeatId === seat.id;
                               const isExit = seat.isExitRow;
-                              const isOccupied = seat.status === "OCCUPIED";
 
                               // Aisle spacer if this letter is after an aisle letter
                               const needsAisle = aisles.includes(seat.letter);
@@ -370,9 +399,7 @@ export default function AirplanesPage() {
                                           ? "border-2 border-emerald-400 bg-emerald-500/30 text-ink font-bold"
                                           : isExit
                                             ? "border border-amber-500/50 bg-amber-500/20 text-amber-200 hover:border-amber-400"
-                                            : isOccupied
-                                              ? "border border-line/60 bg-surface-2 text-subtle opacity-70 hover:opacity-100"
-                                              : "border border-line bg-surface-3 text-ink hover:border-accent/60 hover:bg-surface-2",
+                                            : "border border-line bg-surface-3 text-ink hover:border-accent/60 hover:bg-surface-2",
                                     )}
                                   >
                                     <span className="font-mono text-[9px] font-bold">
@@ -437,14 +464,14 @@ export default function AirplanesPage() {
               sub="Economy to Premium"
             />
             <MetricTile
-              label="In-Flight Radar"
-              value="Live Wi-Fi"
-              sub="High-speed satellite"
+              label="Connectivity"
+              value="Reference only"
+              sub="Not verified for this flight"
             />
           </div>
         </main>
 
-        {/* Right column: Selected Seat Inspector & Reviews */}
+        {/* Right column: Selected seat inspector & illustrative notes */}
         <aside className="space-y-2.5">
           {selectedSeat ? (
             <Panel className="p-3">
@@ -463,7 +490,7 @@ export default function AirplanesPage() {
                     Seat {selectedSeat.id}
                     {mySeatId === selectedSeat.id && (
                       <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold text-emerald-400">
-                        YOUR SEAT
+                        SELECTED
                       </span>
                     )}
                   </h3>
@@ -507,7 +534,7 @@ export default function AirplanesPage() {
                 </div>
               </div>
 
-              {/* Passenger Review & Advice */}
+              {/* Illustrative seat note — not a passenger review */}
               {selectedSeat.review && (
                 <div className="mt-3 rounded-lg border border-line bg-surface-2 p-2.5">
                   <div className="flex items-center gap-1 text-[9px] font-bold">
@@ -528,10 +555,10 @@ export default function AirplanesPage() {
                       }
                     >
                       {selectedSeat.review.rating === "GOOD"
-                        ? "Recommended Seat"
+                        ? "Illustrative note"
                         : selectedSeat.review.rating === "CAUTION"
-                          ? "Seat Alert / Restricted"
-                          : "Standard Passenger Seat"}
+                          ? "Configuration note"
+                          : "Standard configuration"}
                     </span>
                   </div>
                   <p className="mt-1 text-[10px] text-muted leading-relaxed">
@@ -566,7 +593,7 @@ export default function AirplanesPage() {
                   }}
                 >
                   <Armchair className="size-3.5" />
-                  {mySeatId === selectedSeat.id ? "Deselect My Seat" : "Select As My Seat"}
+                  {mySeatId === selectedSeat.id ? "Deselect seat" : "Select seat"}
                 </Button>
               </div>
             </Panel>
@@ -575,7 +602,7 @@ export default function AirplanesPage() {
               <Armchair className="mx-auto size-7 text-subtle" />
               <h4 className="mt-2 text-xs font-bold text-ink">No Seat Selected</h4>
               <p className="mt-1 text-[10px] text-muted">
-                Click any seat in the fuselage map to inspect seat pitch, recline, legroom, and reviews.
+                Click any seat to inspect the illustrative pitch, width, and recline. Seat availability is not connected.
               </p>
             </Panel>
           )}

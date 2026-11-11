@@ -50,6 +50,7 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
           400: errorResponseSchema,
           429: errorResponseSchema,
           502: errorResponseSchema,
+          503: errorResponseSchema,
         },
       },
       config: PROVIDER_RATE_LIMIT,
@@ -84,6 +85,19 @@ export const flightRoutes: FastifyPluginAsyncZod<FlightOptions> = async (
           options.usage.add(options.config.AERODATABOX_UNITS_PER_FLIGHT);
         } else {
           await refundProviderQuota(request, options.userQuota, units);
+        }
+        if (result.meta.source === "not_configured") {
+          return reply.code(503).send({
+            error: "provider_not_configured",
+            message: "Live flight data is not configured.",
+          });
+        }
+        if (result.meta.source === "quota_fallback") {
+          return reply.code(429).send({
+            error: "provider_quota_exhausted",
+            message:
+              "Live flight lookups are paused until the provider quota resets.",
+          });
         }
         reply.header(
           "Cache-Control",

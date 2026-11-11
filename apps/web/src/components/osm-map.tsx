@@ -156,7 +156,7 @@ export function OsmRouteMap({
 
       const sub = document.createElement("span");
       sub.className = "text-[9px] text-blue-100 font-semibold mt-0.5";
-      sub.textContent = "Check prices ›";
+      sub.textContent = "View route details ›";
       el.appendChild(sub);
 
       const marker = new Marker({ element: el, anchor: "bottom" })
@@ -218,7 +218,6 @@ export function OsmRouteMap({
         iata: airport.iata,
         city: airport.city,
         name: airport.name,
-        destCount: airport.destCount ?? 0,
         isOrigin: airport.iata === origin?.iata,
         isSelected: airport.iata === selected?.iata,
         isConnected: true,
@@ -280,13 +279,7 @@ export function OsmRouteMap({
             9.5,
             ["get", "isOrigin"],
             9.5,
-            [">", ["get", "destCount"], 100],
-            6.5,
-            [">", ["get", "destCount"], 30],
-            5.2,
-            [">", ["get", "destCount"], 7],
             4.0,
-            3.0,
           ],
           6,
           [
@@ -295,28 +288,18 @@ export function OsmRouteMap({
             12.5,
             ["get", "isOrigin"],
             12.5,
-            [">", ["get", "destCount"], 100],
-            10.5,
-            [">", ["get", "destCount"], 30],
-            8.5,
-            [">", ["get", "destCount"], 7],
-            7.0,
-            5.5,
+            6.5,
           ],
         ],
+        // Marker size/color encodes selection only. The bundled catalog's
+        // destination counts are not live connectivity and are not used.
         "circle-color": [
           "case",
           ["get", "isSelected"],
           "#0077ff",
           ["get", "isOrigin"],
           "#0077ff",
-          [">", ["get", "destCount"], 100],
-          "#0b4ea2",
-          [">", ["get", "destCount"], 30],
           "#1e88e5",
-          [">", ["get", "destCount"], 7],
-          "#f59e0b",
-          "#ef4444",
         ],
         "circle-stroke-color": "rgba(0, 0, 0, 0.25)",
         "circle-stroke-width": [
@@ -539,21 +522,16 @@ export function OsmRouteMap({
           </div>
           <div className="space-y-1.5 text-[10.5px] font-medium text-ink">
             <div className="flex items-center gap-2">
-              <span className="size-3 rounded-full bg-[#0b4ea2] shrink-0 border border-black/20 shadow-sm" />
-              <span>&gt; 100 direct destinations</span>
+              <span className="size-3 rounded-full bg-[#0077ff] shrink-0 border border-black/20 shadow-sm" />
+              <span>Origin / selected airport</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="size-2.5 rounded-full bg-[#1e88e5] shrink-0 border border-black/20 shadow-sm" />
-              <span>&gt; 30 direct destinations</span>
+              <span>Destination airport</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#f59e0b] shrink-0 border border-black/20 shadow-sm" />
-              <span>&gt; 7 direct destinations</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#ef4444] shrink-0 border border-black/20 shadow-sm" />
-              <span>&le; 7 direct destinations</span>
-            </div>
+            <p className="pt-1 text-[9px] leading-relaxed text-subtle">
+              Marker size does not encode live destination counts.
+            </p>
           </div>
         </div>
       ) : (

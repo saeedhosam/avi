@@ -18,6 +18,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
+private fun RealtimeAirportInfo.asReference(): RealtimeAirportInfo = copy(
+    operationalStatus = "Not reported",
+    statusReported = false,
+    isDelayed = false,
+    delayMinutes = 0,
+    onTimePercentage = 0,
+    activeDeparturesCount = 0,
+    activeArrivalsCount = 0,
+    activeRunways = emptyList(),
+    terminalCount = 0,
+    weather = weather.copy(reported = false),
+    hubAirlines = emptyList()
+)
+
 class RealtimeAirportRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val openMeteoApi: OpenMeteoApiService? = null,
@@ -466,7 +480,9 @@ class RealtimeAirportRepository(
             val candidateAirports = if (enableLiveNetwork && q.length >= 2) {
                 fetchLiveAirportsOrFallback(q)
             } else {
-                allAirports
+                // Reference catalog only: names and coordinates are useful,
+                // operational status and weather are explicitly unreported.
+                allAirports.map { it.asReference() }
             }
 
             val qLower = q.lowercase()
@@ -503,12 +519,12 @@ class RealtimeAirportRepository(
             val searchResponse = GatewayNetworkClient.apiService.searchAirports(query = query)
             if (searchResponse.code() == 429) {
                 _dataSourceMode.value = DataSourceMode.QUOTA_FALLBACK
-                return allAirports
+                return allAirports.map { it.asReference() }
             }
 
             if (searchResponse.isSuccessful && searchResponse.body()?.airports?.isNotEmpty() == true) {
                 _dataSourceMode.value = DataSourceMode.LIVE_DATA
-                val mapped = searchResponse.body()!!.airports.orEmpty().mapNotNull { node ->
+                return searchResponse.body()!!.airports.orEmpty().mapNotNull { node ->
                     val base = allAirports.find { it.code.equals(node.iata, ignoreCase = true) }
                     val info = node.toRealtimeInfo(base)
                     if (info != null) {
@@ -516,20 +532,21 @@ class RealtimeAirportRepository(
                             val wRes = weatherClient.getForecast(info.latitude, info.longitude)
                             wRes.body()?.let { OpenMeteoMapper.mapToRealtimeAirportWeather(info.icao, it) }
                         }.getOrNull()
-                        if (liveWeather != null) info.copy(weather = liveWeather) else info
+                        if (liveWeather != null) {
+                            info.copy(weather = liveWeather.copy(reported = true))
+                        } else {
+                            info.copy(weather = info.weather.copy(reported = false))
+                        }
                     } else null
                 }.filterNotNull()
-                if (mapped.isNotEmpty()) {
-                    val existingCodes = mapped.map { it.code }.toSet()
-                    mapped + allAirports.filter { it.code !in existingCodes }
-                } else {
-                    allAirports
-                }
-            } else {
-                allAirports
             }
+            // No live results. Reference names may be shown, but no live
+            // status/weather is fabricated and no static extras are appended.
+            _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
+            allAirports.map { it.asReference() }
         } catch (_: Exception) {
-            allAirports
+            _dataSourceMode.value = DataSourceMode.DEMO_CACHE_NO_KEY
+            allAirports.map { it.asReference() }
         }
     }
 
@@ -551,7 +568,8 @@ class RealtimeAirportRepository(
             latitude = latitude,
             longitude = longitude,
             elevationFeet = 0,
-            operationalStatus = "Normal Operations",
+            operationalStatus = "Not reported",
+            statusReported = false,
             isDelayed = false,
             delayMinutes = 0,
             onTimePercentage = 0,
@@ -568,17 +586,18 @@ class RealtimeAirportRepository(
                 humidity = 0,
                 pressureInHg = 30.0,
                 metarRaw = "",
-                flightCategory = FlightCategory.VFR
+                flightCategory = FlightCategory.VFR,
+                reported = false
             ),
             hubAirlines = hubAirlines
         )
     }
 
     suspend fun getAirportByCode(code: String): RealtimeAirportInfo? = withContext(ioDispatcher) {
-        allAirports.find { it.code.equals(code, ignoreCase = true) }
+        allAirports.find { it.code.equals(code, ignoreCase = true) }?.asReference()
     }
 
     suspend fun getAllAirports(): List<RealtimeAirportInfo> = withContext(ioDispatcher) {
-        allAirports
+        allAirports.map { it.asReference() }
     }
 }

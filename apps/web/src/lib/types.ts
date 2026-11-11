@@ -80,8 +80,10 @@ export interface OperatingCarrierRoute {
   airlineCode: string;
   airlineName: string;
   flightNumbers: string[];
-  dailyFrequencies: number;
-  weeklyFrequencies?: number;
+  /** Null when the provider did not report per-carrier frequency. */
+  dailyFrequencies: number | null;
+  weeklyFrequencies?: number | null;
+  /** Only present when a verified schedule source reported the days. */
   operatingDays?: number[];
   aircraftTypes: string[];
 }
@@ -90,18 +92,35 @@ export interface DirectFlightConnection {
   id: string;
   origin: AirportNode;
   destination: AirportNode;
+  /** Great-circle distance from the two verified airport coordinates. */
   distanceKm: number;
   distanceNm: number;
-  estimatedDurationMinutes: number;
-  durationFormatted: string;
   haulCategory: HaulCategory;
-  dailyFlightsCount: number;
-  weeklyFlightsCount?: number;
+  /** Null when AeroDataBox did not report a daily average for this route. */
+  dailyFlightsCount: number | null;
+  weeklyFlightsCount?: number | null;
+  /** Only present when a verified schedule source reported the days. */
   operatingDays?: number[];
-  hasDepartures: boolean;
-  hasArrivals: boolean;
   operatingCarriers: OperatingCarrierRoute[];
-  isLiveVerified: boolean;
+  dataSource: "AERODATABOX";
+  isForwardSchedule: false;
+}
+
+export interface RouteDataProvenance {
+  source: "AERODATABOX";
+  fetchedAt: string;
+  attribution: string;
+  mode: string;
+  statisticsWindowDays: 7;
+  note: string;
+}
+
+export interface TodayBoardMeta {
+  source: "AERODATABOX";
+  fetchedAt: string;
+  attribution: string;
+  mode: string;
+  window: { from: string; to: string } | null;
 }
 
 export interface AirlineFilterChipItem {
@@ -116,12 +135,13 @@ export interface AirportRouteNetworkSummary {
   totalDirectDestinations: number;
   totalCountriesServed: number;
   totalOperatingAirlines: number;
-  totalDailyFlights: number;
-  totalWeeklyFlights?: number;
+  /** Null when no route in the response reported a daily average. */
+  totalDailyFlights: number | null;
+  totalWeeklyFlights?: number | null;
   availableAirlines: AirlineFilterChipItem[];
 }
 
-export type FlightCategory = "VFR" | "MVFR" | "IFR";
+export type FlightCategory = "VFR" | "MVFR" | "IFR" | "UNKNOWN";
 
 export interface RealtimeAirportWeather {
   tempC: number;
@@ -183,10 +203,10 @@ export interface DailyForecast {
 
 export interface ArrivalAviationAdvisory {
   flightCategory: string;
-  crosswindKnots: number;
-  crosswindRisk: string;
-  runwayVisualRange: string;
-  arrivalNotice: string;
+  crosswindKnots: number | null;
+  crosswindRisk: string | null;
+  runwayVisualRange: string | null;
+  arrivalNotice: string | null;
 }
 
 export interface DestinationArrivalForecast {
@@ -311,7 +331,7 @@ export interface SeatInfo {
   isMiddle: boolean;
   isExitRow?: boolean;
   isBulkhead?: boolean;
-  status: "AVAILABLE" | "OCCUPIED" | "SELECTED" | "BLOCKED";
+  status: "AVAILABLE" | "OCCUPIED" | "SELECTED" | "BLOCKED" | "UNKNOWN";
   pitchInches: number;
   widthInches: number;
   reclineInches: number;

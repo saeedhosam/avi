@@ -1,22 +1,43 @@
 import { NextResponse } from "next/server";
 import type { Airport } from "@/lib/types";
-import {
-  generateFallbackForecast,
-  mapOpenMeteoToForecast,
-} from "@/lib/weather";
+import { mapOpenMeteoToForecast } from "@/lib/weather";
 
-
-function numberParam(value: string | null, fallback: number) {
+function finiteParam(value: string | null): number | null {
+  if (value == null || value.trim() === "") return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const lat = numberParam(searchParams.get("lat"), 0);
-  const lon = numberParam(searchParams.get("lon"), 0);
-  const code = (searchParams.get("code") ?? "JFK").toUpperCase();
-  const arrival = searchParams.get("arrival") ?? "12:00";
+  const lat = finiteParam(searchParams.get("lat"));
+  const lon = finiteParam(searchParams.get("lon"));
+  const code = (searchParams.get("code") ?? "").trim().toUpperCase();
+  const arrival = (searchParams.get("arrival") ?? "").trim();
+  const date = (searchParams.get("date") ?? "").trim();
+
+  if (lat == null || lon == null || !/^[A-Z]{3}$/.test(code)) {
+    return NextResponse.json(
+      {
+        live: false,
+        error:
+          "A valid latitude, longitude, and 3-letter airport code are required.",
+      },
+      { status: 400 },
+    );
+  }
+  if (!/^\d{1,2}:\d{2}$/.test(arrival)) {
+    return NextResponse.json(
+      { live: false, error: "A valid arrival time (HH:MM) is required." },
+      { status: 400 },
+    );
+  }
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return NextResponse.json(
+      { live: false, error: "A valid arrival date (YYYY-MM-DD) is required." },
+      { status: 400 },
+    );
+  }
 
   const airport: Airport = {
     code,
@@ -26,13 +47,15 @@ export async function GET(request: Request) {
     timezone: "auto",
     latitude: lat,
     longitude: lon,
+    // Weather values are intentionally empty placeholders; the forecast
+    // mapper must not use them as observations.
     weather: {
-      tempC: numberParam(searchParams.get("tempC"), 20),
-      tempF: numberParam(searchParams.get("tempF"), 68),
-      condition: searchParams.get("condition") ?? "Partly Cloudy",
-      wind: searchParams.get("wind") ?? "10 kt",
-      visibility: searchParams.get("visibility") ?? "10+ mi",
-      humidity: numberParam(searchParams.get("humidity"), 60),
+      tempC: 0,
+      tempF: 0,
+      condition: "",
+      wind: "",
+      visibility: "",
+      humidity: 0,
     },
   };
 
@@ -62,14 +85,20 @@ export async function GET(request: Request) {
     });
     if (!response.ok) throw new Error(`Open-Meteo ${response.status}`);
     const data = await response.json();
+    const forecast = mapOpenMeteoToForecast(airport, arrival, data, date || undefined);
     return NextResponse.json({
       live: true,
-      forecast: mapOpenMeteoToForecast(airport, arrival, data),
+      forecast,
+      fetchedAt: new Date().toISOString(),
     });
   } catch {
-    return NextResponse.json({
-      live: false,
-      forecast: generateFallbackForecast(airport, arrival),
-    });
+    return NextResponse.json(
+      {
+        live: false,
+        error:
+          "Open-Meteo arrival weather is temporarily unavailable. No estimated forecast is substituted.",
+      },
+      { status: 502 },
+    );
   }
 }

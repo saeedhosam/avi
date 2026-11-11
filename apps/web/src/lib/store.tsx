@@ -94,7 +94,11 @@ interface AppContextValue {
   offlineMode: boolean;
   toggleOffline: () => void;
   refreshData: () => Promise<void>;
-  refreshWatchlistFlights: () => Promise<void>;
+  refreshWatchlistFlights: () => Promise<{
+    refreshed: number;
+    failed: number;
+    skipped: number;
+  }>;
   syncing: boolean;
   dataSourceMode: DataSourceMode;
   setQuotaFallback: () => void;
@@ -172,6 +176,17 @@ function readPersisted(key: string): PersistedState {
       flights: Array.isArray(parsed.flights)
         ? (parsed.flights as unknown[])
             .map(normalizePersistedFlight)
+            .filter((flight) => {
+              // Privacy policy promises a 7-day purge. Records without a
+              // timestamp are kept but must render as "age unknown" rather
+              // than current.
+              if (!flight.fetchedAt) return true;
+              const fetchedMs = Date.parse(flight.fetchedAt);
+              return (
+                !Number.isFinite(fetchedMs) ||
+                Date.now() - fetchedMs <= 7 * 24 * 60 * 60_000
+              );
+            })
             .slice(0, MAX_PERSISTED_FLIGHTS)
         : [],
       alerts: Array.isArray(parsed.alerts) ? parsed.alerts.slice(0, MAX_PERSISTED_ALERTS) : [],
@@ -209,7 +224,11 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
   // the UI renders them relative-to-now with formatAlertTimestamp().
   const now = new Date().toISOString();
 
-  if (previous.gateDeparture !== next.gateDeparture) {
+  if (
+    previous.gateDeparture !== next.gateDeparture &&
+    previous.gateDeparture !== "Gate TBD" &&
+    next.gateDeparture !== "Gate TBD"
+  ) {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
@@ -222,7 +241,11 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
     });
   }
 
-  if (next.status === "CANCELLED" && previous.status !== "CANCELLED") {
+  if (
+    next.statusReported &&
+    next.status === "CANCELLED" &&
+    previous.status !== "CANCELLED"
+  ) {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
@@ -234,8 +257,12 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
       isRead: false,
     });
   } else if (
-    next.delayMinutes > previous.delayMinutes ||
-    (next.status === "DELAYED" && previous.status !== "DELAYED")
+    next.statusReported &&
+    ((next.delayReported &&
+      next.delayMinutes > 0 &&
+      (!previous.delayReported ||
+        next.delayMinutes > previous.delayMinutes)) ||
+      (next.status === "DELAYED" && previous.status !== "DELAYED"))
   ) {
     alerts.push({
       id: uid("alert"),
@@ -243,13 +270,19 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
       flightDate: next.flightDate,
       type: "DELAY",
       title: `Delay update · ${next.flightNumber}`,
-      message: `${next.flightNumber} is now delayed by ${next.delayMinutes} minutes. Estimated departure ${next.departureTimeEstimated}. ${next.delayReason ?? ""}`.trim(),
+      message: next.delayReported
+        ? `${next.flightNumber} is now delayed by ${next.delayMinutes} minutes. Estimated departure ${next.departureTimeEstimated}. ${next.delayReason ?? ""}`.trim()
+        : `${next.flightNumber} is reported delayed. The provider did not report a duration. Estimated departure ${next.departureTimeEstimated}.` ,
       timestamp: now,
       isRead: false,
     });
   }
 
-  if (next.status === "BOARDING" && previous.status !== "BOARDING") {
+  if (
+    next.statusReported &&
+    next.status === "BOARDING" &&
+    previous.status !== "BOARDING"
+  ) {
     alerts.push({
       id: uid("alert"),
       flightNumber: next.flightNumber,
@@ -263,6 +296,7 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
   }
 
   if (
+    next.statusReported &&
     next.status === "LANDED" &&
     previous.baggageCarousel !== next.baggageCarousel &&
     next.baggageCarousel &&
@@ -400,7 +434,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (offlineMode) {
       setDataSourceMode("OFFLINE_CACHE");
     } else if (aeroConfigured) {
-      setDataSourceMode("LIVE_AERODATABOX");
+      // Configuration is not proof of a live response. Keep a successful
+      // LIVE state if one was already observed; otherwise show "provider
+      // ready, no recent response".
+      setDataSourceMode((current) =>
+        current === "LIVE_AERODATABOX" ? current : "CONFIGURED_IDLE",
+      );
     } else {
       setDataSourceMode("NOT_CONFIGURED");
     }
@@ -523,12 +562,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           record,
         ]),
       );
-      const cloudByFlightNumber = new Map(
-        records.map((record) => [
-          normalizeFlightNumber(record.flightNumber).toLowerCase(),
-          record,
-        ]),
-      );
       const fetched: Flight[] = [];
       let liveLookups = 0;
 
@@ -588,8 +621,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const num = normalizeFlightNumber(flight.flightNumber).toLowerCase();
           const record =
             cloudByNumber.get(key) ??
-            cloudByNumber.get(`${num}|any`) ??
-            cloudByFlightNumber.get(num);
+            (!flight.flightDate ? cloudByNumber.get(`${num}|any`) : undefined);
           if (!record) {
             return flight.isWatchlisted
               ? { ...flight, isWatchlisted: false }
@@ -630,13 +662,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const refreshWatchlistFlights = useCallback(async () => {
-    if (offlineMode || !aeroConfigured || refreshingRef.current) return;
+  const refreshWatchlistFlights = useCallback(async (): Promise<{
+    refreshed: number;
+    failed: number;
+    skipped: number;
+  }> => {
+    if (offlineMode || !aeroConfigured || refreshingRef.current) {
+      return { refreshed: 0, failed: 0, skipped: 0 };
+    }
     const targets = flightsRef.current.filter((flight) => flight.isWatchlisted);
-    if (!targets.length) return;
+    if (!targets.length) return { refreshed: 0, failed: 0, skipped: 0 };
     refreshingRef.current = true;
     setSyncing(true);
     try {
+      let failed = 0;
       const results = await Promise.all(
         targets.slice(0, 8).map(async (flight) => {
           try {
@@ -647,25 +686,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
             );
             if (flight.flightDate) url.searchParams.set("date", flight.flightDate);
             const response = await authFetch(url, { cache: "no-store" });
-            const data = (await response.json()) as {
-              mode: string;
-              flights?: Flight[];
-            };
-            if (data.mode === "QUOTA_FALLBACK") setDataSourceMode("QUOTA_FALLBACK");
-            return data.flights ?? [];
+            const data = (await response.json().catch(() => null)) as
+              | { mode?: string; flights?: Flight[]; error?: string }
+              | null;
+            if (!response.ok || data?.error || !Array.isArray(data?.flights)) {
+              failed += 1;
+              if (data?.mode === "QUOTA_FALLBACK") {
+                setDataSourceMode("QUOTA_FALLBACK");
+              }
+              return [];
+            }
+            if (data.mode === "QUOTA_FALLBACK") {
+              setDataSourceMode("QUOTA_FALLBACK");
+            } else if (data.mode === "LIVE_AERODATABOX") {
+              setDataSourceMode("LIVE_AERODATABOX");
+            }
+            return data.flights;
           } catch {
+            failed += 1;
             return [];
           }
         }),
       );
       const merged = results.flat();
       if (merged.length) upsertFlights(merged);
-      updateAccountSync();
+      return {
+        refreshed: merged.length,
+        failed,
+        skipped: Math.max(0, targets.length - 8),
+      };
     } finally {
       refreshingRef.current = false;
       setSyncing(false);
     }
-  }, [aeroConfigured, offlineMode, updateAccountSync, upsertFlights]);
+  }, [aeroConfigured, offlineMode, upsertFlights]);
 
   // The server watch engine pushes status changes via Realtime, so browser
   // polling is a fallback only: a safety net at a long interval when the
@@ -861,16 +915,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleWatchlist = useCallback(
     (flight: Flight, notes = "") => {
       const targetKey = flightKey(flight);
-      const targetNumber = normalizeFlightNumber(flight.flightNumber).toLowerCase();
-      let current = flightsRef.current.find(
+      const current = flightsRef.current.find(
         (item) => flightKey(item) === targetKey,
       );
-      if (!current) {
-        current = flightsRef.current.find(
-          (item) =>
-            normalizeFlightNumber(item.flightNumber).toLowerCase() === targetNumber,
-        );
-      }
       if (!current) {
         const newFlight: Flight = {
           ...flight,
@@ -890,20 +937,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
       const willWatch = !current.isWatchlisted;
-      const currentKey = flightKey(current);
       let foundTarget = false;
       const updated = flightsRef.current.map((item) => {
-        const itemKey = flightKey(item);
-        const itemNumber = normalizeFlightNumber(item.flightNumber).toLowerCase();
-        if (itemKey === targetKey) {
+        if (flightKey(item) === targetKey) {
           foundTarget = true;
-          return {
-            ...item,
-            isWatchlisted: willWatch,
-            customNotes: notes || item.customNotes,
-          };
-        }
-        if (itemKey === currentKey || itemNumber === targetNumber) {
           return {
             ...item,
             isWatchlisted: willWatch,
@@ -922,9 +959,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       flightsRef.current = updated;
       setFlights(updated);
       const nextFlight =
-        updated.find(
-          (item) => flightKey(item) === targetKey || flightKey(item) === currentKey,
-        ) ?? updated[0];
+        updated.find((item) => flightKey(item) === targetKey) ?? updated[0];
       if (nextFlight && account.uid) {
         if (nextFlight.isWatchlisted) {
           void saveWatchlistItemCloud(account.uid, nextFlight);
@@ -1083,10 +1118,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // The quota fallback used to stick until reload; clearing it on the next
   // successful live response keeps the banner honest across outages.
   const setLiveRecovered = useCallback(() => {
-    if (!offlineMode && aeroConfigured && dataSourceMode === "QUOTA_FALLBACK") {
+    // Called only after a successful live response, so this is the one place
+    // allowed to promote the global state to LIVE.
+    if (!offlineMode && aeroConfigured) {
       setDataSourceMode("LIVE_AERODATABOX");
     }
-  }, [offlineMode, aeroConfigured, dataSourceMode]);
+  }, [offlineMode, aeroConfigured]);
 
   const refreshData = useCallback(async () => {
     setSyncing(true);
@@ -1100,11 +1137,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAeroConfigured(Boolean(data.aeroDataBoxConfigured));
         setWatchEngineEnabled(Boolean(data.watchEngine?.enabled));
       }
-      await refreshWatchlistFlights();
-      updateAccountSync();
-      notify("Live flight data refreshed.", "success");
+      const result = await refreshWatchlistFlights();
+      if (result.refreshed > 0 && result.failed === 0) {
+        updateAccountSync();
+        notify(
+          `Refreshed ${result.refreshed} watchlisted flight${
+            result.refreshed === 1 ? "" : "s"
+          }.`,
+          "success",
+        );
+      } else if (result.refreshed > 0) {
+        updateAccountSync();
+        notify(
+          `Refreshed ${result.refreshed} flight${
+            result.refreshed === 1 ? "" : "s"
+          }; ${result.failed} failed. Saved data may be stale.`,
+          "warning",
+        );
+      } else if (result.failed > 0) {
+        notify(
+          "Live refresh failed. Saved flight records may be stale.",
+          "warning",
+        );
+      } else {
+        notify(
+          "No watchlisted flights to refresh. Saved data may be stale.",
+          "info",
+        );
+      }
     } catch {
-      notify("Live refresh failed. Cached results remain available.", "warning");
+      notify("Live refresh failed. Saved flight records may be stale.", "warning");
     } finally {
       setSyncing(false);
     }

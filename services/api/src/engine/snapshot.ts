@@ -11,7 +11,12 @@ export type EngineAlertType =
 /** Mirrors the web client's FlightTelemetry so engine writes stay drop-in. */
 export interface WatchSnapshotTelemetry {
   hasLiveLocation?: boolean;
+  /** Provider observation time, only when the provider actually supplies one. */
   locationUpdatedAt?: number;
+  /** When this engine received the provider response. */
+  fetchedAt?: number;
+  /** True when numeric telemetry is retained from an older live fix. */
+  stale?: boolean;
   currentLatitude: number;
   currentLongitude: number;
   altitudeFeet: number;
@@ -34,11 +39,19 @@ export interface WatchSnapshot {
   airline?: string;
   airlineCode?: string;
   status?: string;
+  statusReported?: boolean;
+  statusRaw?: string;
   statusNote?: string | null;
   /** Epoch ms when the engine first observed the LANDED state. */
   landedAt?: number;
   delayMinutes?: number;
+  delayReported?: boolean;
+  delaySource?: "provider" | "derived" | "unknown";
   delayReason?: string | null;
+  /** Provider response identity and freshness for this snapshot. */
+  dataSource?: "AERODATABOX";
+  fetchedAt?: string;
+  cached?: boolean;
   terminalDeparture?: string;
   gateDeparture?: string;
   terminalArrival?: string;
@@ -273,45 +286,73 @@ export function mergeSnapshot(
 
   snapshot.flightNumber = snapshot.flightNumber || summary.flightNumber;
   const operatingDate = summary.scheduledDeparture?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  // Never merge a provider result for a different operating date into this
+  // snapshot. A date-less match is not evidence that it is the same flight.
+  if (snapshot.flightDate && operatingDate && snapshot.flightDate !== operatingDate) {
+    return snapshot;
+  }
   if (!snapshot.flightDate && operatingDate) snapshot.flightDate = operatingDate;
   if (summary.airline) snapshot.airline = summary.airline;
   if (summary.airlineCode) snapshot.airlineCode = summary.airlineCode;
-  snapshot.status = summary.status;
-  if (summary.status === "LANDED" && typeof snapshot.landedAt !== "number") {
+  if (summary.statusReported) {
+    snapshot.status = summary.status;
+    snapshot.statusReported = true;
+    snapshot.statusRaw = summary.statusRaw;
+  } else {
+    // Preserve the last verified status when this poll did not report one.
+    if (!snapshot.status) snapshot.status = summary.status;
+    snapshot.statusReported = snapshot.statusReported ?? false;
+    snapshot.statusRaw = summary.statusRaw;
+  }
+  if (snapshot.status === "LANDED" && typeof snapshot.landedAt !== "number") {
     snapshot.landedAt = nowMs;
+  } else if (snapshot.status !== "LANDED") {
+    snapshot.landedAt = undefined;
   }
   // If the snapshot payload was pruned, rebuild the airport endpoints from
   // the provider so the snapshot remains a usable Flight face for clients.
+  // Only overwrite airport fields the provider explicitly returned. A missing
+  // timezone must not replace a previously verified one with "UTC".
   snapshot.origin = {
     ...(snapshot.origin ?? {}),
-    code: summary.origin.code,
-    name: summary.origin.name,
-    city: summary.origin.city,
-    country: summary.origin.country,
-    timezone: summary.origin.timezone,
+    code: summary.origin.code || snapshot.origin?.code,
+    ...(summary.origin.name ? { name: summary.origin.name } : {}),
+    ...(summary.origin.city ? { city: summary.origin.city } : {}),
+    ...(summary.origin.country ? { country: summary.origin.country } : {}),
+    ...(summary.origin.timezone ? { timezone: summary.origin.timezone } : {}),
     latitude: summary.origin.latitude,
     longitude: summary.origin.longitude,
   };
   snapshot.destination = {
     ...(snapshot.destination ?? {}),
-    code: summary.destination.code,
-    name: summary.destination.name,
-    city: summary.destination.city,
-    country: summary.destination.country,
-    timezone: summary.destination.timezone,
+    code: summary.destination.code || snapshot.destination?.code,
+    ...(summary.destination.name ? { name: summary.destination.name } : {}),
+    ...(summary.destination.city ? { city: summary.destination.city } : {}),
+    ...(summary.destination.country ? { country: summary.destination.country } : {}),
+    ...(summary.destination.timezone ? { timezone: summary.destination.timezone } : {}),
     latitude: summary.destination.latitude,
     longitude: summary.destination.longitude,
   };
   if (!Array.isArray(snapshot.timeline)) snapshot.timeline = [];
   if (summary.statusNote) snapshot.statusNote = summary.statusNote;
-  if (Number.isFinite(summary.delayMinutes)) {
+  if (summary.delayReported) {
     snapshot.delayMinutes = summary.delayMinutes;
-    snapshot.delayReason =
-      summary.delayMinutes >= 15 ? "Operational / Air Traffic Control revision" : null;
+    snapshot.delayReported = true;
+    snapshot.delaySource = summary.delaySource;
+    // Only a provider-supplied reason is a fact. FlightSummary currently has
+    // no reason field, so this remains null rather than inventing one.
+    snapshot.delayReason = null;
+  } else {
+    // Preserve the last reported delay; do not turn "unknown" into 0 minutes.
+    snapshot.delayReported = snapshot.delayReported ?? false;
+    snapshot.delaySource = snapshot.delaySource ?? "unknown";
   }
+  snapshot.dataSource = "AERODATABOX";
+  snapshot.fetchedAt = new Date(nowMs).toISOString();
+  snapshot.cached = false;
 
   const scheduled = timeHHmm(summary.scheduledDeparture);
-  if (scheduled && !/^\d{1,2}:\d{2}$/.test(snapshot.departureTimeScheduled ?? "")) {
+  if (scheduled) {
     snapshot.departureTimeScheduled = scheduled;
   }
   const depEstimate = timeHHmm(summary.estimatedDeparture);
@@ -366,7 +407,14 @@ export function mergeSnapshot(
     telemetry = {
       ...telemetry,
       hasLiveLocation: true,
-      locationUpdatedAt: nowMs,
+      // Only a provider-supplied observation time is valid here. The engine
+      // response time is recorded separately as `fetchedAt`.
+      locationUpdatedAt:
+        summary.telemetry.updatedAt != null
+          ? Date.parse(summary.telemetry.updatedAt)
+          : undefined,
+      fetchedAt: nowMs,
+      stale: false,
       currentLatitude: summary.telemetry.latitude,
       currentLongitude: summary.telemetry.longitude,
       altitudeFeet: summary.telemetry.altitudeFeet,
@@ -378,18 +426,22 @@ export function mergeSnapshot(
       etaMinutesRemaining: etaMinutes,
     };
   } else if (summary.telemetry.hasLiveLocation === false) {
-    // No live fix from the provider this cycle; drop the live flag but keep
-    // any previously known position so the UI does not fabricate fresh data.
+    // No live fix this cycle. Clear measured values instead of leaving old
+    // altitude/speed/ETA numbers looking current.
     telemetry = {
-      ...telemetry,
+      ...defaultTelemetry(),
       hasLiveLocation: false,
       locationUpdatedAt: undefined,
+      fetchedAt: nowMs,
+      stale: true,
       progressPercent:
         summary.status === "LANDED"
           ? 1
           : summary.status === "DEPARTED"
             ? telemetry.progressPercent
             : 0,
+      distanceRemainingNm: 0,
+      etaMinutesRemaining: 0,
     };
   }
   snapshot.telemetry = telemetry;
@@ -412,6 +464,8 @@ export function diffAlerts(
   if (
     previous.gateDeparture &&
     next.gateDeparture &&
+    previous.gateDeparture !== "Gate TBD" &&
+    next.gateDeparture !== "Gate TBD" &&
     previous.gateDeparture !== next.gateDeparture
   ) {
     drafts.push({
@@ -428,15 +482,23 @@ export function diffAlerts(
       message: `${flightNumber} (${next.origin?.code ?? previous.origin?.code ?? "—"} → ${next.destination?.code ?? previous.destination?.code ?? "—"}) has been cancelled. ${next.delayReason ?? "Contact your airline for rebooking."}`,
     });
   } else if (
-    (Number.isFinite(next.delayMinutes) &&
-      Number.isFinite(previous.delayMinutes) &&
-      (next.delayMinutes ?? 0) > (previous.delayMinutes ?? 0)) ||
-    (next.status === "DELAYED" && previous.status !== "DELAYED")
+    next.statusReported !== false &&
+    ((next.delayReported &&
+      typeof next.delayMinutes === "number" &&
+      Number.isFinite(next.delayMinutes) &&
+      next.delayMinutes > 0 &&
+      (!previous.delayReported ||
+        (typeof previous.delayMinutes === "number" &&
+          Number.isFinite(previous.delayMinutes) &&
+          next.delayMinutes > previous.delayMinutes))) ||
+      (next.status === "DELAYED" && previous.status !== "DELAYED"))
   ) {
     drafts.push({
       type: "DELAY",
       title: `Delay update · ${flightNumber}`,
-      message: `${flightNumber} is now delayed by ${next.delayMinutes ?? 0} minutes. Estimated departure ${next.departureTimeEstimated ?? "—"}. ${next.delayReason ?? ""}`.trim(),
+      message: next.delayReported
+        ? `${flightNumber} is now delayed by ${next.delayMinutes} minutes. Estimated departure ${next.departureTimeEstimated ?? "—"}. ${next.delayReason ?? ""}`.trim()
+        : `${flightNumber} is reported delayed. The provider did not report a delay duration. Estimated departure ${next.departureTimeEstimated ?? "—"}.`,
     });
   }
 
@@ -482,9 +544,10 @@ export function matchesJob(summary: FlightSummary, job: WatchJob): boolean {
     return false;
   }
   const summaryDate = summary.scheduledDeparture?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
-  // Legacy rows may have no flight_date; accept a number match rather than
-  // refusing to refresh them forever.
-  if (!job.flightDate) return true;
+  // A flight number alone does not identify an operating date. Without a
+  // stored date we cannot prove this summary belongs to the watched flight,
+  // so it must not be merged into that row.
+  if (!job.flightDate) return false;
   return job.flightDate === summaryDate;
 }
 

@@ -49,6 +49,9 @@ function WeatherGlyph({
 }
 
 function categoryColor(category: string) {
+  if (!category || category === "UNKNOWN" || category.includes("Not reported")) {
+    return "#94A3B8";
+  }
   if (category.includes("VFR") && !category.includes("MVFR")) return "#10B981";
   if (category.includes("MVFR")) return "#F59E0B";
   return "#EF4444";
@@ -57,15 +60,17 @@ function categoryColor(category: string) {
 export function DestinationWeatherCard({
   forecast,
   loading,
+  error,
   className,
 }: {
   forecast: DestinationArrivalForecast | null;
   loading?: boolean;
+  error?: string | null;
   className?: string;
 }) {
   const [tab, setTab] = useState<"hourly" | "daily" | "advisory">("hourly");
 
-  if (loading || !forecast) {
+  if (loading) {
     return (
       <div
         className={cn(
@@ -86,6 +91,27 @@ export function DestinationWeatherCard({
           >
             Weather data by Open-Meteo
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (!forecast) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-[220px] items-center justify-center rounded-2xl border border-delayed/30 bg-delayed/10",
+          className,
+        )}
+      >
+        <div className="max-w-md px-4 text-center">
+          <p className="text-[11px] font-bold text-delayed">
+            Arrival weather unavailable
+          </p>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted">
+            {error ??
+              "Open-Meteo did not return a complete forecast for the arrival time. No estimated weather is substituted."}
+          </p>
         </div>
       </div>
     );
@@ -114,15 +140,8 @@ export function DestinationWeatherCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              "hidden rounded-md border px-1.5 py-1 text-[8px] font-bold sm:inline",
-              forecast.isEstimated
-                ? "border-delayed/30 bg-delayed/10 text-delayed"
-                : "border-landed/30 bg-landed/10 text-landed",
-            )}
-          >
-            {forecast.isEstimated ? "ESTIMATED · NOT LIVE" : "LIVE WEATHER"}
+          <span className="rounded-md border border-accent/30 bg-accent-soft px-1.5 py-1 text-[8px] font-bold text-accent">
+            OPEN-METEO MODEL
           </span>
           <span
             className="rounded-md border px-1.5 py-1 text-[8px] font-bold"
@@ -302,17 +321,25 @@ export function DestinationWeatherCard({
             <AdvisoryTile
               icon={<Navigation className="size-3.5" />}
               label="Crosswind"
-              value={`${forecast.advisory.crosswindKnots} kt · ${forecast.advisory.crosswindRisk}`}
+              value={
+                forecast.advisory.crosswindKnots != null
+                  ? `${forecast.advisory.crosswindKnots} kt${
+                      forecast.advisory.crosswindRisk
+                        ? ` · ${forecast.advisory.crosswindRisk}`
+                        : ""
+                    }`
+                  : "Not reported"
+              }
             />
             <AdvisoryTile
               icon={<Eye className="size-3.5" />}
               label="Runway visual range"
-              value={forecast.advisory.runwayVisualRange}
+              value={forecast.advisory.runwayVisualRange ?? "Not reported"}
             />
             <AdvisoryTile
               icon={<Gauge className="size-3.5" />}
               label="Arrival notice"
-              value={forecast.advisory.arrivalNotice}
+              value={forecast.advisory.arrivalNotice ?? "Not reported"}
             />
             <div className="rounded-lg border border-dashed border-line bg-surface-2/50 px-2.5 py-2 sm:col-span-2">
               <p className="label-caps text-subtle">Arrival preparation</p>
@@ -428,7 +455,11 @@ export function AirportWeatherCard({
               failed ? "bg-delayed" : "animate-pulse-dot bg-landed",
             )}
           />
-          {loading ? "FETCHING LIVE WEATHER" : failed ? "WEATHER UNAVAILABLE" : "LIVE WEATHER"}
+          {loading
+            ? "FETCHING OPEN-METEO"
+            : failed
+              ? "WEATHER UNAVAILABLE"
+              : "OPEN-METEO MODEL"}
         </span>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">

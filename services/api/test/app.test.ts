@@ -48,15 +48,14 @@ describe("flight routes", () => {
     expect(response.json().error).toBe("invalid_flight_number");
   });
 
-  it("returns an empty live result when AeroDataBox is not configured", async () => {
+  it("fails explicitly when AeroDataBox is not configured", async () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/flights/search?number=BA117",
     });
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({
-      flights: [],
-      meta: { source: "not_configured", cached: false },
+      error: "provider_not_configured",
     });
   });
 

@@ -24,7 +24,14 @@ import { useApp } from "@/lib/store";
 import { authFetch } from "@/lib/authed-fetch";
 import { fetchDestinationForecast } from "@/lib/weather";
 import type { DestinationArrivalForecast, Flight } from "@/lib/types";
-import { STATUS_META, cn, flightDateLabel, normalizeFlightNumber } from "@/lib/utils";
+import {
+  STATUS_META,
+  cn,
+  flightDateLabel,
+  isFreshTimestamp,
+  normalizeFlightNumber,
+  timeAgo,
+} from "@/lib/utils";
 import { FlightMapPreview } from "@/components/flight-map-preview";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { DestinationWeatherCard, AirportWeatherCard } from "@/components/weather-cards";
@@ -52,8 +59,7 @@ export default function FlightDetailPage() {
     upsertFlights,
     aeroConfigured,
     offlineMode,
-    refreshData,
-    syncing,
+    notify,
   } = useApp();
 
   const dateParam = searchParams.get("date") ?? "";
@@ -65,19 +71,26 @@ export default function FlightDetailPage() {
       normalizeFlightNumber(item.flightNumber).toLowerCase() === cleanId;
     const dateMatch = (item: Flight) =>
       !dateParam || (item.flightDate ?? "") === dateParam;
-    return (
-      flights.find((item) => numberMatch(item) && dateMatch(item)) ??
-      flights.find(numberMatch)
-    );
+    if (dateParam) {
+      // A requested operating date must match exactly. Never substitute the
+      // same flight number from another day.
+      return flights.find((item) => numberMatch(item) && dateMatch(item));
+    }
+    return flights.find(numberMatch);
   }, [flights, params.id, dateParam]);
 
   const [forecast, setForecast] = useState<DestinationArrivalForecast | null>(null);
   const [forecastLoading, setForecastLoading] = useState(true);
+  const [forecastError, setForecastError] = useState<string | null>(null);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
-  const [lookupState, setLookupState] = useState<"idle" | "loading" | "notfound">("idle");
+  const [lookupState, setLookupState] = useState<
+    "idle" | "loading" | "notfound" | "error"
+  >("idle");
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [refreshingCurrent, setRefreshingCurrent] = useState(false);
   // Tracks the previously seen config state so a lookup that failed just
   // because /api/status had not resolved yet is retried once it does. A
   // genuine miss (provider really returned nothing) stays final.
@@ -103,17 +116,33 @@ export default function FlightDetailPage() {
       window.location.origin,
     );
     if (dateParam) url.searchParams.set("date", dateParam);
+    setLookupError(null);
     authFetch(url, {
       cache: "no-store",
     })
-      .then((response) => response.json())
-      .then((data: { flights?: Flight[] }) => {
+      .then(async (response) => {
+        const data = (await response.json().catch(() => null)) as
+          | { flights?: Flight[]; error?: string; mode?: string }
+          | null;
         if (!active) return;
-        if (data.flights?.length) upsertFlights(data.flights);
-        else setLookupState("notfound");
+        if (!response.ok || data?.error) {
+          setLookupError(
+            data?.error ?? "Live flight lookup is temporarily unavailable.",
+          );
+          setLookupState("error");
+          return;
+        }
+        if (data?.flights?.length) {
+          upsertFlights(data.flights);
+          setLookupState("idle");
+        } else {
+          setLookupState("notfound");
+        }
       })
       .catch(() => {
-        if (active) setLookupState("notfound");
+        if (!active) return;
+        setLookupError("Live flight lookup is temporarily unavailable.");
+        setLookupState("error");
       });
     return () => {
       active = false;
@@ -143,9 +172,23 @@ export default function FlightDetailPage() {
     let active = true;
     setForecast(null);
     setForecastLoading(true);
-    fetchDestinationForecast(flight.destination, flight.arrivalTimeEstimated)
+    setForecastError(null);
+    fetchDestinationForecast(
+      flight.destination,
+      flight.arrivalTimeEstimated,
+      flight.flightDate,
+    )
       .then((next) => {
         if (active) setForecast(next);
+      })
+      .catch((error) => {
+        if (active) {
+          setForecastError(
+            error instanceof Error
+              ? error.message
+              : "Arrival weather is unavailable.",
+          );
+        }
       })
       .finally(() => {
         if (active) setForecastLoading(false);
@@ -170,13 +213,20 @@ export default function FlightDetailPage() {
           ) : (
             <EmptyState
               icon={<Plane className="size-6" />}
-              title="Flight not available"
+              title={
+                lookupState === "error"
+                  ? "Live flight lookup unavailable"
+                  : "Flight not available"
+              }
               description={
                 offlineMode
                   ? "Offline mode is active and this flight is not cached. Reconnect to fetch it live."
                   : !aeroConfigured
-                    ? "Live flight data is unavailable right now. Weather and your saved data still work."
-                    : "No live data found for this number. It may not be operating today."
+                    ? "Live flight data is unavailable right now. Saved data still works."
+                    : lookupState === "error"
+                      ? lookupError ??
+                        "Live flight lookup is temporarily unavailable. This is not evidence that the flight does not operate."
+                      : "No live data found for this number and date. It may not be operating, or the provider may not cover it."
               }
               action={
                 <Link href="/search">
@@ -191,7 +241,50 @@ export default function FlightDetailPage() {
   }
 
   const meta = STATUS_META[flight.status];
-  const isLive = flight.status === "DEPARTED";
+  const isLivePosition =
+    Boolean(flight.telemetry.hasLiveLocation) &&
+    isFreshTimestamp(flight.fetchedAt);
+
+  const refreshCurrentFlight = async () => {
+    if (offlineMode || refreshingCurrent) return;
+    setRefreshingCurrent(true);
+    try {
+      const url = new URL(
+        "/api/flights/search",
+        window.location.origin,
+      );
+      url.searchParams.set(
+        "flight",
+        normalizeFlightNumber(flight.flightNumber),
+      );
+      if (flight.flightDate) url.searchParams.set("date", flight.flightDate);
+      const response = await authFetch(url, { cache: "no-store" });
+      const data = (await response.json().catch(() => null)) as
+        | { flights?: Flight[]; error?: string }
+        | null;
+      if (!response.ok || data?.error) {
+        throw new Error(
+          data?.error ?? "Live flight refresh is temporarily unavailable.",
+        );
+      }
+      if (!data?.flights?.length) {
+        throw new Error(
+          "The provider returned no live record for this flight and date.",
+        );
+      }
+      upsertFlights(data.flights);
+      notify(`${flight.flightNumber} refreshed from the provider.`, "success");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Live flight refresh is temporarily unavailable.",
+        "warning",
+      );
+    } finally {
+      setRefreshingCurrent(false);
+    }
+  };
 
   const openNotes = () => {
     setNoteDraft(flight.customNotes);
@@ -214,13 +307,26 @@ export default function FlightDetailPage() {
             <h2 className="flex flex-wrap items-center gap-2 text-lg font-black tracking-tight text-ink lg:text-xl">
               {flight.flightNumber}
               <span className="text-xs font-medium text-muted">{flight.airline}</span>
-              <StatusBadge status={flight.status} delayMinutes={flight.delayMinutes} />
-              {isLive && (
+              <StatusBadge
+                status={flight.status}
+                statusReported={flight.statusReported}
+                delayMinutes={flight.delayMinutes}
+                delayReported={flight.delayReported}
+              />
+              {isLivePosition && (
                 <span className="flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-accent">
                   <Radio className="size-2.5 animate-pulse" /> LIVE
                 </span>
               )}
             </h2>
+            <p className="mt-1 text-[9px] text-subtle">
+              {flight.fetchedAt &&
+              Number.isFinite(Date.parse(flight.fetchedAt))
+                ? `Provider data retrieved ${timeAgo(Date.parse(flight.fetchedAt))}${
+                    flight.source ? ` · ${flight.source}` : ""
+                  }`
+                : "Provider retrieval time not recorded"}
+            </p>
           </div>
         </div>
 
@@ -251,9 +357,16 @@ export default function FlightDetailPage() {
             onClick={() => toggleWatchlist(flight)}
           />
           <ActionButton
-            icon={<Radio className={cn("size-3.5", syncing && "animate-pulse")} />}
-            label={syncing ? "Refreshing" : "Refresh"}
-            onClick={() => void refreshData()}
+            icon={
+              <Radio
+                className={cn(
+                  "size-3.5",
+                  refreshingCurrent && "animate-pulse",
+                )}
+              />
+            }
+            label={refreshingCurrent ? "Refreshing" : "Refresh flight"}
+            onClick={() => void refreshCurrentFlight()}
           />
           <Link href={`/map/${encodeURIComponent(flight.id)}`}>
             <Button size="sm" variant="outline">
@@ -340,19 +453,23 @@ export default function FlightDetailPage() {
                   sub={`Scheduled ${flight.arrivalTimeScheduled}`}
                 />
                 <InlineMetric
-                  label="Duration"
+                  label="Remaining (calc.)"
                   value={
-                    flight.telemetry.etaMinutesRemaining > 0
+                    isLivePosition && flight.telemetry.etaMinutesRemaining > 0
                       ? `${Math.floor(flight.telemetry.etaMinutesRemaining / 60)}h ${flight.telemetry.etaMinutesRemaining % 60}m`
                       : "—"
                   }
-                  sub={isLive ? "Remaining" : "Not reported"}
+                  sub={isLivePosition ? "Calculated from position" : "Not reported"}
                 />
                 <InlineMetric
-                  label="Progress"
-                  value={flight.telemetry.hasLiveLocation ? `${Math.round(flight.telemetry.progressPercent * 100)}%` : "—"}
+                  label="Progress (calc.)"
+                  value={
+                    isLivePosition
+                      ? `${Math.round(flight.telemetry.progressPercent * 100)}%`
+                      : "—"
+                  }
                   sub={
-                    flight.telemetry.hasLiveLocation
+                    isLivePosition
                       ? `${flight.telemetry.distanceRemainingNm} nm remaining`
                       : "Live position not reported"
                   }
@@ -386,8 +503,11 @@ export default function FlightDetailPage() {
           <div className="grid gap-2 sm:grid-cols-2">
             <GateTile
               label="Departure gate"
-              primary={`T${flight.terminalDeparture} · ${flight.gateDeparture}`}
-              secondary={flight.checkInCounter}
+              primary={gateLabel(
+                flight.terminalDeparture,
+                flight.gateDeparture,
+              )}
+              secondary={reportedOrUnavailable(flight.checkInCounter)}
               icon={<PlaneTakeoff className="size-4" />}
               onMap={() =>
                 router.push(
@@ -397,8 +517,11 @@ export default function FlightDetailPage() {
             />
             <GateTile
               label="Arrival gate"
-              primary={`T${flight.terminalArrival} · ${flight.gateArrival}`}
-              secondary={flight.baggageCarousel}
+              primary={gateLabel(
+                flight.terminalArrival,
+                flight.gateArrival,
+              )}
+              secondary={reportedOrUnavailable(flight.baggageCarousel)}
               icon={<PlaneLanding className="size-4" />}
               onMap={() =>
                 router.push(
@@ -425,6 +548,7 @@ export default function FlightDetailPage() {
           <DestinationWeatherCard
             forecast={forecast}
             loading={forecastLoading}
+            error={forecastError}
           />
 
           <AirportWeatherCard
@@ -504,9 +628,16 @@ export default function FlightDetailPage() {
                 onClick={openNotes}
               />
               <MiniAction
-                icon={<Radio className={cn("size-3.5", syncing && "animate-pulse")} />}
-                label="Refresh live"
-                onClick={() => void refreshData()}
+                icon={
+                  <Radio
+                    className={cn(
+                      "size-3.5",
+                      refreshingCurrent && "animate-pulse",
+                    )}
+                  />
+                }
+                label={refreshingCurrent ? "Refreshing flight" : "Refresh flight"}
+                onClick={() => void refreshCurrentFlight()}
               />
               <MiniAction
                 icon={<Layers className="size-3.5" />}
@@ -522,19 +653,31 @@ export default function FlightDetailPage() {
 
           <Panel className="p-3.5">
             <div className="flex items-center justify-between">
-              <p className="label-caps text-subtle">Live telemetry</p>
-              <span className="flex items-center gap-1 text-[9px] font-bold text-landed">
-                <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                {flight.telemetry.hasLiveLocation ? "LIVE POSITION" : "AWAITING POSITION"}
+              <p className="label-caps text-subtle">Provider telemetry</p>
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-[9px] font-bold",
+                  isLivePosition ? "text-landed" : "text-subtle",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    isLivePosition
+                      ? "animate-pulse-dot bg-landed"
+                      : "bg-subtle",
+                  )}
+                />
+                {isLivePosition ? "LIVE POSITION" : "POSITION NOT REPORTED"}
               </span>
             </div>
             <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <Snapshot label="Altitude" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
-              <Snapshot label="Ground speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
-              <Snapshot label="Mach" value={flight.telemetry.hasLiveLocation ? flight.telemetry.mach.toFixed(2) : "—"} />
-              <Snapshot label="Heading" value={flight.telemetry.hasLiveLocation ? `${Math.round(flight.telemetry.headingDegrees)}°` : "—"} />
-              <Snapshot label="Vertical speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.verticalSpeedFpm} fpm` : "—"} />
-              <Snapshot label="ETA" value={flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
+              <Snapshot label="Altitude" value={isLivePosition ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
+              <Snapshot label="Ground speed" value={isLivePosition ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
+              <Snapshot label="Mach" value="—" />
+              <Snapshot label="Heading" value={isLivePosition ? `${Math.round(flight.telemetry.headingDegrees)}°` : "—"} />
+              <Snapshot label="Vertical speed" value="—" />
+              <Snapshot label="ETA (calculated)" value={isLivePosition && flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
             </div>
             {flight.customNotes && (
               <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-2">
@@ -546,7 +689,10 @@ export default function FlightDetailPage() {
             )}
           </Panel>
 
-          <AircraftInfoCard aircraft={flight.aircraft} />
+          <AircraftInfoCard
+            aircraft={flight.aircraft}
+            airlineCode={flight.airlineCode}
+          />
 
           <Panel className="p-3.5">
             <p className="label-caps text-subtle">Flight data</p>
@@ -554,8 +700,14 @@ export default function FlightDetailPage() {
               <DataRow label="Airline" value={flight.airline} />
               <DataRow label="Airline code" value={flight.airlineCode} mono />
               <DataRow label="Flight number" value={flight.flightNumber} mono />
-              <DataRow label="Check-in" value={flight.checkInCounter} />
-              <DataRow label="Baggage" value={flight.baggageCarousel} />
+              <DataRow
+                label="Check-in"
+                value={reportedOrUnavailable(flight.checkInCounter)}
+              />
+              <DataRow
+                label="Baggage"
+                value={reportedOrUnavailable(flight.baggageCarousel)}
+              />
               <DataRow label="Origin TZ" value={flight.origin.timezone} />
               <DataRow label="Dest. TZ" value={flight.destination.timezone} />
             </div>
@@ -640,6 +792,25 @@ function InlineMetric({
       {sub && <p className="mt-0.5 truncate text-[8px] text-subtle">{sub}</p>}
     </div>
   );
+}
+
+function gateLabel(terminal: string, gate: string): string {
+  const terminalPart =
+    terminal && terminal !== "—" ? `Terminal ${terminal}` : null;
+  const gatePart = gate && gate !== "Gate TBD" ? gate : null;
+  return [terminalPart, gatePart].filter(Boolean).join(" · ") || "Not reported";
+}
+
+function reportedOrUnavailable(value: string | null | undefined): string {
+  if (
+    !value ||
+    value === "—" ||
+    value === "N/A" ||
+    value === "Carousel TBD"
+  ) {
+    return "Not reported";
+  }
+  return value;
 }
 
 function GateTile({

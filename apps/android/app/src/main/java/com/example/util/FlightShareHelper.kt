@@ -19,12 +19,17 @@ object FlightShareHelper {
             FlightStatus.SCHEDULED -> "🕒"
         }
 
-        val delayText = if (flight.delayMinutes > 0) {
-            " (+${flight.delayMinutes}m delay: ${flight.delayReason ?: "ATC Flow"})"
+        val delayText = if (flight.delayReported && flight.delayMinutes > 0) {
+            " (+${flight.delayMinutes}m delay${flight.delayReason?.let { ": $it" } ?: "; reason not reported"})"
         } else ""
 
-        val etaText = if (flight.status == FlightStatus.DEPARTED) {
-            "\n⏳ ETA Countdown: ${flight.telemetry.etaMinutesRemaining} mins remaining (${flight.telemetry.distanceRemainingNm} NM)"
+        val etaText = if (
+            flight.statusReported &&
+            flight.status == FlightStatus.DEPARTED &&
+            flight.telemetry.hasLiveLocation &&
+            flight.telemetry.etaMinutesRemaining > 0
+        ) {
+            "\n⏳ ETA (calculated): ${flight.telemetry.etaMinutesRemaining} mins remaining (${flight.telemetry.distanceRemainingNm} NM)"
         } else ""
 
         val noteText = if (personalNote.isNotBlank()) {
@@ -38,7 +43,13 @@ object FlightShareHelper {
             appendLine("━━━━━━━━━━━━━━━━━━━━━")
             appendLine("Flight: ${flight.airline} (${flight.flightNumber})")
             appendLine("Route: ${flight.origin.code} (${flight.origin.city}) ➔ ${flight.destination.code} (${flight.destination.city})")
-            appendLine("Status: $statusEmoji ${flight.status.label}$delayText")
+            appendLine(
+                "Status: " + if (flight.statusReported) {
+                    "$statusEmoji ${flight.status.label}$delayText"
+                } else {
+                    "❔ Status not reported"
+                }
+            )
             appendLine("Departure: ${flight.departureTimeEstimated} · Terminal ${flight.terminalDeparture}, Gate ${flight.gateDeparture}")
             appendLine("Arrival: ${flight.arrivalTimeEstimated} · Terminal ${flight.terminalArrival}, Gate ${flight.gateArrival}")
             if (flight.baggageCarousel.isNotBlank() && flight.baggageCarousel != "N/A") {

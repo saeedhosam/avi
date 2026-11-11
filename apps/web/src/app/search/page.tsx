@@ -28,6 +28,7 @@ import {
   STATUS_META,
   cn,
   flightDateLabel,
+  isFreshTimestamp,
   isoDateToday,
   normalizeFlightNumber,
   parseFlexibleDate,
@@ -71,6 +72,10 @@ export default function SearchPage() {
   const [results, setResults] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastResultMeta, setLastResultMeta] = useState<{
+    mode: string;
+    fetchedAt: string | null;
+  } | null>(null);
   // Bumping the nonce re-runs the current lookup so "Refresh" refreshes the
   // page's own results, not just the background watchlist sync.
   const [searchNonce, setSearchNonce] = useState(0);
@@ -159,6 +164,7 @@ export default function SearchPage() {
       setLoading(true);
       setError(null);
       setResults([]);
+      setLastResultMeta(null);
       try {
         if (activeSearch.mode === "FLIGHT_NUMBER") {
           const dateParam = activeSearch.date ? `&date=${encodeURIComponent(activeSearch.date)}` : "";
@@ -170,6 +176,7 @@ export default function SearchPage() {
             mode: string;
             flights?: Flight[];
             error?: string;
+            fetchedAt?: string;
           };
           if (controller.signal.aborted) return;
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
@@ -179,6 +186,10 @@ export default function SearchPage() {
           }
           if (data.error) throw new Error(data.error);
           const incoming = data.flights ?? [];
+          setLastResultMeta({
+            mode: data.mode,
+            fetchedAt: data.fetchedAt ?? incoming[0]?.fetchedAt ?? null,
+          });
           setResults(incoming);
           if (incoming.length) upsertFlights(incoming);
           else setError("No live flights found for this number and date.");
@@ -191,6 +202,7 @@ export default function SearchPage() {
             mode: string;
             flights?: Flight[];
             error?: string;
+            fetchedAt?: string;
           };
           if (controller.signal.aborted) return;
           if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
@@ -199,6 +211,10 @@ export default function SearchPage() {
             throw new Error("Live flight data is unavailable right now.");
           }
           if (data.error) throw new Error(data.error);
+          setLastResultMeta({
+            mode: data.mode,
+            fetchedAt: data.fetchedAt ?? data.flights?.[0]?.fetchedAt ?? null,
+          });
           const destination = activeSearch.destination.toLowerCase();
           const departures = (data.flights ?? []).filter((flight) => {
             if (flight.origin.code !== activeSearch.origin) return false;
@@ -235,13 +251,10 @@ export default function SearchPage() {
   const resolvedResults = useMemo(() => {
     if (!results.length) return [];
     const flightMap = new Map(flights.map((f) => [flightKey(f), f]));
-    const numberMap = new Map(
-      flights.map((f) => [normalizeFlightNumber(f.flightNumber).toLowerCase(), f]),
-    );
     return results.map((flight) => {
-      const stored =
-        flightMap.get(flightKey(flight)) ??
-        numberMap.get(normalizeFlightNumber(flight.flightNumber).toLowerCase());
+      // Only merge the exact flight number + operating date. A number-only
+      // fallback could display another day's status or gate.
+      const stored = flightMap.get(flightKey(flight));
       return stored
         ? {
             ...flight,
@@ -255,7 +268,9 @@ export default function SearchPage() {
   const displayFlights = useMemo(
     () =>
       resolvedResults.filter((flight) => {
-        const matchesStatus = !statusFilter || flight.status === statusFilter;
+        const matchesStatus =
+          !statusFilter ||
+          (flight.statusReported && flight.status === statusFilter);
         const matchesWatchlist = !onlyWatchlisted || flight.isWatchlisted;
         return matchesStatus && matchesWatchlist;
       }),
@@ -266,7 +281,9 @@ export default function SearchPage() {
     const counts = Object.fromEntries(
       STATUSES.map((status) => [status, 0]),
     ) as Record<FlightStatus, number>;
-    for (const flight of resolvedResults) counts[flight.status] += 1;
+    for (const flight of resolvedResults) {
+      if (flight.statusReported) counts[flight.status] += 1;
+    }
     return counts;
   }, [resolvedResults]);
 
@@ -276,6 +293,8 @@ export default function SearchPage() {
   );
 
   const hasLookup = activeSearch !== null;
+  const hasFreshResult =
+    Boolean(lastResultMeta) && isFreshTimestamp(lastResultMeta?.fetchedAt);
   const canSearch =
     mode === "FLIGHT_NUMBER"
       ? normalizeFlightNumber(flightNumber).length >= 3 &&
@@ -594,7 +613,11 @@ export default function SearchPage() {
                 <span
                   className={cn(
                     "size-1.5 rounded-full",
-                    error ? "bg-delayed" : "animate-pulse-dot bg-landed",
+                    error
+                      ? "bg-delayed"
+                      : hasFreshResult
+                        ? "animate-pulse-dot bg-landed"
+                        : "bg-subtle",
                   )}
                 />
                 <span className="text-[10px] font-semibold text-muted">
@@ -602,7 +625,11 @@ export default function SearchPage() {
                     ? "Querying live data…"
                     : error
                       ? "Live lookup unavailable"
-                      : "Live data"}
+                      : hasFreshResult
+                        ? "Live data received"
+                        : hasLookup
+                          ? "No fresh result"
+                          : "Idle"}
                 </span>
               </div>
               <Button
@@ -670,7 +697,7 @@ export default function SearchPage() {
                 title="Search live flights"
                 description={
                   mode === "FLIGHT_NUMBER"
-                    ? "Enter a flight number and departure day, then press Search for live results. No simulated data is ever shown."
+                    ? "Enter a flight number and departure day, then press Search for live results. No simulated flight records are shown."
                     : "Enter a 3-letter origin airport code, then press Search. Live departures will be filtered by the optional destination."
                 }
               />

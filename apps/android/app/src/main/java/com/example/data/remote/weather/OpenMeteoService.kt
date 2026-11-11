@@ -130,22 +130,38 @@ object OpenMeteoMapper {
         dto: OpenMeteoResponseDto
     ): RealtimeAirportWeather {
         val current = dto.current
-        val tempC = current?.temperature2m?.toInt() ?: 20
-        val tempF = (tempC * 9 / 5) + 32
-        val condition = mapWmoCodeToCondition(current?.weatherCode)
-        val windKnots = current?.windSpeed10m?.toInt() ?: 10
-        val windDir = degreesToCardinal(current?.windDirection10m)
-        val visMiles = ((current?.visibility ?: 16000.0) / 1609.34).toInt().coerceIn(1, 10)
-        val visLabel = if (visMiles >= 10) "10+ mi" else "$visMiles mi"
-        val humidity = current?.relativeHumidity2m ?: 55
-        val hPa = current?.surfacePressure ?: 1013.25
-        val inHg = ((hPa * 0.02953) * 100).toInt() / 100.0
-        val flightCat = determineFlightCategory(current?.visibility, current?.weatherCode)
+        if (
+            current?.temperature2m == null ||
+            current.weatherCode == null ||
+            current.windSpeed10m == null ||
+            current.windDirection10m == null ||
+            current.visibility == null ||
+            current.relativeHumidity2m == null ||
+            current.surfacePressure == null
+        ) {
+            return RealtimeAirportWeather(
+                tempC = 0,
+                tempF = 32,
+                condition = "Not reported",
+                wind = "Not reported",
+                visibility = "Not reported",
+                humidity = 0,
+                metarRaw = "",
+                reported = false
+            )
+        }
 
-        val degStr = String.format(Locale.US, "%03d", current?.windDirection10m ?: 270)
-        val ktStr = String.format(Locale.US, "%02d", windKnots)
-        val qnh = hPa.toInt()
-        val metar = "$icao AUTO ${degStr}${ktStr}KT ${visMiles}SM ${condition.uppercase(Locale.US).take(6)} ${tempC}/${maxOf(0, tempC - 6)} Q$qnh"
+        val tempC = current.temperature2m.toInt()
+        val tempF = (tempC * 9 / 5) + 32
+        val condition = mapWmoCodeToCondition(current.weatherCode)
+        val windKnots = current.windSpeed10m.toInt()
+        val windDir = degreesToCardinal(current.windDirection10m)
+        val visMiles = (current.visibility / 1609.34).toInt().coerceIn(1, 10)
+        val visLabel = if (visMiles >= 10) "10+ mi" else "$visMiles mi"
+        val humidity = current.relativeHumidity2m
+        val hPa = current.surfacePressure
+        val inHg = ((hPa * 0.02953) * 100).toInt() / 100.0
+        val flightCat = determineFlightCategory(current.visibility, current.weatherCode)
 
         return RealtimeAirportWeather(
             tempC = tempC,
@@ -155,8 +171,10 @@ object OpenMeteoMapper {
             visibility = visLabel,
             humidity = humidity,
             pressureInHg = inHg,
-            metarRaw = metar,
-            flightCategory = flightCat
+            // Open-Meteo is a model, not a METAR feed. Never synthesize a METAR.
+            metarRaw = "",
+            flightCategory = flightCat,
+            reported = true
         )
     }
 
@@ -278,13 +296,16 @@ object OpenMeteoMapper {
             dailyForecast = dailyForecasts,
             advisory = ArrivalAviationAdvisory(
                 flightCategory = flightCategoryLabel,
-                crosswindKnots = windKnots,
-                crosswindRisk = crosswindRisk,
-                runwayVisualRange = if (visMiles >= 6) "6,000+ ft (RVR Clear)" else "${visMiles * 1000} ft (Reduced RVR)",
-                arrivalNotice = "Live Open-Meteo telemetry for ${airport.code} (${airport.city}): ${tempC}°C, $condition."
+                // Open-Meteo does not provide runway heading, crosswind
+                // components, RVR, or operational notices.
+                crosswindKnots = 0,
+                crosswindRisk = "Not reported",
+                runwayVisualRange = "Not reported",
+                arrivalNotice = "Open-Meteo model forecast; not an operational observation."
             ),
             packingAdvice = packingAdvice,
-            lastUpdated = System.currentTimeMillis()
+            lastUpdated = System.currentTimeMillis(),
+            dataAvailable = current != null
         )
     }
 

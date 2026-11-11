@@ -54,8 +54,10 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleFidsResponseSchema,
             400: errorResponseSchema,
+            404: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
+            503: errorResponseSchema,
           },
         },
         config: PROVIDER_RATE_LIMIT,
@@ -91,6 +93,38 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
               options.userQuota,
               options.config.AERODATABOX_UNITS_PER_FLIGHT,
             );
+          }
+          if (outcome.status === 204) {
+            return reply.code(503).send({
+              error: "board_data_unavailable",
+              message:
+                "The provider returned no board data. This is not evidence that no flights operate.",
+            });
+          }
+          if (outcome.mode === "NOT_FOUND") {
+            return reply.code(404).send({
+              error: "airport_not_found",
+              message: "The provider has no airport board for that code.",
+            });
+          }
+          if (outcome.mode === "INVALID_REQUEST") {
+            return reply.code(400).send({
+              error: "invalid_provider_request",
+              message: "The provider rejected that airport board query.",
+            });
+          }
+          if (outcome.mode === "NOT_CONFIGURED") {
+            return reply.code(503).send({
+              error: "provider_not_configured",
+              message: "Live airport board data is not configured.",
+            });
+          }
+          if (outcome.mode === "QUOTA_FALLBACK") {
+            return reply.code(429).send({
+              error: "provider_quota_exhausted",
+              message:
+                "Live airport board data is paused until the provider quota resets.",
+            });
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
@@ -128,8 +162,10 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleRoutesResponseSchema,
             400: errorResponseSchema,
+            404: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
+            503: errorResponseSchema,
           },
         },
         config: PROVIDER_RATE_LIMIT,
@@ -165,6 +201,38 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
               options.userQuota,
               options.config.AERODATABOX_UNITS_PER_ROUTE,
             );
+          }
+          if (outcome.status === 204) {
+            return reply.code(503).send({
+              error: "route_data_unavailable",
+              message:
+                "The provider returned no route data. This is not evidence that no routes exist.",
+            });
+          }
+          if (outcome.mode === "NOT_FOUND") {
+            return reply.code(404).send({
+              error: "airport_not_found",
+              message: "The provider has no route statistics for that airport.",
+            });
+          }
+          if (outcome.mode === "INVALID_REQUEST") {
+            return reply.code(400).send({
+              error: "invalid_provider_request",
+              message: "The provider rejected that route-statistics query.",
+            });
+          }
+          if (outcome.mode === "NOT_CONFIGURED") {
+            return reply.code(503).send({
+              error: "provider_not_configured",
+              message: "Live route statistics are not configured.",
+            });
+          }
+          if (outcome.mode === "QUOTA_FALLBACK") {
+            return reply.code(429).send({
+              error: "provider_quota_exhausted",
+              message:
+                "Live route statistics are paused until the provider quota resets.",
+            });
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({
@@ -202,8 +270,10 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
           response: {
             200: consoleAirportSearchResponseSchema,
             400: errorResponseSchema,
+            404: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
+            503: errorResponseSchema,
           },
         },
         config: PROVIDER_RATE_LIMIT,
@@ -215,9 +285,12 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
         const q = request.query.q.trim();
         if (q.length < 2) {
           return reply.code(200).send({
-            mode: "LIVE_AERODATABOX",
+            mode: "IDLE",
             status: 0,
             airports: [],
+            source: "AERODATABOX",
+            fetchedAt: new Date().toISOString(),
+            attribution: "AeroDataBox",
           });
         }
         try {
@@ -240,6 +313,31 @@ export const consoleAirportRoutes: FastifyPluginAsyncZod<ConsoleAirportOptions> 
               options.userQuota,
               options.config.AERODATABOX_UNITS_PER_FLIGHT,
             );
+          }
+          if (outcome.mode === "NOT_FOUND") {
+            return reply.code(404).send({
+              error: "airport_not_found",
+              message: "The provider returned no airport search results.",
+            });
+          }
+          if (outcome.mode === "INVALID_REQUEST") {
+            return reply.code(400).send({
+              error: "invalid_provider_request",
+              message: "The provider rejected that airport search query.",
+            });
+          }
+          if (outcome.mode === "NOT_CONFIGURED") {
+            return reply.code(503).send({
+              error: "provider_not_configured",
+              message: "Airport search is not configured.",
+            });
+          }
+          if (outcome.mode === "QUOTA_FALLBACK") {
+            return reply.code(429).send({
+              error: "provider_quota_exhausted",
+              message:
+                "Airport search is paused until the provider quota resets.",
+            });
           }
           if (outcome.mode === "ERROR") {
             return reply.code(502).send({

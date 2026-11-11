@@ -95,7 +95,12 @@ fun FlightCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
+                    StatusBadge(
+                        status = flight.status,
+                        delayMinutes = flight.delayMinutes,
+                        statusReported = flight.statusReported,
+                        delayReported = flight.delayReported
+                    )
 
                     IconButton(
                         onClick = onToggleFavorite,
@@ -295,7 +300,11 @@ fun FlightCard(
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Arrival ${flight.destination.code}: ${flight.destination.weather.tempC}°C · ${flight.destination.weather.condition}",
+                                text = if (flight.destination.weatherReported) {
+                                    "Arrival ${flight.destination.code}: ${flight.destination.weather.tempC}°C · ${flight.destination.weather.condition}"
+                                } else {
+                                    "Arrival ${flight.destination.code}: weather not reported"
+                                },
                                 color = TextWhite,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,

@@ -30,15 +30,21 @@ export interface Airport {
   latitude: number;
   longitude: number;
   weather: AirportWeather;
+  /** False when the weather block is a placeholder, not an observation. */
+  weatherReported?: boolean;
 }
 
 export interface AircraftInfo {
   model: string;
   registration: string;
-  age: string;
-  wifiAvailable: boolean;
-  powerOutlets: boolean;
-  seatLayout: string;
+  /** `null` when the provider did not report the airframe age. */
+  age: string | null;
+  /** `null` when the provider did not report onboard Wi-Fi. */
+  wifiAvailable: boolean | null;
+  /** `null` when the provider did not report seat power. */
+  powerOutlets: boolean | null;
+  /** `null` when the provider did not report a cabin layout. */
+  seatLayout: string | null;
 }
 
 export interface Waypoint {
@@ -63,6 +69,8 @@ export interface FlightTelemetry {
   distanceRemainingNm: number;
   etaMinutesRemaining: number;
   waypoints: Waypoint[];
+  /** True when progress/ETA were calculated from a live position, not reported. */
+  isDerived?: boolean;
 }
 
 export interface FlightTimelineEvent {
@@ -89,8 +97,16 @@ export interface Flight {
   arrivalTimeEstimated: string;
   arrivalTimeActual: string | null;
   status: FlightStatus;
+  /** False when the provider did not report a status we can verify. */
+  statusReported: boolean;
+  /** Raw provider status text, preserved for auditability. */
+  statusRaw: string;
   statusNote: string;
+  /** Always numeric for client compatibility; check `delayReported` first. */
   delayMinutes: number;
+  /** False when the provider did not report enough time data to compute a delay. */
+  delayReported: boolean;
+  delaySource: "provider" | "derived" | "unknown";
   delayReason: string | null;
   terminalDeparture: string;
   gateDeparture: string;
@@ -103,6 +119,10 @@ export interface Flight {
   timeline: FlightTimelineEvent[];
   isWatchlisted: boolean;
   customNotes: string;
+  /** Provider that produced this record, when known. */
+  source?: string;
+  /** ISO timestamp of the provider response that produced this record. */
+  fetchedAt?: string;
 }
 
 export type RouteRegion =
@@ -141,6 +161,7 @@ export interface ConsoleRouteStat {
   timezone?: string;
   latitude: number;
   longitude: number;
-  dailyFlights: number;
+  /** Null when the provider did not report a daily average. */
+  dailyFlights: number | null;
   operators: RouteOperator[];
 }

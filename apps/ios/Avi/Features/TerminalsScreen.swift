@@ -44,6 +44,13 @@ public struct TerminalsScreen: View {
             AviTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                Text("Illustrative terminal guide — not live gate or amenity data.")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AviTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
                 // Airport Selector & Floor Strip
                 HStack {
                     Menu {

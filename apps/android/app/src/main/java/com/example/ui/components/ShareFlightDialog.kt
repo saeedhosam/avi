@@ -114,7 +114,12 @@ fun ShareFlightDialog(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
                             )
-                            StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
+                            StatusBadge(
+                                status = flight.status,
+                                delayMinutes = flight.delayMinutes,
+                                statusReported = flight.statusReported,
+                                delayReported = flight.delayReported
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))

@@ -6,6 +6,10 @@ import type { Flight } from "@/lib/types";
 import { STATUS_META } from "@/lib/utils";
 import { Button, Modal } from "./ui";
 
+function known(value: string | null | undefined): value is string {
+  return Boolean(value) && value !== "—" && value !== "N/A" && value !== "TBD";
+}
+
 export function generateFlightSummary(flight: Flight, personalNote = "") {
   const statusEmoji =
     flight.status === "DEPARTED"
@@ -19,13 +23,19 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
             : flight.status === "CANCELLED"
               ? "❌"
               : "🕒";
+  const statusText = flight.statusReported
+    ? `${statusEmoji} ${STATUS_META[flight.status].label}`
+    : "❔ Status not reported";
   const delayText =
-    flight.delayMinutes > 0
-      ? ` (+${flight.delayMinutes}m delay: ${flight.delayReason ?? "ATC Flow"})`
+    flight.delayReported && flight.delayMinutes > 0
+      ? ` (+${flight.delayMinutes}m delay${flight.delayReason ? `: ${flight.delayReason}` : "; reason not reported"})`
       : "";
   const etaText =
-    flight.status === "DEPARTED"
-      ? `\n⏳ ETA Countdown: ${flight.telemetry.etaMinutesRemaining} mins remaining (${flight.telemetry.distanceRemainingNm} NM)`
+    flight.statusReported &&
+    flight.status === "DEPARTED" &&
+    flight.telemetry.hasLiveLocation &&
+    flight.telemetry.etaMinutesRemaining > 0
+      ? `\n⏳ ETA (calculated): ${flight.telemetry.etaMinutesRemaining} mins remaining (${flight.telemetry.distanceRemainingNm} NM)`
       : "";
   const noteText = personalNote.trim()
     ? `\n💬 Note: "${personalNote.trim()}"`
@@ -37,23 +47,35 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
     typeof window !== "undefined"
       ? window.location.origin
       : "";
-  const flightLink = `${shareUrl}/flight/${flight.flightNumber.replace(/\s+/g, "")}${flight.flightDate ? `?date=${flight.flightDate}` : ""}`;
+  const flightLink = `${shareUrl}/flight/${encodeURIComponent(flight.id)}${flight.flightDate ? `?date=${flight.flightDate}` : ""}`;
+  const departureParts = [
+    flight.departureTimeEstimated,
+    known(flight.terminalDeparture) ? `Terminal ${flight.terminalDeparture}` : null,
+    known(flight.gateDeparture) ? flight.gateDeparture : null,
+  ].filter(Boolean);
+  const arrivalParts = [
+    flight.arrivalTimeEstimated,
+    known(flight.terminalArrival) ? `Terminal ${flight.terminalArrival}` : null,
+    known(flight.gateArrival) ? flight.gateArrival : null,
+  ].filter(Boolean);
 
   return [
     "✈️ Avi Flight Status Update",
     "━━━━━━━━━━━━━━━━━━━━━",
     `Flight: ${flight.airline} (${flight.flightNumber})`,
     `Route: ${flight.origin.code} (${flight.origin.city}) ➔ ${flight.destination.code} (${flight.destination.city})`,
-    `Status: ${statusEmoji} ${STATUS_META[flight.status].label}${delayText}`,
-    `Departure: ${flight.departureTimeEstimated} · Terminal ${flight.terminalDeparture}, ${flight.gateDeparture}`,
-    `Arrival: ${flight.arrivalTimeEstimated} · Terminal ${flight.terminalArrival}, ${flight.gateArrival}`,
-    flight.baggageCarousel && flight.baggageCarousel !== "N/A"
+    `Status: ${statusText}${delayText}`,
+    `Departure: ${departureParts.join(" · ")}`,
+    `Arrival: ${arrivalParts.join(" · ")}`,
+    known(flight.baggageCarousel)
       ? `Baggage: ${flight.baggageCarousel}`
       : "",
-    `Aircraft: ${flight.aircraft.model} (${flight.aircraft.registration})`,
+    flight.aircraft.model !== "Not reported"
+      ? `Aircraft: ${flight.aircraft.model}${flight.aircraft.registration !== "Not reported" ? ` (${flight.aircraft.registration})` : ""}`
+      : "",
   ]
     .filter(Boolean)
-    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nTrack live with Avi: ${flightLink}`;
+    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nView with Avi: ${flightLink}`;
 }
 
 export function ShareFlightDialog({

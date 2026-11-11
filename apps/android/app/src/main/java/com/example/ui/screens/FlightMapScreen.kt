@@ -249,7 +249,12 @@ fun FlightMapScreen(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            StatusBadge(status = flight.status, delayMinutes = flight.delayMinutes)
+                            StatusBadge(
+                                status = flight.status,
+                                delayMinutes = flight.delayMinutes,
+                                statusReported = flight.statusReported,
+                                delayReported = flight.delayReported
+                            )
                         }
                         Text(
                             text = "${flight.origin.code} (${flight.origin.city}) → ${flight.destination.code} (${flight.destination.city})",

@@ -85,7 +85,8 @@ data class CloudAirportSnapshot(
     val timezone: String = "UTC",
     val latitude: Double,
     val longitude: Double,
-    val weather: CloudAirportWeatherSnapshot = CloudAirportWeatherSnapshot()
+    val weather: CloudAirportWeatherSnapshot = CloudAirportWeatherSnapshot(),
+    val weatherReported: Boolean = false
 )
 
 @Serializable
@@ -102,10 +103,10 @@ data class CloudAirportWeatherSnapshot(
 data class CloudAircraftSnapshot(
     val model: String = "",
     val registration: String = "",
-    val age: String = "",
-    val wifiAvailable: Boolean = false,
-    val powerOutlets: Boolean = false,
-    val seatLayout: String = ""
+    val age: String? = null,
+    val wifiAvailable: Boolean? = null,
+    val powerOutlets: Boolean? = null,
+    val seatLayout: String? = null
 )
 
 @Serializable
@@ -149,8 +150,10 @@ data class CloudFlightSnapshot(
     val arrivalTimeEstimated: String = "",
     val arrivalTimeActual: String? = null,
     val status: String = "SCHEDULED",
+    val statusReported: Boolean = true,
     val statusNote: String = "",
     val delayMinutes: Int = 0,
+    val delayReported: Boolean = true,
     val delayReason: String? = null,
     val terminalDeparture: String = "",
     val gateDeparture: String = "",
@@ -163,6 +166,8 @@ data class CloudFlightSnapshot(
     val timeline: List<CloudTimelineSnapshot> = emptyList(),
     val isFavorite: Boolean = false,
     val isTracked: Boolean = true,
-    val customNotes: String = ""
+    val customNotes: String = "",
+    val source: String? = null,
+    val fetchedAt: String? = null
 )
 

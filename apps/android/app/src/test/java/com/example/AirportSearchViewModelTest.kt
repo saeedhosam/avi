@@ -87,12 +87,13 @@ class AirportSearchViewModelTest {
     }
 
     @Test
-    fun onStatusFilterSelected_filtersDelayedAirports() = runTest {
+    fun onStatusFilterSelected_neverTreatsReferenceDataAsDelayed() = runTest {
         viewModel.onStatusFilterSelected("Delayed")
 
         val state = viewModel.uiState.value
-        assertTrue("Should produce Success state", state is AirportSearchUiState.Success)
-        val success = state as AirportSearchUiState.Success
-        assertTrue("All results should be marked delayed", success.airports.all { it.isDelayed })
+        // Reference airport rows are explicitly unreported. The Delayed
+        // filter must not invent delayed airports from them, so the result is
+        // an explicit empty state.
+        assertTrue("Should produce Empty state", state is AirportSearchUiState.Empty)
     }
 }

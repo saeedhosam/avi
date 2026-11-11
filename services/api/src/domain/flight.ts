@@ -32,6 +32,8 @@ export interface FlightSummary {
   airline: string;
   airlineCode: string;
   status: FlightStatus;
+  statusReported: boolean;
+  statusRaw: string;
   statusNote: string;
   origin: FlightEndpoint;
   destination: FlightEndpoint;
@@ -49,6 +51,8 @@ export interface FlightSummary {
     registration: string;
   };
   delayMinutes: number;
+  delayReported: boolean;
+  delaySource: "provider" | "derived" | "unknown";
   telemetry: FlightTelemetry;
   source: "aerodatabox";
   updatedAt: string;

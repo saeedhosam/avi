@@ -48,7 +48,7 @@ const NAV_ITEMS = [
 ];
 
 const PAGE_TITLES: Record<string, { title: string; eyebrow: string }> = {
-  "/search": { title: "Flight Search", eyebrow: "Live telemetry console" },
+  "/search": { title: "Flight Search", eyebrow: "Provider flight lookup" },
   "/routes": { title: "Route Network", eyebrow: "Global direct connections" },
   "/airports": {
     title: "Airport Indoor Maps",
@@ -73,7 +73,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     syncing,
     dataSourceMode,
     aeroConfigured,
-    offlineMode,
     toasts,
     dismissToast,
   } = useApp();
@@ -87,9 +86,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         pathname === key || (key !== "/search" && pathname.startsWith(key)),
     ) ?? "/search";
   const meta = pathname.startsWith("/flight/")
-    ? { title: "Flight Dossier", eyebrow: "Live flight detail" }
+    ? { title: "Flight Dossier", eyebrow: "Provider flight detail" }
     : pathname.startsWith("/map/")
-      ? { title: "Live Flight Map", eyebrow: "Airborne route tracking" }
+      ? { title: "Flight Map", eyebrow: "Route and live position when reported" }
       : PAGE_TITLES[pageKey];
 
   const source = DATA_SOURCE_META[dataSourceMode];
@@ -342,27 +341,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="space-y-2">
             <DiagnosticRow
               title="Live flight data"
-              detail="Live flight lookup, airport boards, daily route stats"
-              active={aeroConfigured && !offlineMode}
-              value={aeroConfigured ? "CONNECTED" : "SAVED DATA"}
+              detail="Flight lookup, airport boards, daily route stats"
+              active={dataSourceMode === "LIVE_AERODATABOX"}
+              value={
+                dataSourceMode === "LIVE_AERODATABOX"
+                  ? "LIVE RESPONSE"
+                  : aeroConfigured
+                    ? "READY · NO DATA"
+                    : "SAVED DATA"
+              }
             />
             <DiagnosticRow
               title="Destination weather"
-              detail="METAR, arrival forecasts, VFR/IFR rules"
-              active={!offlineMode}
-              value="CONNECTED"
+              detail="Open-Meteo model forecast, fetched on demand"
+              active={false}
+              value="ON DEMAND"
             />
             <DiagnosticRow
               title="Local cache & background sync"
-              detail="Flights, watchlist, notes, alerts, route cache"
+              detail="Saved flight records, watchlist, notes, alerts"
               active
               value="ACTIVE"
             />
             <DiagnosticRow
               title="Account sync"
               detail="Sign-in · profile · watchlist · alerts"
-              active={aeroConfigured || Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)}
-              value={aeroConfigured ? "CONNECTED" : "OPTIONAL"}
+              active={Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)}
+              value={Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) ? "CONFIGURED" : "OPTIONAL"}
             />
           </div>
           {!aeroConfigured && (

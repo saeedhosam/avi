@@ -38,7 +38,12 @@ object FlightStateDiffer {
         }
 
         // 2. Check Delay Increase (>= 15m difference)
-        if (updated.delayMinutes - previous.delayMinutes >= 15) {
+        if (
+            updated.delayReported &&
+            updated.delayMinutes > 0 &&
+            (!previous.delayReported ||
+                updated.delayMinutes - previous.delayMinutes >= 15)
+        ) {
             alerts.add(
                 FlightAlert(
                     id = UUID.randomUUID().toString(),
@@ -53,7 +58,7 @@ object FlightStateDiffer {
         }
 
         // 3. Check Operational Status Transition
-        if (previous.status != updated.status) {
+        if (updated.statusReported && previous.status != updated.status) {
             when (updated.status) {
                 FlightStatus.BOARDING -> {
                     alerts.add(

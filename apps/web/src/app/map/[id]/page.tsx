@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { authFetch } from "@/lib/authed-fetch";
-import { cn, geodesicDistanceKm, kmToNm, normalizeFlightNumber } from "@/lib/utils";
+import {
+  cn,
+  geodesicDistanceKm,
+  isFreshTimestamp,
+  kmToNm,
+  normalizeFlightNumber,
+} from "@/lib/utils";
 import type { Flight } from "@/lib/types";
 import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
 
@@ -39,6 +45,7 @@ export default function FlightMapPage() {
   const { flights, upsertFlights, offlineMode } = useApp();
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupAttempted, setLookupAttempted] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const dateParam = searchParams.get("date") ?? "";
   const flight = useMemo(() => {
@@ -49,10 +56,10 @@ export default function FlightMapPage() {
       normalizeFlightNumber(item.flightNumber).toLowerCase() === cleanId;
     const dateMatch = (item: Flight) =>
       !dateParam || (item.flightDate ?? "") === dateParam;
-    return (
-      flights.find((item) => numberMatch(item) && dateMatch(item)) ??
-      flights.find(numberMatch)
-    );
+    if (dateParam) {
+      return flights.find((item) => numberMatch(item) && dateMatch(item));
+    }
+    return flights.find(numberMatch);
   }, [flights, params.id, dateParam]);
 
   useEffect(() => {
@@ -68,15 +75,25 @@ export default function FlightMapPage() {
     const dateQuery = dateParam ? `&date=${encodeURIComponent(dateParam)}` : "";
     authFetch(`/api/flights/search?flight=${encodeURIComponent(rawId)}${dateQuery}`)
       .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as
+          | { flights?: Flight[]; error?: string }
+          | null;
         if (!active) return;
-        if (res.ok) {
-          const data = (await res.json()) as { flights?: Flight[] };
-          if (Array.isArray(data.flights) && data.flights.length > 0) {
-            upsertFlights(data.flights);
-          }
+        if (!res.ok || data?.error) {
+          setLookupError(
+            data?.error ?? "Live flight lookup is temporarily unavailable.",
+          );
+          return;
+        }
+        if (Array.isArray(data?.flights) && data.flights.length > 0) {
+          upsertFlights(data.flights);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) {
+          setLookupError("Live flight lookup is temporarily unavailable.");
+        }
+      })
       .finally(() => {
         if (active) {
           setLookupLoading(false);
@@ -109,8 +126,14 @@ export default function FlightMapPage() {
         <Panel>
           <EmptyState
             icon={<MapIcon className="size-6" />}
-            title="Flight map unavailable"
-            description="We could not find active telemetry for this flight. Check the flight number or search again."
+            title={
+              lookupError ? "Live flight lookup unavailable" : "Flight map unavailable"
+            }
+            description={
+              lookupError
+                ? `${lookupError} This is not evidence that the flight does not operate.`
+                : "We could not find a live record for this flight and date. The provider may not cover it."
+            }
             action={
               <Link href="/search">
                 <Button size="sm">Back to search</Button>
@@ -129,6 +152,9 @@ export default function FlightMapPage() {
     flight.destination.longitude,
   );
   const distanceNm = kmToNm(distance);
+  const hasFreshPosition =
+    Boolean(flight.telemetry.hasLiveLocation) &&
+    isFreshTimestamp(flight.fetchedAt);
 
   const toggleFullscreen = async () => {
     try {
@@ -156,7 +182,9 @@ export default function FlightMapPage() {
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0">
-            <p className="label-caps text-accent">Live flight map</p>
+            <p className="label-caps text-accent">
+              {hasFreshPosition ? "Live flight map" : "Flight route map"}
+            </p>
             <h2 className="flex items-center gap-2 text-base font-bold text-ink lg:text-lg">
               {flight.flightNumber}
               {flight.isWatchlisted && (
@@ -168,7 +196,12 @@ export default function FlightMapPage() {
               <span className="text-[11px] font-medium text-muted">
                 {flight.origin.code} → {flight.destination.code}
               </span>
-              <StatusBadge status={flight.status} delayMinutes={flight.delayMinutes} />
+              <StatusBadge
+                status={flight.status}
+                statusReported={flight.statusReported}
+                delayMinutes={flight.delayMinutes}
+                delayReported={flight.delayReported}
+              />
             </h2>
           </div>
         </div>
@@ -212,9 +245,21 @@ export default function FlightMapPage() {
                   <p className="text-[9px] text-subtle">{flight.airline}</p>
                 </div>
               </div>
-              <span className="flex items-center gap-1 text-[8px] font-bold text-landed">
-                <span className="size-1.5 animate-pulse-dot rounded-full bg-landed" />
-                LIVE
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-[8px] font-bold",
+                  hasFreshPosition ? "text-landed" : "text-subtle",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    hasFreshPosition
+                      ? "animate-pulse-dot bg-landed"
+                      : "bg-subtle",
+                  )}
+                />
+                {hasFreshPosition ? "LIVE" : "POSITION NOT REPORTED"}
               </span>
             </div>
             <div className="mt-2.5 flex items-center justify-between rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5">
@@ -227,7 +272,7 @@ export default function FlightMapPage() {
               <span className="flex flex-1 flex-col items-center px-2">
                 <Plane className="size-3 rotate-90 text-accent" />
                 <span className="mt-0.5 text-[8px] font-semibold text-accent">
-                  {flight.telemetry.hasLiveLocation
+                  {hasFreshPosition
                     ? `${Math.round(flight.telemetry.progressPercent * 100)}%`
                     : "No position"}
                 </span>
@@ -243,15 +288,17 @@ export default function FlightMapPage() {
               <p className="flex items-center justify-between">
                 <span className="text-subtle">Position</span>
                 <span className="font-mono font-semibold text-ink">
-                  {flight.telemetry.currentLatitude.toFixed(2)},{" "}
-                  {flight.telemetry.currentLongitude.toFixed(2)}
+                  {hasFreshPosition
+                    ? `${flight.telemetry.currentLatitude.toFixed(2)}, ${flight.telemetry.currentLongitude.toFixed(2)}`
+                    : "Not reported"}
                 </span>
               </p>
               <p className="flex items-center justify-between">
-                <span className="text-subtle">Heading</span>
+                <span className="text-subtle">Heading / speed</span>
                 <span className="font-semibold text-ink">
-                  {Math.round(flight.telemetry.headingDegrees)}° ·{" "}
-                  {flight.telemetry.groundSpeedKnots} kt
+                  {hasFreshPosition
+                    ? `${Math.round(flight.telemetry.headingDegrees)}° · ${flight.telemetry.groundSpeedKnots} kt`
+                    : "Not reported"}
                 </span>
               </p>
               <p className="flex items-center justify-between">
@@ -263,9 +310,11 @@ export default function FlightMapPage() {
             </div>
             <div className="mt-2 flex items-center gap-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] text-delayed">
               <TriangleAlert className="size-2.5" />
-              {flight.statusNote || "Normal operations"}
+              {flight.statusReported
+                ? flight.statusNote || "No status note reported"
+                : "Status not reported by provider"}
             </div>
-            {!flight.telemetry.hasLiveLocation && (
+            {!hasFreshPosition && (
               <div className="mt-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] leading-relaxed text-delayed">
                 A live aircraft position isn’t available for this flight. The route is
                 shown, but no aircraft marker is fabricated.
@@ -289,13 +338,18 @@ export default function FlightMapPage() {
               <p className="flex justify-between gap-2">
                 <span className="text-subtle">Remaining</span>
                 <span className="font-semibold text-accent">
-                  {flight.telemetry.distanceRemainingNm} nm
+                  {hasFreshPosition
+                    ? `${flight.telemetry.distanceRemainingNm} nm`
+                    : "Not reported"}
                 </span>
               </p>
               <p className="flex justify-between gap-2">
                 <span className="text-subtle">ETA</span>
                 <span className="font-semibold text-ink">
-                  {flight.arrivalTimeEstimated} · {flight.telemetry.etaMinutesRemaining}m
+                  {hasFreshPosition &&
+                  flight.telemetry.etaMinutesRemaining > 0
+                    ? `${flight.arrivalTimeEstimated} · ${flight.telemetry.etaMinutesRemaining}m`
+                    : flight.arrivalTimeEstimated || "Not reported"}
                 </span>
               </p>
               <p className="flex justify-between gap-2">
@@ -316,12 +370,12 @@ export default function FlightMapPage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-3">
             <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 px-3 py-2 shadow-xl backdrop-blur">
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                <HudItem label="Altitude" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
-                <HudItem label="Ground speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
-                <HudItem label="Mach" value={flight.telemetry.hasLiveLocation ? flight.telemetry.mach.toFixed(2) : "—"} />
-                <HudItem label="Vertical speed" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.verticalSpeedFpm} fpm` : "—"} />
-                <HudItem label="Remaining" value={flight.telemetry.hasLiveLocation ? `${flight.telemetry.distanceRemainingNm} nm` : "—"} />
-                <HudItem label="ETA" value={flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
+                <HudItem label="Altitude" value={hasFreshPosition ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
+                <HudItem label="Ground speed" value={hasFreshPosition ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
+                <HudItem label="Mach" value="—" />
+                <HudItem label="Vertical speed" value="—" />
+                <HudItem label="Remaining" value={hasFreshPosition ? `${flight.telemetry.distanceRemainingNm} nm` : "—"} />
+                <HudItem label="ETA (calc.)" value={hasFreshPosition && flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
               </div>
             </div>
           </div>

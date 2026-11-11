@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import {
   findAirportNode,
-  routeAirports,
   searchAirportNodes,
   terminalLayouts,
 } from "@/lib/data";
@@ -78,6 +77,18 @@ const CATEGORY_ORDER: AmenityCategory[] = [
   "TRANSIT",
 ];
 
+function normalizeGate(value: string | null | undefined): string {
+  return (value ?? "").toUpperCase().replace(/^GATE\s*/, "").trim();
+}
+
+function departureSortKey(flight: Flight): string {
+  return (
+    flight.departureTimeEstimated ||
+    flight.departureTimeScheduled ||
+    "99:99"
+  );
+}
+
 export default function AirportsPage() {
   const [airportCode, setAirportCode] = useState("CAI");
   const [viewMode, setViewMode] = useState<"GROUNDS" | "INDOOR">("GROUNDS");
@@ -92,10 +103,12 @@ export default function AirportsPage() {
   // Live flights for this airport
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flightsLoading, setFlightsLoading] = useState(false);
+  const [flightsError, setFlightsError] = useState<string | null>(null);
+  const [flightsFetchedAt, setFlightsFetchedAt] = useState<string | null>(null);
 
   // Airport node from global catalog
   const airportNode = useMemo(
-    () => findAirportNode(airportCode) ?? routeAirports[0],
+    () => findAirportNode(airportCode) ?? null,
     [airportCode],
   );
 
@@ -159,20 +172,45 @@ export default function AirportsPage() {
   useEffect(() => {
     let cancelled = false;
     setFlightsLoading(true);
+    setFlightsError(null);
+    setFlightsFetchedAt(null);
 
-    fetch(`/api/airports/${encodeURIComponent(airportCode)}/flights`)
-      .then((res) => (res.ok ? res.json() : { flights: [] }))
-      .then((data) => {
-        if (!cancelled) {
-          setFlights(Array.isArray(data.flights) ? data.flights : []);
-          setFlightsLoading(false);
+    fetch(`/api/airports/${encodeURIComponent(airportCode)}/flights`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as
+          | {
+              flights?: unknown;
+              error?: string;
+              fetchedAt?: string;
+            }
+          | null;
+        if (!res.ok || !data || data.error) {
+          throw new Error(
+            data?.error ?? "Live airport board is temporarily unavailable.",
+          );
         }
+        if (!Array.isArray(data.flights)) {
+          throw new Error("The provider returned an unexpected airport board.");
+        }
+        return data as { flights: Flight[]; fetchedAt?: string };
       })
-      .catch(() => {
-        if (!cancelled) {
-          setFlights([]);
-          setFlightsLoading(false);
-        }
+      .then((data) => {
+        if (cancelled) return;
+        setFlights(data.flights);
+        setFlightsFetchedAt(data.fetchedAt ?? null);
+        setFlightsLoading(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setFlights([]);
+        setFlightsError(
+          error instanceof Error
+            ? error.message
+            : "Live airport board is temporarily unavailable.",
+        );
+        setFlightsLoading(false);
       });
 
     return () => {
@@ -241,26 +279,47 @@ export default function AirportsPage() {
     }
   };
 
-  // Filtered flights for the selected gate or upcoming departures
+  // Filtered flights for the selected gate or upcoming departures. This is
+  // intentionally strict: unrelated flights are never substituted when the
+  // selected gate has no match.
   const gateDepartures = useMemo(() => {
-    if (!flights.length) return [];
-    if (selected && selected.gateNumber) {
-      const clean = selected.gateNumber.toLowerCase();
-      const matched = flights.filter(
-        (f) =>
-          (f.gateDeparture && f.gateDeparture.toLowerCase() === clean) ||
-          (f.gateArrival && f.gateArrival.toLowerCase() === clean),
-      );
-      if (matched.length > 0) return matched.slice(0, 5);
+    const airportDepartures = flights
+      .filter((flight) => flight.origin.code === airportCode)
+      .sort((a, b) => departureSortKey(a).localeCompare(departureSortKey(b)));
+
+    if (selected?.gateNumber) {
+      const clean = normalizeGate(selected.gateNumber);
+      return airportDepartures
+        .filter((flight) => normalizeGate(flight.gateDeparture) === clean)
+        .slice(0, 5);
     }
-    return flights.slice(0, 6);
-  }, [flights, selected]);
+    return airportDepartures.slice(0, 6);
+  }, [flights, selected, airportCode]);
 
   // Search filtered airports in modal
   const filteredAirports = useMemo(() => {
     if (!pickerSearch.trim()) return [];
     return searchAirportNodes(pickerSearch);
   }, [pickerSearch]);
+
+  if (!airportNode) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <Panel className="p-6 text-center">
+          <p className="text-sm font-bold text-ink">Airport not found</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {airportCode} is not in Avi&apos;s reference catalog. No airport data
+            is substituted.
+          </p>
+          <Link href="/airports" className="mt-3 inline-block">
+            <Button size="sm" variant="outline">
+              Back to airports
+            </Button>
+          </Link>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1720px] px-4 py-4 lg:px-6">
@@ -286,8 +345,8 @@ export default function AirportsPage() {
             )}
           </h1>
           <p className="mt-0.5 text-xs text-muted">
-            {airportNode.city}, {airportNode.country} · {airportNode.timezone} ·{" "}
-            {airportNode.destCount ? `${airportNode.destCount} direct destinations` : "Commercial hub"}
+            {airportNode.city}, {airportNode.country}
+            {airportNode.timezone ? ` · ${airportNode.timezone}` : ""}
           </p>
         </div>
 
@@ -372,6 +431,17 @@ export default function AirportsPage() {
             <span className="size-1.5 rounded-full bg-cyan-400" />
           </button>
         ))}
+      </div>
+
+      {/* Static terminal data is a guide, not live operational data. */}
+      <div className="mb-3 flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
+        <Info className="mt-0.5 size-3.5 shrink-0 text-accent" />
+        <span>
+          Terminal diagrams, amenity locations, walking distances, and wait
+          times are an illustrative reference guide. They are not live gate,
+          security, or facility data. Live flight status is shown separately
+          from AeroDataBox.
+        </span>
       </div>
 
       {/* Non-CAD Notice Banner (if in Grounds view for airports without pre-modeled indoor CAD) */}
@@ -468,12 +538,18 @@ export default function AirportsPage() {
                 <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
                   <span>Hub Carriers:</span>
                   <span className="font-semibold text-ink text-right truncate max-w-[140px]">
-                    {airportNode.hubAirlines?.join(", ") || "International"}
+                    {airportNode.hubAirlines?.length
+                      ? airportNode.hubAirlines.join(", ")
+                      : "Not reported"}
                   </span>
                 </div>
                 <div className="flex justify-between text-muted">
                   <span>Direct Routes:</span>
-                  <span className="font-mono font-bold text-accent">{airportNode.destCount ?? "—"} destinations</span>
+                  <span className="font-mono font-bold text-accent">
+                    {airportNode.destCount != null
+                      ? `${airportNode.destCount} catalog reference destinations`
+                      : "Destination count not reported"}
+                  </span>
                 </div>
               </div>
             </Panel>
@@ -534,7 +610,9 @@ export default function AirportsPage() {
                   <span className="flex items-center gap-1.5">
                     <Shield className="size-3.5 text-red-400" /> Origin:
                   </span>
-                  <span className="font-semibold text-ink">Main TSA Security</span>
+                  <span className="font-semibold text-ink">
+                    Security checkpoint (reference)
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-muted">
                   <span className="flex items-center gap-1.5">
@@ -552,14 +630,12 @@ export default function AirportsPage() {
                         <Footprints className="size-3.5" /> Walk time:
                       </span>
                       <span className="font-mono text-sm font-black text-ink">
-                        ~{selected.walkTimeFromSecurityMinutes} min
+                        Illustrative
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[9px] text-subtle">
                       <span>Concourse distance:</span>
-                      <span className="font-mono">
-                        {selected.walkDistanceMeters} m / ~{Math.round(selected.walkDistanceMeters * 3.28)} ft
-                      </span>
+                      <span className="font-mono">Not reported</span>
                     </div>
                   </div>
                 )}
@@ -600,9 +676,9 @@ export default function AirportsPage() {
                 sub={floor.description}
               />
               <MetricTile
-                label="Active Boarding Gates"
+                label="Mapped Gates"
                 value={String(layout.amenities.filter((a) => a.category === "GATE" && a.level === floor.level).length)}
-                sub="Equipped with jetbridges & queue lanes"
+                sub="Reference positions in the illustrative diagram"
               />
               <MetricTile
                 label="Dining & Lounges"
@@ -611,12 +687,12 @@ export default function AirportsPage() {
                     (a) => (a.category === "LOUNGE" || a.category === "DINING") && a.level === floor.level,
                   ).length,
                 )}
-                sub="Airside food courts & airline clubs"
+                sub="Reference listings, not live availability"
               />
               <MetricTile
-                label="TSA Security Throughput"
-                value="~8–12 min"
-                sub="Standard & FastTrack lanes"
+                label="Security Wait"
+                value="Not reported"
+                sub="No live queue data source is connected"
               />
             </div>
           ) : (
@@ -632,9 +708,13 @@ export default function AirportsPage() {
                 sub={airportNode.timezone}
               />
               <MetricTile
-                label="Direct Destinations"
-                value={String(airportNode.destCount ?? 40)}
-                sub="Worldwide commercial connections"
+                label="Catalog Reference"
+                value={
+                  airportNode.destCount != null
+                    ? String(airportNode.destCount)
+                    : "Not reported"
+                }
+                sub="Undated reference count, not live route data"
               />
               <MetricTile
                 label="Indoor CAD Support"
@@ -676,16 +756,14 @@ export default function AirportsPage() {
                     <Clock className="size-3.5 text-accent" /> Walk from security
                   </span>
                   <span className="font-mono font-bold text-accent">
-                    ~{selected.walkTimeFromSecurityMinutes} min
+                    Illustrative
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-muted">
-                    <Footprints className="size-3.5" /> Distance from TSA
+                    <Footprints className="size-3.5" /> Distance from security
                   </span>
-                  <span className="font-mono text-ink">
-                    {selected.walkDistanceMeters} m
-                  </span>
+                  <span className="font-mono text-ink">Not reported</span>
                 </div>
                 {selected.openingHours && (
                   <div className="flex items-center justify-between">
@@ -745,7 +823,10 @@ export default function AirportsPage() {
           )}
 
           {/* Gate Departures / Live Flights */}
-          {(gateDepartures.length > 0 || flightsLoading) && (
+          {(gateDepartures.length > 0 ||
+            flightsLoading ||
+            Boolean(selected?.gateNumber) ||
+            Boolean(flightsError)) && (
             <Panel className="p-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="label-caps text-subtle flex items-center gap-1">
@@ -755,16 +836,34 @@ export default function AirportsPage() {
                 {flightsLoading ? (
                   <span className="font-mono text-[9px] text-accent animate-pulse">Syncing...</span>
                 ) : (
-                  <span className="font-mono text-[9px] text-muted">{gateDepartures.length} flights</span>
+                  <span className="font-mono text-[9px] text-muted">
+                    {gateDepartures.length} flights
+                    {flightsFetchedAt
+                      ? ` · ${new Date(flightsFetchedAt).toLocaleTimeString()}`
+                      : ""}
+                  </span>
                 )}
               </div>
               {flightsLoading && gateDepartures.length === 0 ? (
                 <p className="py-4 text-center text-xs text-subtle">Loading airport departures...</p>
+              ) : flightsError ? (
+                <p className="py-4 text-center text-xs leading-relaxed text-delayed">
+                  {flightsError} No substitute board is shown.
+                </p>
+              ) : gateDepartures.length === 0 ? (
+                <p className="py-4 text-center text-xs leading-relaxed text-muted">
+                  No departures from {airportCode}
+                  {selected?.gateNumber
+                    ? ` at Gate ${selected.gateNumber}`
+                    : ""}{" "}
+                  were returned by AeroDataBox&apos;s current board. This is not
+                  proof that no flight operates.
+                </p>
               ) : (
                 <div className="space-y-1.5">
                   {gateDepartures.map((flight) => (
                     <Link
-                      key={flight.id}
+                      key={`${flight.id}-${flight.flightDate ?? "any"}`}
                       href={`/flight/${encodeURIComponent(flight.id)}`}
                       className="flex items-center justify-between rounded-lg border border-line bg-surface-2 p-2 transition-colors hover:border-accent/40"
                     >
@@ -777,13 +876,16 @@ export default function AirportsPage() {
                           <span>{flight.origin.code}</span>
                           <ArrowRight className="size-2.5 text-subtle" />
                           <span className="font-semibold text-ink">{flight.destination.code}</span>
-                          {flight.gateDeparture && (
+                          {normalizeGate(flight.gateDeparture) && (
                             <span className="font-mono text-[9px] text-accent ml-1">Gate {flight.gateDeparture}</span>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
-                        <StatusBadge status={flight.status} />
+                        <StatusBadge
+                          status={flight.status}
+                          statusReported={flight.statusReported}
+                        />
                         <p className="mt-0.5 font-mono text-[9px] text-subtle">{flight.departureTimeScheduled}</p>
                       </div>
                     </Link>
@@ -848,7 +950,7 @@ export default function AirportsPage() {
                         </span>
                       </div>
                       <span className="shrink-0 font-mono text-[10px] text-muted">
-                        {item.walkTimeFromSecurityMinutes}m
+                        Ref
                       </span>
                     </button>
                   );

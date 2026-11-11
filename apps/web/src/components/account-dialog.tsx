@@ -68,6 +68,7 @@ export function AccountDialog({
     syncing,
     supabaseReady,
     aeroConfigured,
+    dataSourceMode,
     webPushSubscribed,
     accountUsage,
     refreshUsage,
@@ -169,14 +170,20 @@ export function AccountDialog({
             <StatusMini
               icon={<Wifi className="size-3.5" />}
               label="Live data"
-              value={aeroConfigured ? "Connected" : "Saved only"}
-              active={aeroConfigured}
+              value={
+                dataSourceMode === "LIVE_AERODATABOX"
+                  ? "Recent live response"
+                  : aeroConfigured
+                    ? "Ready · no data"
+                    : "Saved only"
+              }
+              active={dataSourceMode === "LIVE_AERODATABOX"}
             />
             <StatusMini
               icon={<Sparkles className="size-3.5" />}
               label="Weather"
-              value="Live"
-              active
+              value={offlineMode ? "Offline" : "On demand"}
+              active={false}
             />
           </div>
         </div>

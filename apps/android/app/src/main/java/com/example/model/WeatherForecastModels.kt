@@ -56,5 +56,7 @@ data class DestinationArrivalForecast(
     val dailyForecast: List<DailyForecast>,
     val advisory: ArrivalAviationAdvisory,
     val packingAdvice: String,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    /** False when no live/cached forecast exists; numeric fields are placeholders. */
+    val dataAvailable: Boolean = true
 )

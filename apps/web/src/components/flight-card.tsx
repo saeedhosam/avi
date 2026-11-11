@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { flightKey, useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
-import { STATUS_META, cn, flightDateLabel, normalizeFlightNumber } from "@/lib/utils";
+import { STATUS_META, cn, flightDateLabel, timeAgo } from "@/lib/utils";
 import { StatusBadge } from "./ui";
 
 export function FlightCard({
@@ -26,17 +26,8 @@ export function FlightCard({
   const { toggleWatchlist, addRecent, flights } = useApp();
   const isWatchlisted = useMemo(() => {
     const key = flightKey(flight);
-    const targetNumber = normalizeFlightNumber(flight.flightNumber).toLowerCase();
-    const inStore =
-      flights.find((f) => flightKey(f) === key) ??
-      flights.find(
-        (f) =>
-          normalizeFlightNumber(f.flightNumber).toLowerCase() === targetNumber &&
-          f.isWatchlisted,
-      ) ??
-      flights.find(
-        (f) => normalizeFlightNumber(f.flightNumber).toLowerCase() === targetNumber,
-      );
+    // Never fall back to another operating date with the same flight number.
+    const inStore = flights.find((f) => flightKey(f) === key);
     if (inStore !== undefined) return Boolean(inStore.isWatchlisted);
     return Boolean(flight.isWatchlisted);
   }, [flights, flight]);
@@ -44,13 +35,11 @@ export function FlightCard({
     ? `/flight/${encodeURIComponent(flight.id)}?date=${flight.flightDate}`
     : `/flight/${encodeURIComponent(flight.id)}`;
   const progress =
-    flight.status === "LANDED"
+    flight.statusReported && flight.status === "LANDED"
       ? 1
-      : flight.status === "SCHEDULED" || flight.status === "CANCELLED"
-        ? 0
-        : flight.telemetry.hasLiveLocation
-          ? Math.min(0.95, Math.max(0.05, flight.telemetry.progressPercent))
-          : 0;
+      : flight.telemetry.hasLiveLocation
+        ? Math.min(0.98, Math.max(0, flight.telemetry.progressPercent))
+        : null;
 
   return (
     <Link
@@ -82,10 +71,20 @@ export function FlightCard({
               )}
               <StatusBadge
                 status={flight.status}
+                statusReported={flight.statusReported}
                 delayMinutes={flight.delayMinutes}
+                delayReported={flight.delayReported}
               />
             </div>
             <p className="mt-1 truncate text-[11px] text-muted">{flight.airline}</p>
+            <p className="mt-0.5 text-[8px] text-subtle">
+              {flight.fetchedAt &&
+              Number.isFinite(Date.parse(flight.fetchedAt))
+                ? `Retrieved ${timeAgo(Date.parse(flight.fetchedAt))}${
+                    flight.source ? ` · ${flight.source}` : ""
+                  }`
+                : "Retrieval time not recorded"}
+            </p>
           </div>
         </div>
 
@@ -146,30 +145,35 @@ export function FlightCard({
             <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
             <div
               className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-accent to-accent-2"
-              style={{ width: `${progress * 100}%` }}
+              style={{ width: `${(progress ?? 0) * 100}%` }}
             />
-            <div
-              className="absolute top-1/2 -translate-y-1/2"
-              style={{ left: `calc(${progress * 100}% - 9px)` }}
-            >
-              <span className="flex size-[18px] items-center justify-center rounded-full bg-accent text-[color:var(--bg)] shadow-[0_0_12px_rgba(0,229,255,0.55)]">
-                <Plane className="size-2.5 rotate-90" />
-              </span>
-            </div>
+            {progress != null && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2"
+                style={{ left: `calc(${progress * 100}% - 9px)` }}
+              >
+                <span className="flex size-[18px] items-center justify-center rounded-full bg-accent text-[color:var(--bg)] shadow-[0_0_12px_rgba(0,229,255,0.55)]">
+                  <Plane className="size-2.5 rotate-90" />
+                </span>
+              </div>
+            )}
           </div>
-          {flight.status === "DEPARTED" ? (
+          {flight.statusReported && flight.status === "DEPARTED" ? (
             <p className="mt-0.5 text-[10px] font-semibold text-accent-2">
-              {flight.telemetry.hasLiveLocation
-                ? `${flight.telemetry.etaMinutesRemaining}m to arrival`
+              {flight.telemetry.hasLiveLocation &&
+              flight.telemetry.etaMinutesRemaining > 0
+                ? `${flight.telemetry.etaMinutesRemaining}m to arrival (calculated)`
                 : "Live position not reported"}
             </p>
-          ) : flight.delayMinutes > 0 ? (
+          ) : flight.delayReported && flight.delayMinutes > 0 ? (
             <p className="mt-0.5 text-[10px] font-semibold text-delayed">
               +{flight.delayMinutes}m delay
             </p>
           ) : (
             <p className="mt-0.5 text-[10px] text-subtle">
-              {STATUS_META[flight.status].label}
+              {flight.statusReported
+                ? STATUS_META[flight.status].label
+                : "Status not reported"}
             </p>
           )}
         </div>

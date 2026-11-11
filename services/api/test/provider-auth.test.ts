@@ -86,7 +86,8 @@ describe("provider auth gate", () => {
       method: "GET",
       url: "/v1/flights/search?number=BA117",
     });
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
     await app.close();
   });
 
@@ -128,8 +129,8 @@ describe("provider auth gate", () => {
       url: "/v1/flights/search?number=BA117",
       headers: { authorization: TOKEN },
     });
-    expect(response.statusCode).toBe(200);
-    expect(response.json().meta.source).toBe("not_configured");
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toBe("provider_not_configured");
     await app.close();
   });
 

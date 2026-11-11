@@ -53,7 +53,7 @@ fun WeatherCard(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "METAR Live Feed",
+                    text = "OPEN-METEO MODEL",
                     color = RadarCyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
@@ -123,31 +123,40 @@ private fun AirportWeatherPane(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = "${airport.weather.tempC}°C / ${airport.weather.tempF}°F",
-                color = TextWhite,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            if (!airport.weatherReported) {
+                Text(
+                    text = "Weather not reported",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Text(
+                    text = "${airport.weather.tempC}°C / ${airport.weather.tempF}°F",
+                    color = TextWhite,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = airport.weather.condition,
-                color = AeroBlue,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1
-            )
+                Text(
+                    text = airport.weather.condition,
+                    color = AeroBlue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = InstrumentBorder.copy(alpha = 0.5f), thickness = 0.5.dp)
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = InstrumentBorder.copy(alpha = 0.5f), thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Weather Metrics
-            WeatherMetricRow(icon = Icons.Default.Air, text = airport.weather.wind)
-            Spacer(modifier = Modifier.height(4.dp))
-            WeatherMetricRow(icon = Icons.Default.Visibility, text = "Vis: ${airport.weather.visibility}")
-            Spacer(modifier = Modifier.height(4.dp))
-            WeatherMetricRow(icon = Icons.Default.WaterDrop, text = "Humidity: ${airport.weather.humidity}%")
+                // Weather Metrics
+                WeatherMetricRow(icon = Icons.Default.Air, text = airport.weather.wind)
+                Spacer(modifier = Modifier.height(4.dp))
+                WeatherMetricRow(icon = Icons.Default.Visibility, text = "Vis: ${airport.weather.visibility}")
+                Spacer(modifier = Modifier.height(4.dp))
+                WeatherMetricRow(icon = Icons.Default.WaterDrop, text = "Humidity: ${airport.weather.humidity}%")
+            }
         }
     }
 }

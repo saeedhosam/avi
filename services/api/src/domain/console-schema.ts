@@ -34,10 +34,10 @@ export const airportSchema = z.object({
 export const aircraftSchema = z.object({
   model: z.string(),
   registration: z.string(),
-  age: z.string(),
-  wifiAvailable: z.boolean(),
-  powerOutlets: z.boolean(),
-  seatLayout: z.string(),
+  age: z.string().nullable(),
+  wifiAvailable: z.boolean().nullable(),
+  powerOutlets: z.boolean().nullable(),
+  seatLayout: z.string().nullable(),
 });
 
 export const waypointSchema = z.object({
@@ -62,6 +62,7 @@ export const flightTelemetrySchema = z.object({
   distanceRemainingNm: z.number(),
   etaMinutesRemaining: z.number(),
   waypoints: z.array(waypointSchema),
+  isDerived: z.boolean().optional(),
 });
 
 export const flightTimelineEventSchema = z.object({
@@ -89,8 +90,12 @@ export const consoleFlightSchema = z.object({
   arrivalTimeEstimated: z.string(),
   arrivalTimeActual: z.string().nullable(),
   status: flightStatusSchema,
+  statusReported: z.boolean(),
+  statusRaw: z.string(),
   statusNote: z.string(),
   delayMinutes: z.number(),
+  delayReported: z.boolean(),
+  delaySource: z.enum(["provider", "derived", "unknown"]),
   delayReason: z.string().nullable(),
   terminalDeparture: z.string(),
   gateDeparture: z.string(),
@@ -103,6 +108,8 @@ export const consoleFlightSchema = z.object({
   timeline: z.array(flightTimelineEventSchema),
   isWatchlisted: z.boolean().optional(),
   customNotes: z.string().optional(),
+  source: z.string().optional(),
+  fetchedAt: z.string().optional(),
 });
 
 export const routeOperatorSchema = z.object({
@@ -119,7 +126,8 @@ export const consoleRouteStatSchema = z.object({
   timezone: z.string().optional(),
   latitude: z.number(),
   longitude: z.number(),
-  dailyFlights: z.number(),
+  /** Null when the provider did not report a daily average. */
+  dailyFlights: z.number().nullable(),
   operators: z.array(routeOperatorSchema),
 });
 
@@ -145,26 +153,46 @@ export const airportNodeSchema = z.object({
   hubAirlines: z.array(z.string()),
 });
 
+export const dataProvenanceSchema = z.object({
+  source: z.literal("AERODATABOX"),
+  fetchedAt: z.string(),
+  attribution: z.literal("AeroDataBox"),
+});
+
 export const consoleSearchResponseSchema = z.object({
   mode: z.string(),
   flights: z.array(consoleFlightSchema),
+  ...dataProvenanceSchema.shape,
 });
 
 export const consoleFidsResponseSchema = z.object({
   mode: z.string(),
   flights: z.array(consoleFlightSchema),
+  ...dataProvenanceSchema.shape,
+  /** Provider board window in UTC, when the board is time-windowed. */
+  window: z
+    .object({ from: z.string(), to: z.string() })
+    .nullable()
+    .optional(),
 });
 
 export const consoleRoutesResponseSchema = z.object({
   mode: z.string(),
   status: z.number(),
   routes: z.array(consoleRouteStatSchema),
+  ...dataProvenanceSchema.shape,
+  /** AeroDataBox daily route stats are calculated over the prior 7 days. */
+  statisticsWindowDays: z.literal(7),
+  note: z.string(),
+  /** Route records the provider returned without plotable coordinates. */
+  omittedRoutes: z.number().int().nonnegative(),
 });
 
 export const consoleAirportSearchResponseSchema = z.object({
   mode: z.string(),
   status: z.number(),
   airports: z.array(airportNodeSchema),
+  ...dataProvenanceSchema.shape,
 });
 
 export { errorResponseSchema } from "./schemas.js";

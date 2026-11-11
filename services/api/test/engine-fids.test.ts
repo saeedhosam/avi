@@ -59,6 +59,8 @@ function summaryFor(flightNumber: string): FlightSummary {
     airline: "Test Air",
     airlineCode: flightNumber.slice(0, 2),
     status: "DEPARTED",
+    statusReported: true,
+    statusRaw: "Departed",
     statusNote: "En route",
     origin: {
       code: "JFK",
@@ -89,6 +91,8 @@ function summaryFor(flightNumber: string): FlightSummary {
     baggageCarousel: "9",
     aircraft: { model: "777", registration: "G-ZBJG" },
     delayMinutes: 0,
+    delayReported: true,
+    delaySource: "derived",
     telemetry: {
       hasLiveLocation: false,
       latitude: 0,

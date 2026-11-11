@@ -38,7 +38,9 @@ export function getSupabase(): SupabaseClient<Database> | null {
 export function watchRowId(
   flight: Pick<Flight, "id" | "flightNumber" | "flightDate">,
 ): string {
-  const compact = (flight.id || flight.flightNumber)
+  // Always derive from the flight number. `flight.id` now includes the
+  // operating date, so appending the date to it would double the suffix.
+  const compact = (flight.flightNumber || flight.id)
     .replace(/\s+/g, "")
     .toUpperCase();
   return flight.flightDate ? `${compact}-${flight.flightDate}` : compact;

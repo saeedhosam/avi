@@ -68,7 +68,7 @@ export class ProviderError extends Error {
 
 function normalizeFlightNumber(raw: string): string {
   const compact = raw.replace(/\s+/g, "").toUpperCase();
-  const match = compact.match(/^([A-Z0-9]{2,3})(\d{1,4}[A-Z]?)$/);
+  const match = compact.match(/^([A-Z]{2,3})(\d{1,4}[A-Z]?)$/);
   return match ? `${match[1]} ${match[2]}` : compact;
 }
 
@@ -86,29 +86,53 @@ function resolveAirport(
   if (!code || lat == null || lon == null) return null;
   return {
     code,
-    name: dto.name ?? `${code} Airport`,
-    city: dto.municipalityName ?? code,
+    name: dto.name ?? code,
+    city: dto.municipalityName ?? "",
     country: dto.countryCode ?? "",
-    timezone: dto.timeZone ?? "UTC",
+    timezone: dto.timeZone ?? "",
     latitude: lat,
     longitude: lon,
   };
 }
 
-function mapStatus(raw: string | undefined, delayMinutes: number): FlightStatus {
-  const status = (raw ?? "").toLowerCase();
-  if (status.includes("cancel")) return "CANCELLED";
-  if (status.includes("board")) return "BOARDING";
-  if (status.includes("arriv") || status.includes("land")) return "LANDED";
+interface MappedStatus {
+  status: FlightStatus;
+  reported: boolean;
+  raw: string;
+}
+
+function mapStatus(
+  raw: string | undefined,
+  delayMinutes: number | null,
+): MappedStatus {
+  const rawText = raw?.trim() ?? "";
+  const status = rawText.toLowerCase();
+  if (status.includes("cancel")) {
+    return { status: "CANCELLED", reported: true, raw: rawText };
+  }
+  if (status.includes("board")) {
+    return { status: "BOARDING", reported: true, raw: rawText };
+  }
+  if (status.includes("arriv") || status.includes("land")) {
+    return { status: "LANDED", reported: true, raw: rawText };
+  }
   if (
     status.includes("depart") ||
     status.includes("en route") ||
     status.includes("airborne")
   ) {
-    return "DEPARTED";
+    return { status: "DEPARTED", reported: true, raw: rawText };
   }
-  if (status.includes("delay") || delayMinutes >= 15) return "DELAYED";
-  return "SCHEDULED";
+  if (status.includes("delay")) {
+    return { status: "DELAYED", reported: true, raw: rawText };
+  }
+  if (status.includes("schedul")) {
+    return { status: "SCHEDULED", reported: true, raw: rawText };
+  }
+  if (delayMinutes != null && delayMinutes >= 15) {
+    return { status: "DELAYED", reported: false, raw: rawText };
+  }
+  return { status: "SCHEDULED", reported: false, raw: rawText };
 }
 
 function parseTime(value: string | undefined): number | null {
@@ -120,10 +144,10 @@ function parseTime(value: string | undefined): number | null {
 function computeDelay(
   scheduled: AeroTimeDto | undefined,
   revised: AeroTimeDto | undefined,
-): number {
+): number | null {
   const start = parseTime(scheduled?.utc ?? scheduled?.local);
   const end = parseTime(revised?.utc ?? revised?.local);
-  if (start == null || end == null) return 0;
+  if (start == null || end == null) return null;
   return Math.max(0, Math.round((end - start) / 60_000));
 }
 
@@ -143,20 +167,29 @@ function mapFlight(
   const flightNumber = normalizeFlightNumber(rawNumber);
   const compactNumber = flightNumber.replace(/\s+/g, "");
   const scheduledDeparture = firstTime(departure?.scheduledTime);
-  const delayMinutes = computeDelay(
+  const reportedDelay = computeDelay(
     departure?.scheduledTime,
     departure?.revisedTime ?? departure?.predictedTime,
   );
+  const delayMinutes = reportedDelay ?? 0;
+  const delayReported = reportedDelay != null;
   const hasLiveLocation =
     dto.location?.lat != null && dto.location?.lon != null;
+  const mappedStatus = mapStatus(dto.status, reportedDelay);
 
   return {
     id: `${compactNumber}-${scheduledDeparture.slice(0, 10) || "unknown"}`,
     flightNumber,
-    airline: dto.airline?.name ?? "",
-    airlineCode: dto.airline?.iata ?? compactNumber.slice(0, 2),
-    status: mapStatus(dto.status, delayMinutes),
-    statusNote: dto.status ?? "",
+    airline: dto.airline?.name ?? "Not reported",
+    airlineCode: dto.airline?.iata ?? "",
+    status: mappedStatus.status,
+    statusReported: mappedStatus.reported,
+    statusRaw: mappedStatus.raw,
+    statusNote: mappedStatus.reported
+      ? mappedStatus.raw
+      : delayReported
+        ? "Delay inferred from provider times; status not reported"
+        : "Status not reported by provider",
     origin,
     destination,
     scheduledDeparture,
@@ -177,14 +210,18 @@ function mapFlight(
       registration: dto.aircraft?.reg ?? "",
     },
     delayMinutes,
+    delayReported,
+    delaySource: delayReported ? "derived" : "unknown",
     telemetry: {
       hasLiveLocation,
-      latitude: dto.location?.lat ?? 0,
-      longitude: dto.location?.lon ?? 0,
+      latitude: hasLiveLocation ? dto.location!.lat! : 0,
+      longitude: hasLiveLocation ? dto.location!.lon! : 0,
       altitudeFeet: Math.round(dto.location?.altitude?.feet ?? 0),
       groundSpeedKnots: Math.round(dto.location?.groundSpeed?.kt ?? 0),
       headingDegrees: dto.location?.trueTrack?.deg ?? 0,
-      updatedAt: hasLiveLocation ? new Date().toISOString() : null,
+      // The provider does not expose an observation timestamp. Do not claim
+      // the mapping time is when the position was observed.
+      updatedAt: null,
     },
     source: "aerodatabox",
     updatedAt: new Date().toISOString(),
@@ -238,13 +275,17 @@ export class AeroDataBoxProvider {
     }
 
     const cacheKey = `flight:${flightNumber}`;
-    const cached = this.cache.get<FlightSummary[]>(cacheKey);
+    const cached = this.cache.get<{
+      flights: FlightSummary[];
+      fetchedAt: string;
+    }>(cacheKey);
     if (cached) {
       return {
-        flights: cached,
+        flights: cached.flights,
         meta: {
           source: "cached",
-          fetchedAt,
+          // Preserve the original provider retrieval time on a cache hit.
+          fetchedAt: cached.fetchedAt,
           cached: true,
           attribution: "AeroDataBox",
         },
@@ -266,7 +307,7 @@ export class AeroDataBoxProvider {
     }
 
     if (response.status === 204) {
-      this.cache.set(cacheKey, [], 60_000);
+      this.cache.set(cacheKey, { flights: [], fetchedAt }, 60_000);
       return {
         flights: [],
         meta: {
@@ -309,7 +350,7 @@ export class AeroDataBoxProvider {
       .map((dto) => mapFlight(dto))
       .filter((flight): flight is FlightSummary => flight !== null);
 
-    this.cache.set(cacheKey, flights, 60_000);
+    this.cache.set(cacheKey, { flights, fetchedAt }, 60_000);
 
     return {
       flights,
@@ -357,6 +398,9 @@ export class AeroDataBoxProvider {
       return { meta: { source: "error" }, summaries: [] };
     }
 
+    if (response.status === 204) {
+      return { meta: { source: "live" }, summaries: [] };
+    }
     if (response.status === 429) {
       return { meta: { source: "quota_fallback" }, summaries: [] };
     }
@@ -368,6 +412,12 @@ export class AeroDataBoxProvider {
     try {
       payload = (await response.json()) as { departures?: unknown[]; arrivals?: unknown[] };
     } catch {
+      return { meta: { source: "error" }, summaries: [] };
+    }
+    if (
+      !Array.isArray(payload.departures) &&
+      !Array.isArray(payload.arrivals)
+    ) {
       return { meta: { source: "error" }, summaries: [] };
     }
 

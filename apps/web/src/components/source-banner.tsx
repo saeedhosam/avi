@@ -91,18 +91,28 @@ export function SourceBanner({ className }: { className?: string }) {
             <DiagnosticRow
               title="Live flight data"
               detail="Flights, airport boards, delays, daily route stats"
-              active={aeroConfigured && !offlineMode}
-              value={aeroConfigured ? "CONNECTED" : "SAVED DATA"}
+              active={dataSourceMode === "LIVE_AERODATABOX"}
+              value={
+                offlineMode
+                  ? "OFFLINE"
+                  : dataSourceMode === "LIVE_AERODATABOX"
+                    ? "LIVE RESPONSE"
+                    : dataSourceMode === "CONFIGURED_IDLE"
+                      ? "READY · NO DATA"
+                      : dataSourceMode === "QUOTA_FALLBACK"
+                        ? "PAUSED"
+                        : "UNAVAILABLE"
+              }
             />
             <DiagnosticRow
               title="Destination weather"
-              detail="Live METAR, forecasts, VFR/IFR rules"
-              active={!offlineMode}
-              value="CONNECTED"
+              detail="Open-Meteo model forecast, fetched on demand"
+              active={false}
+              value="ON DEMAND"
             />
             <DiagnosticRow
               title="Local cache + background sync"
-              detail="Flights, watchlist, notes, alerts, routes"
+              detail="Saved flight records, watchlist, notes, alerts"
               active
               value="ACTIVE"
             />
@@ -112,13 +122,23 @@ export function SourceBanner({ className }: { className?: string }) {
               Data sources
             </p>
             <p className="text-[9px] leading-relaxed text-subtle">
+              Flight data by{" "}
+              <a
+                href="https://aerodatabox.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-accent"
+              >
+                AeroDataBox
+              </a>
+              .{" "}
               <a
                 href="https://open-meteo.com/"
                 target="_blank"
                 rel="noreferrer"
                 className="underline underline-offset-2 hover:text-accent"
               >
-                Weather data by Open-Meteo
+                Weather model by Open-Meteo
               </a>
               . Map data ©{" "}
               <a

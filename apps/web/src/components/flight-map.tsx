@@ -21,7 +21,7 @@ import {
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
 import { useResolvedTheme } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { cn, isFreshTimestamp } from "@/lib/utils";
 export function FlightMap({
   flight,
   className,
@@ -57,6 +57,7 @@ export function FlightMap({
     const route = routeCoordinates(origin, destination);
     const live =
       flight.telemetry.hasLiveLocation &&
+      isFreshTimestamp(flight.fetchedAt) &&
       Number.isFinite(flight.telemetry.currentLatitude) &&
       Number.isFinite(flight.telemetry.currentLongitude);
     const aircraft: LngLat = [
@@ -228,7 +229,12 @@ export function FlightMap({
 
   useEffect(() => {
     if (!map || recenterSignal === 0) return;
-    if (!flight.telemetry.hasLiveLocation) return;
+    if (
+      !flight.telemetry.hasLiveLocation ||
+      !isFreshTimestamp(flight.fetchedAt)
+    ) {
+      return;
+    }
     map.flyTo({
       center: [
         flight.telemetry.currentLongitude,

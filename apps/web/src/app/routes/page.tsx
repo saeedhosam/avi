@@ -29,17 +29,18 @@ import type {
   AirportNode,
   AirportRouteNetworkSummary,
   DirectFlightConnection,
+  Flight,
   HaulCategory,
   OperatingCarrierRoute,
+  RouteDataProvenance,
   RouteRegion,
+  TodayBoardMeta,
 } from "@/lib/types";
 import {
   HAUL_META,
   REGION_META,
   classifyHaul,
   cn,
-  estimateDurationMinutes,
-  formatDuration,
   geodesicDistanceKm,
   kmToNm,
 } from "@/lib/utils";
@@ -68,7 +69,7 @@ interface LiveRoute {
   timezone?: string;
   latitude?: number;
   longitude?: number;
-  dailyFlights?: number;
+  dailyFlights?: number | null;
   operators?: Array<{ code?: string; name?: string }>;
 }
 
@@ -81,96 +82,25 @@ function toNode(route: LiveRoute): AirportNode | null {
     return null;
   }
   const known = findAirportNode(route.destination);
-  if (known) return known;
+  // Provider metadata wins over the bundled reference catalog; the catalog is
+  // only a fallback for fields the provider omitted.
   return {
     iata: route.destination.toUpperCase(),
-    icao: route.icao ?? "",
-    name: route.destinationName ?? route.destination,
-    city: route.city ?? route.destination,
-    country: route.country ?? "—",
+    icao: route.icao ?? known?.icao ?? "",
+    name: route.destinationName ?? known?.name ?? route.destination,
+    city: route.city ?? known?.city ?? route.destination,
+    country: route.country ?? known?.country ?? "—",
     region: inferRegionFromCoords(route.latitude, route.longitude),
     latitude: route.latitude,
     longitude: route.longitude,
-    timezone: route.timezone ?? "UTC",
-    hubAirlines: [],
+    timezone: route.timezone ?? known?.timezone ?? "",
+    hubAirlines: known?.hubAirlines ?? [],
   };
 }
 
-export function deriveOperatingDays(
-  originIata: string,
-  destIata: string,
-  carrierCode: string,
-  weeklyFlights: number,
-): number[] {
-  const o = originIata.toUpperCase();
-  const d = destIata.toUpperCase();
-
-  // Curated pair: Sohag (HMB) <-> Medina (MED) operates weekly on Wednesday
-  if ((o === "HMB" && d === "MED") || (o === "MED" && d === "HMB")) {
-    return [3];
-  }
-
-  if (weeklyFlights >= 7) {
-    return [0, 1, 2, 3, 4, 5, 6];
-  }
-
-  let hash = 0;
-  const key = `${o}-${d}-${carrierCode}`;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash |= 0;
-  }
-  const absHash = Math.abs(hash);
-
-  if (weeklyFlights === 6) {
-    const offDay = absHash % 7;
-    return [0, 1, 2, 3, 4, 5, 6].filter((day) => day !== offDay);
-  }
-
-  if (weeklyFlights === 5) {
-    const patterns = [
-      [1, 2, 3, 4, 5],
-      [0, 1, 2, 3, 4],
-      [0, 1, 3, 4, 5],
-      [1, 2, 4, 5, 6],
-    ];
-    return patterns[absHash % patterns.length];
-  }
-
-  if (weeklyFlights === 4) {
-    const patterns = [
-      [1, 3, 5, 0],
-      [1, 2, 4, 6],
-      [2, 4, 6, 0],
-      [1, 2, 4, 5],
-    ];
-    return patterns[absHash % patterns.length];
-  }
-
-  if (weeklyFlights === 3) {
-    const patterns = [
-      [1, 3, 5],
-      [2, 4, 6],
-      [0, 2, 4],
-      [0, 3, 5],
-    ];
-    return patterns[absHash % patterns.length];
-  }
-
-  if (weeklyFlights === 2) {
-    const patterns = [
-      [2, 6],
-      [1, 4],
-      [3, 0],
-      [4, 0],
-      [1, 5],
-    ];
-    return patterns[absHash % patterns.length];
-  }
-
-  // 1 flight per week
-  const singleDays = [3, 5, 6, 0, 1, 2, 4];
-  return [singleDays[absHash % singleDays.length]];
+function formatProvenanceTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : iso;
 }
 
 function toConnections(origin: AirportNode, routes: LiveRoute[]) {
@@ -181,60 +111,37 @@ function toConnections(origin: AirportNode, routes: LiveRoute[]) {
     if (!destination || destination.iata === origin.iata) continue;
     if (seen.has(destination.iata)) continue;
     seen.add(destination.iata);
+
+    // Distance is a geometric fact derived from two verified coordinates.
+    // Duration is not reported by the route-statistics endpoint, so it stays
+    // null rather than being estimated from cruise speed.
     const distanceKm = geodesicDistanceKm(
       origin.latitude,
       origin.longitude,
       destination.latitude,
       destination.longitude,
     );
-    const duration = estimateDurationMinutes(distanceKm);
-    const daily = Math.max(1, Math.round(route.dailyFlights ?? 1));
-    const weekly = Math.max(1, Math.round(daily * 7));
-    const operators = (route.operators ?? []).filter(
-      (operator) => operator.code && operator.name,
-    );
-    const carriers: OperatingCarrierRoute[] = operators.length
-      ? operators.map((operator) => {
-          const carrierWeekly = Math.max(
-            1,
-            Math.round(weekly / operators.length),
-          );
-          const carrierDays = deriveOperatingDays(
-            origin.iata,
-            destination.iata,
-            operator.code!.toUpperCase(),
-            carrierWeekly,
-          );
-          return {
-            airlineCode: operator.code!.toUpperCase(),
-            airlineName: operator.name!,
-            flightNumbers: [],
-            dailyFrequencies: Math.max(
-              1,
-              Math.round(daily / operators.length),
-            ),
-            weeklyFrequencies: carrierWeekly,
-            operatingDays: carrierDays,
-            aircraftTypes: [],
-          };
-        })
-      : [
-          {
-            airlineCode: origin.hubAirlines[0]?.slice(0, 2).toUpperCase() ?? "FL",
-            airlineName: origin.hubAirlines[0] ?? "Scheduled Carrier",
-            flightNumbers: [],
-            dailyFrequencies: daily,
-            weeklyFrequencies: weekly,
-            operatingDays: deriveOperatingDays(origin.iata, destination.iata, "FL", weekly),
-            aircraftTypes: [],
-          },
-        ];
+    const reportedDaily = route.dailyFlights;
+    const daily =
+      typeof reportedDaily === "number" &&
+      Number.isFinite(reportedDaily) &&
+      reportedDaily > 0
+        ? Math.round(reportedDaily * 10) / 10
+        : null;
 
-    const allDays = new Set<number>();
-    for (const c of carriers) {
-      for (const d of c.operatingDays ?? []) allDays.add(d);
-    }
-    const connectionDays = Array.from(allDays).sort((a, b) => a - b);
+    // AeroDataBox reports operators, not per-carrier frequencies or days.
+    // Those fields stay unknown until a real schedule source is available.
+    const carriers: OperatingCarrierRoute[] = (route.operators ?? [])
+      .filter((operator) => operator.code || operator.name)
+      .map((operator) => ({
+        airlineCode: operator.code?.toUpperCase() ?? "",
+        airlineName: operator.name ?? operator.code ?? "Not reported",
+        flightNumbers: [],
+        dailyFrequencies: null,
+        weeklyFrequencies: null,
+        operatingDays: undefined,
+        aircraftTypes: [],
+      }));
 
     connections.push({
       id: `${origin.iata}-${destination.iata}`,
@@ -242,19 +149,20 @@ function toConnections(origin: AirportNode, routes: LiveRoute[]) {
       destination,
       distanceKm,
       distanceNm: kmToNm(distanceKm),
-      estimatedDurationMinutes: duration,
-      durationFormatted: formatDuration(duration),
       haulCategory: classifyHaul(distanceKm),
       dailyFlightsCount: daily,
-      weeklyFlightsCount: weekly,
-      operatingDays: connectionDays,
-      hasDepartures: true,
-      hasArrivals: true,
+      // A 7-day average extrapolated to a week is not a forward schedule;
+      // keep it null rather than presenting a derived weekly claim.
+      weeklyFlightsCount: null,
+      operatingDays: undefined,
       operatingCarriers: carriers,
-      isLiveVerified: true,
+      dataSource: "AERODATABOX",
+      isForwardSchedule: false,
     });
   }
-  return connections.sort((a, b) => b.dailyFlightsCount - a.dailyFlightsCount);
+  return connections.sort(
+    (a, b) => (b.dailyFlightsCount ?? -1) - (a.dailyFlightsCount ?? -1),
+  );
 }
 
 function buildSummary(
@@ -264,33 +172,38 @@ function buildSummary(
   const airlineMap = new Map<string, AirlineFilterChipItem>();
   for (const connection of connections) {
     for (const carrier of connection.operatingCarriers) {
-      const current = airlineMap.get(carrier.airlineCode);
+      const key = carrier.airlineCode || carrier.airlineName;
+      const current = airlineMap.get(key);
       if (current) current.destinationCount += 1;
       else
-        airlineMap.set(carrier.airlineCode, {
+        airlineMap.set(key, {
           code: carrier.airlineCode,
           name: carrier.airlineName,
           destinationCount: 1,
         });
     }
   }
+  const reportedDaily = connections
+    .map((connection) => connection.dailyFlightsCount)
+    .filter((value): value is number => value != null);
+  const totalDaily = reportedDaily.length
+    ? Math.round(reportedDaily.reduce((sum, value) => sum + value, 0) * 10) / 10
+    : null;
+
   return {
     originAirport: origin,
     connections,
     totalDirectDestinations: connections.length,
     totalCountriesServed: new Set(
-      connections.map((connection) => connection.destination.country),
+      connections
+        .map((connection) => connection.destination.country)
+        .filter(Boolean),
     ).size,
     totalOperatingAirlines: airlineMap.size,
-    totalDailyFlights: connections.reduce(
-      (sum, connection) => sum + connection.dailyFlightsCount,
-      0,
-    ),
-    totalWeeklyFlights: connections.reduce(
-      (sum, connection) =>
-        sum + (connection.weeklyFlightsCount ?? connection.dailyFlightsCount * 7),
-      0,
-    ),
+    totalDailyFlights: totalDaily,
+    // Not a forward weekly schedule; do not derive one from the trailing
+    // daily average.
+    totalWeeklyFlights: null,
     availableAirlines: [...airlineMap.values()].sort(
       (a, b) => b.destinationCount - a.destinationCount,
     ),
@@ -299,7 +212,7 @@ function buildSummary(
 
 function RoutesContent() {
   const searchParams = useSearchParams();
-  const { offlineMode, setQuotaFallback, setLiveRecovered, refreshData } = useApp();
+  const { offlineMode, setQuotaFallback, setLiveRecovered } = useApp();
 
   const [originIata, setOriginIata] = useState<string | null>(null);
   const [departureInput, setDepartureInput] = useState("");
@@ -318,6 +231,12 @@ function RoutesContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fullMap, setFullMap] = useState(false);
+  const [routeProvenance, setRouteProvenance] =
+    useState<RouteDataProvenance | null>(null);
+  const [todayFlights, setTodayFlights] = useState<Flight[]>([]);
+  const [todayMeta, setTodayMeta] = useState<TodayBoardMeta | null>(null);
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [todayError, setTodayError] = useState<string | null>(null);
 
   const activeRequestId = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -421,6 +340,61 @@ function RoutesContent() {
     [],
   );
 
+  const loadTodayBoard = useCallback(
+    async (
+      code: string,
+      requestId: number,
+      signal: AbortSignal,
+    ): Promise<void> => {
+      setTodayLoading(true);
+      setTodayError(null);
+      setTodayFlights([]);
+      setTodayMeta(null);
+      try {
+        const response = await authFetch(`/api/airports/${code}/flights`, {
+          cache: "no-store",
+          signal,
+        });
+        const data = (await response.json()) as {
+          mode?: string;
+          flights?: Flight[];
+          error?: string;
+          source?: string;
+          fetchedAt?: string;
+          attribution?: string;
+          window?: { from: string; to: string } | null;
+        };
+        if (requestId !== activeRequestId.current || signal.aborted) return;
+        if (!response.ok || data.error) {
+          throw new Error(
+            data.error ?? "Live airport board data is temporarily unavailable.",
+          );
+        }
+        if (!Array.isArray(data.flights)) {
+          throw new Error("The provider returned an unexpected airport board.");
+        }
+        setTodayFlights(data.flights);
+        setTodayMeta({
+          source: "AERODATABOX",
+          fetchedAt: data.fetchedAt ?? new Date().toISOString(),
+          attribution: data.attribution ?? "AeroDataBox",
+          mode: data.mode ?? "LIVE_AERODATABOX",
+          window: data.window ?? null,
+        });
+      } catch (boardError) {
+        if (signal.aborted || requestId !== activeRequestId.current) return;
+        setTodayError(
+          boardError instanceof Error
+            ? boardError.message
+            : "Live airport board data is temporarily unavailable.",
+        );
+      } finally {
+        if (requestId === activeRequestId.current) setTodayLoading(false);
+      }
+    },
+    [],
+  );
+
   const loadHub = useCallback(
     async (iata: string, recordHistory = true, targetDest?: string) => {
       const code = iata.trim().toUpperCase();
@@ -459,6 +433,11 @@ function RoutesContent() {
         setDestinationSuggestions([]);
       }
       setAirlineCode(null);
+      setRouteProvenance(null);
+      setTodayFlights([]);
+      setTodayMeta(null);
+      setTodayError(null);
+      setTodayLoading(false);
 
       try {
         const response = await authFetch(`/api/airports/${code}/routes`, {
@@ -467,46 +446,85 @@ function RoutesContent() {
         });
         const data = (await response.json()) as {
           mode: string;
-          routes?: LiveRoute[];
+          routes?: unknown;
           error?: string;
+          source?: string;
+          fetchedAt?: string;
+          attribution?: string;
+          statisticsWindowDays?: number;
+          note?: string;
         };
 
         if (currentRequestId !== activeRequestId.current) return;
 
         if (data.mode === "QUOTA_FALLBACK") setQuotaFallback();
-        else if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
 
-        if (data.mode === "NOT_CONFIGURED") {
-          throw new Error("Live flight data is unavailable right now.");
+        if (!response.ok || data.error) {
+          throw new Error(data.error ?? "Live route data is unavailable right now.");
         }
-        if (data.error) throw new Error(data.error);
+        if (!Array.isArray(data.routes)) {
+          throw new Error("The provider returned an unexpected route network.");
+        }
 
-        // Fallback origin airport node if not in local reference
-        const originNode: AirportNode = node ?? {
-          iata: code,
-          icao: "",
-          name: code,
-          city: code,
-          country: "—",
-          region: "ALL",
-          latitude: data.routes?.[0]?.latitude ?? 0,
-          longitude: data.routes?.[0]?.longitude ?? 0,
-          timezone: "UTC",
-          hubAirlines: [],
-        };
+        // The bundled catalog is incomplete. Resolve a missing origin from
+        // the provider's airport search instead of inventing coordinates.
+        let originNode = node ?? null;
+        if (!originNode) {
+          const searchResponse = await authFetch(
+            `/api/airports/search?q=${encodeURIComponent(code)}`,
+            { cache: "no-store", signal: abortCtrl.signal },
+          );
+          const searchData = (await searchResponse.json()) as {
+            airports?: AirportNode[];
+            error?: string;
+          };
+          if (!searchResponse.ok || searchData.error) {
+            throw new Error(
+              searchData.error ??
+                "Origin airport coordinates are unavailable, so this route network cannot be plotted reliably.",
+            );
+          }
+          originNode =
+            searchData.airports?.find(
+              (airport) => airport.iata.toUpperCase() === code,
+            ) ?? null;
+          if (!originNode) {
+            throw new Error(
+              "Origin airport coordinates are unavailable, so this route network cannot be plotted reliably.",
+            );
+          }
+        }
 
-        const next = toConnections(originNode, data.routes ?? []);
+        const next = toConnections(originNode, data.routes as LiveRoute[]);
         setConnections(next);
+        setRouteProvenance({
+          source: "AERODATABOX",
+          fetchedAt: data.fetchedAt ?? new Date().toISOString(),
+          attribution: data.attribution ?? "AeroDataBox",
+          mode: data.mode,
+          statisticsWindowDays: 7,
+          note:
+            data.note ??
+            "AeroDataBox daily route statistics cover the previous 7 days. They are not a forward schedule.",
+        });
 
         if (!next.length) {
-          setError("No direct routes found for this airport in the weekly schedule.");
-        } else if (targetDest) {
-          const match = next.find(
-            (c) => c.destination.iata.toLowerCase() === targetDest.toLowerCase(),
+          setError(
+            "AeroDataBox returned no direct routes in its 7-day statistics for this airport.",
           );
-          if (match) {
-            setSelectedDest(match.destination.iata);
-            setDestinationInput(`${match.destination.iata} · ${match.destination.city}`);
+        } else {
+          if (data.mode === "LIVE_AERODATABOX") setLiveRecovered();
+          void loadTodayBoard(code, currentRequestId, abortCtrl.signal);
+          if (targetDest) {
+            const match = next.find(
+              (c) => c.destination.iata.toLowerCase() === targetDest.toLowerCase(),
+            );
+            if (match) {
+              setSelectedDest(match.destination.iata);
+              setDestinationInput(
+                `${match.destination.iata} · ${match.destination.city}`,
+              );
+            }
           }
         }
       } catch (loadError) {
@@ -514,6 +532,7 @@ function RoutesContent() {
           return;
         }
         setConnections([]);
+        setRouteProvenance(null);
         setError(
           loadError instanceof Error ? loadError.message : "Live route lookup failed.",
         );
@@ -523,7 +542,7 @@ function RoutesContent() {
         }
       }
     },
-    [offlineMode, originIata, setQuotaFallback, setLiveRecovered],
+    [offlineMode, originIata, setQuotaFallback, setLiveRecovered, loadTodayBoard],
   );
 
   // Initial deep link synchronization from searchParams
@@ -571,7 +590,13 @@ function RoutesContent() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    activeRequestId.current += 1;
     setOriginIata(null);
+    setRouteProvenance(null);
+    setTodayFlights([]);
+    setTodayMeta(null);
+    setTodayError(null);
+    setTodayLoading(false);
     setDepartureInput("");
     setSuggestions([]);
     setDestinationInput("");
@@ -736,6 +761,11 @@ function RoutesContent() {
           <div className="pointer-events-auto absolute z-30 transition-all inset-x-0 bottom-0 top-auto max-h-[72vh] sm:inset-y-0 sm:left-0 sm:right-auto sm:top-0 sm:max-h-full sm:w-[385px] md:w-[415px] shadow-2xl">
             <RouteTimetable
               connection={selectedConnection}
+              provenance={routeProvenance}
+              todayFlights={todayFlights}
+              todayMeta={todayMeta}
+              todayLoading={todayLoading}
+              todayError={todayError}
               onClose={() => {
                 setSelectedDest(null);
                 setDestinationInput("");
@@ -764,7 +794,7 @@ function RoutesContent() {
                     {selectedConnection
                       ? `${selectedConnection.origin.iata} → ${selectedConnection.destination.iata} · ${selectedConnection.destination.city}`
                       : summary.originAirport
-                        ? `${filteredConnections.length} direct destinations served weekly from ${summary.originAirport.city}`
+                        ? `${filteredConnections.length} direct destinations in AeroDataBox's last-7-days statistics from ${summary.originAirport.city}`
                         : "Select an origin airport on the map to explore direct connections"}
                   </p>
                 </div>
@@ -970,7 +1000,7 @@ function RoutesContent() {
         {loading && (
           <div className="absolute left-1/2 top-28 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/50 bg-surface/95 px-3 py-1.5 shadow-xl backdrop-blur">
             <Loader2 className="size-3.5 animate-spin text-accent" />
-            <span className="text-xs font-semibold text-ink">Loading route network for {originIata}…</span>
+            <span className="text-xs font-semibold text-ink">Loading AeroDataBox route statistics for {originIata}…</span>
           </div>
         )}
 
@@ -998,13 +1028,19 @@ function RoutesContent() {
           <span>{summary.totalCountriesServed} countries</span>
           <span>{summary.totalOperatingAirlines} airlines</span>
           <span>
-            {summary.totalWeeklyFlights ?? summary.totalDailyFlights * 7} weekly flights
+            {summary.totalDailyFlights != null
+              ? `${summary.totalDailyFlights} avg departures/day`
+              : "Daily average not reported"}
           </span>
+          {routeProvenance && (
+            <span title={routeProvenance.note}>
+              AeroDataBox · retrieved {formatProvenanceTime(routeProvenance.fetchedAt)} · last 7 days, not a forward schedule
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-subtle">
           <button
             onClick={() => {
-              void refreshData();
               if (originIata) void loadHub(originIata, false);
             }}
             className="flex items-center gap-1 font-semibold text-accent hover:underline cursor-pointer"
@@ -1013,7 +1049,7 @@ function RoutesContent() {
             <span>Refresh data</span>
           </button>
           <span>·</span>
-          <span>Select any destination point or arc to view connection timetable</span>
+          <span>Select a destination to view AeroDataBox&apos;s current departures board</span>
         </div>
       </div>
 
