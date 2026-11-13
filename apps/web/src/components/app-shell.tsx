@@ -52,8 +52,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const {
     watchlist,
     unreadAlertCount,
-    themeMode,
-    setThemeMode,
     account,
     refreshData,
     syncing,
@@ -201,22 +199,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Settings2 className="size-3.5 text-subtle" />
           </button>
 
-          <div className="flex items-center gap-1.5">
-            {(["SYSTEM", "LIGHT", "DARK"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setThemeMode(mode)}
-                className={cn(
-                  "flex-1 rounded-lg border px-1 py-1.5 text-[9px] font-bold transition-colors",
-                  themeMode === mode
-                    ? "border-accent/50 bg-accent-soft text-accent"
-                    : "border-line/60 text-subtle hover:text-ink",
-                )}
-              >
-                {mode === "SYSTEM" ? "AUTO" : mode}
-              </button>
-            ))}
-          </div>
         </div>
       </aside>
 

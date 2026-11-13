@@ -11,3 +11,12 @@ const target = resolve(import.meta.dirname, "../public/maplibre/maplibre-gl-work
 mkdirSync(dirname(target), { recursive: true });
 copyFileSync(worker, target);
 console.log(`MapLibre worker copied to ${target}`);
+
+const mapStyle = resolve(
+  import.meta.dirname,
+  "../../../packages/map-style/style.json",
+);
+const mapTarget = resolve(import.meta.dirname, "../public/map/style.json");
+mkdirSync(dirname(mapTarget), { recursive: true });
+copyFileSync(mapStyle, mapTarget);
+console.log(`Map style copied to ${mapTarget}`);

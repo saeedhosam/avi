@@ -6,8 +6,7 @@ data class CloudUserProfile(
     val displayName: String = "",
     val email: String = "",
     val photoUrl: String = "",
-    val homeAirport: String = "JFK",
-    val themePreference: String = "SYSTEM"
+    val homeAirport: String = "JFK"
 )
 
 data class CloudTrackedFlight(

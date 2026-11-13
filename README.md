@@ -13,8 +13,8 @@ Avi is a flight-tracking and terminal-wayfinding platform with a shared provider
 | `supabase` | Postgres schema, RLS, migrations, tests | Applied to the `avi` project |
 | `packages/contracts` | OpenAPI contract | Generated from the API |
 | `packages/catalog` | Airports, terminal layouts, world reference data | Bundled |
-| `packages/map-style` | Positron-derived MapLibre style | Generated |
-| `packages/design-tokens` | Shared colour/theme tokens | Generated |
+| `packages/map-style` | Dark cockpit MapLibre style | Generated |
+| `packages/design-tokens` | Shared dark cockpit design tokens | Generated |
 | `infra/server` | Docker Compose, Caddy, server env templates | Deployed on Hetzner |
 
 ## Environment

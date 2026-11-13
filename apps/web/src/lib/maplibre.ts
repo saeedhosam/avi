@@ -4,7 +4,6 @@ import {
   type LayerSpecification,
   type Map as MapLibreMap,
   NavigationControl,
-  ScaleControl,
   Map as MapLibreMapClass,
   setWorkerUrl,
 } from "maplibre-gl";
@@ -16,25 +15,22 @@ import type {
   Point,
   Position,
 } from "geojson";
+import { PALETTE } from "./palette";
 
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
-export type MapTheme = "light" | "dark";
-
-export const MAP_STYLE_URLS: Record<MapTheme, string> = {
-  light: "/map/style.json",
-  dark: "/map/style-dark.json",
-};
+/** The single dark cockpit basemap used by every map surface. */
+export const MAP_STYLE_URL = "/map/style.json";
 
 export const MAP_COLORS = {
-  ocean: "#CBE7F9",
-  land: "#F2F3F5",
-  border: "#D3D8E0",
-  routeRemaining: "#D94A6A",
-  routeTraveled: "#0077FF",
-  radarCyan: "#00E5FF",
-  ink: "#071018",
-  white: "#FFFFFF",
+  ocean: PALETTE.map.ocean,
+  land: PALETTE.map.land,
+  border: PALETTE.map.border,
+  routeRemaining: PALETTE.map.routeRemaining,
+  routeTraveled: PALETTE.map.routeTraveled,
+  accent: PALETTE.accent,
+  ink: PALETTE.background,
+  highlight: PALETTE.map.highlight,
 } as const;
 
 export function createBaseMap(
@@ -46,11 +42,10 @@ export function createBaseMap(
     maxZoom?: number;
     attribution?: boolean;
   } = {},
-  theme: MapTheme = "light",
 ): MapLibreMap {
   const map = new MapLibreMapClass({
     container,
-    style: MAP_STYLE_URLS[theme],
+    style: MAP_STYLE_URL,
     center: options.center ?? [10, 24],
     zoom: options.zoom ?? 2,
     minZoom: options.minZoom ?? 1,
@@ -83,7 +78,6 @@ export function createBaseMap(
   }
 
   map.addControl(new NavigationControl({ showCompass: false }), "top-right");
-  map.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
 
   return map;
 }
@@ -110,7 +104,9 @@ export function ensureLayer(map: MapLibreMap, layer: LayerSpecification) {
  * route labels remain readable. Custom avi-* layers are never touched.
  */
 export function setBaseSymbolLayersVisible(map: MapLibreMap, visible: boolean) {
-  const layers = map.getStyle().layers ?? [];
+  const style = map.getStyle();
+  if (!style) return;
+  const layers = style.layers ?? [];
   for (const layer of layers) {
     if (layer.type !== "symbol" || layer.id.startsWith("avi-")) continue;
     if (!map.getLayer(layer.id)) continue;
@@ -149,7 +145,7 @@ export function ensureAircraftImage(map: MapLibreMap) {
   context.lineTo(-28, 4);
   context.lineTo(-6, -7);
   context.closePath();
-  context.fillStyle = MAP_COLORS.radarCyan;
+  context.fillStyle = MAP_COLORS.accent;
   context.strokeStyle = MAP_COLORS.ink;
   context.lineWidth = 2;
   context.fill();
@@ -174,8 +170,10 @@ export function lineFeature(
   coordinates: Position[],
   properties: Record<string, unknown>,
 ): Feature<LineString> {
+  const id = properties.id;
   return {
     type: "Feature",
+    ...(typeof id === "string" || typeof id === "number" ? { id } : {}),
     geometry: { type: "LineString", coordinates },
     properties,
   };

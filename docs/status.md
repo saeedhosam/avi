@@ -64,7 +64,7 @@ Updated: 2026-11-07
   - route network
   - flight dossier map
   - full-screen flight map
-- Light and dark map styles (`style.json` / `style-dark.json`) auto-follow the app theme.
+- A single dark cockpit map style (`packages/map-style/style.json`) is copied into the web public assets and Android assets at build time, so every map surface shares one style.
 - Routes map hides base-map place labels while a hub or route is selected so IATA/route labels stay readable.
 - MapLibre worker served from `/maplibre/maplibre-gl-worker.mjs`.
 - Routes and aircraft symbols render; flight arcs, traveled path, IATA badges, and aircraft heading verified in headless Chrome.
@@ -81,7 +81,7 @@ Updated: 2026-11-07
 - Room remains the offline cache; cloud watchlist items with snapshots and alerts are merged on sign-in.
 - Live Radar screen/tab removed; the flight detail map is kept.
 - User-facing watchlist is unified to one action/list; Supabase calls use `watchlist_items` and `notes`.
-- Google Maps removed from Android: the flight map is now MapLibre Compose (`org.maplibre.compose:maplibre-compose:0.20.0`, OpenGL runtime) using the same Positron light/dark styles as web, copied from `packages/map-style` into assets at build time (`copyAviMapStyles` task). Theme-following, great-circle arcs, traveled path, heading vector, IATA halo labels, and camera fit mirror the web flight map. `play-services-maps`, `maps-compose`, and `MAPS_API_KEY` are gone.
+- Google Maps removed from Android: the flight map is now MapLibre Compose (`org.maplibre.compose:maplibre-compose:0.20.0`, OpenGL runtime) using the same single dark cockpit Positron style as web, copied from `packages/map-style` into assets at build time (`copyAviMapStyles` task). Great-circle arcs, traveled path, heading vector, IATA halo labels, and camera fit mirror the web flight map. `play-services-maps`, `maps-compose`, and `MAPS_API_KEY` are gone.
 - Toolchain refreshed 2026-11-06: AGP 9.5.1 / Gradle 9.8.2 / built-in Kotlin 2.4.21, compileSdk 37, Compose BOM 2026.09.00, KSP 2.3.13, Room 2.8.5, Supabase BOM 3.9.0, Ktor 3.6.1, OkHttp 5.5.1, Retrofit 3.0.0.
 - Android debug build and unit tests pass locally; CI builds with the same Gradle version.
 

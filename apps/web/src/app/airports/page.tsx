@@ -365,7 +365,7 @@ export default function AirportsPage() {
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
                 viewMode === "GROUNDS"
-                  ? "bg-accent text-surface-0 shadow-sm"
+                  ? "bg-accent text-[color:var(--bg)] shadow-sm"
                   : "text-muted hover:text-ink",
               )}
             >
@@ -381,7 +381,7 @@ export default function AirportsPage() {
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
                 viewMode === "INDOOR"
-                  ? "bg-accent text-surface-0 shadow-sm"
+                  ? "bg-accent text-[color:var(--bg)] shadow-sm"
                   : layout
                     ? "text-muted hover:text-ink"
                     : "cursor-not-allowed opacity-40 text-subtle",
@@ -464,7 +464,7 @@ export default function AirportsPage() {
               setAirportCode("CAI");
               setViewMode("INDOOR");
             }}
-            className="shrink-0 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent hover:bg-accent hover:text-surface-0 transition-colors"
+            className="shrink-0 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent hover:bg-accent hover:text-[color:var(--bg)] transition-colors"
           >
             Explore CAI Terminal 3 CAD
           </button>

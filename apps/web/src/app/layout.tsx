@@ -34,37 +34,12 @@ export const metadata: Metadata = {
   ],
 };
 
-const THEME_SCRIPT = `(function(){
-  try{
-    var orig=Object.defineProperty;
-    Object.defineProperty=function(obj,prop,desc){
-      if(prop==='_classRegistryKey'&&(obj===Set||obj===Error||(typeof Map!=='undefined'&&obj===Map))){
-        return obj;
-      }
-      return orig.call(Object,obj,prop,desc);
-    };
-  }catch(e){}
-  try{
-    var raw=localStorage.getItem('skytrack.theme');
-    var mode=raw?JSON.parse(raw):'SYSTEM';
-    var dark=mode==='DARK'||(mode==='SYSTEM'&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.dataset.theme=dark?'dark':'light';
-    document.documentElement.style.colorScheme=dark?'dark':'light';
-  }catch(e){
-    document.documentElement.dataset.theme='dark';
-  }
-})();`;
-
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-      </head>
       <body className="min-h-full bg-bg text-ink">
         <Suspense
           fallback={

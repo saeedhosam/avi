@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,10 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.preferences.ThemeMode
 import com.example.model.Flight
 import com.example.notifications.FlightNotificationManager
 import com.example.ui.screens.*
@@ -43,7 +41,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        enableEdgeToEdge()
+        // The app is dark-only: keep system-bar icons light regardless of the
+        // device's light/dark setting.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
 
         // Initialize Notification Channels
         FlightNotificationManager.createNotificationChannel(this)
@@ -52,21 +55,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val viewModel: FlightViewModel = viewModel()
-            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-            val isSystemDark = isSystemInDarkTheme()
-            val isDarkTheme = when (themeMode) {
-                ThemeMode.SYSTEM -> isSystemDark
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
-            }
 
-            SkyTrackTheme(darkTheme = isDarkTheme) {
+            SkyTrackTheme {
                 SkyTrackApp(
                     viewModel = viewModel,
                     initialFlightNumber = initialFlightNumber,
-                    initialOpenNotifications = initialOpenNotifications,
-                    themeMode = themeMode,
-                    onThemeModeChange = { viewModel.setThemeMode(it) }
+                    initialOpenNotifications = initialOpenNotifications
                 )
             }
         }
@@ -98,9 +92,7 @@ fun SkyTrackApp(
     viewModel: FlightViewModel = viewModel(),
     connectionsViewModel: com.example.ui.viewmodel.ConnectionsViewModel = viewModel(),
     initialFlightNumber: String? = null,
-    initialOpenNotifications: Boolean = false,
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
-    onThemeModeChange: (ThemeMode) -> Unit = {}
+    initialOpenNotifications: Boolean = false
 ) {
     var currentScreen by remember { mutableStateOf(NavigationScreen.SEARCH) }
     var selectedDetailFlight by remember { mutableStateOf<Flight?>(null) }
@@ -346,8 +338,6 @@ fun SkyTrackApp(
     if (showAccountDialog) {
         OAuthLoginDialog(
             account = userAccount,
-            themeMode = themeMode,
-            onThemeModeChange = onThemeModeChange,
             onDismiss = { showAccountDialog = false },
             onSignIn = { provider -> viewModel.signInWithOAuth(provider) },
             onSignOut = { viewModel.signOut() },

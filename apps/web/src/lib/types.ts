@@ -39,8 +39,6 @@ export type AlertType =
   | "CANCELLATION"
   | "BAGGAGE";
 
-export type ThemeMode = "SYSTEM" | "LIGHT" | "DARK";
-
 export interface FlightAlert {
   id: string;
   flightNumber: string;

@@ -14,7 +14,6 @@ import type {
   Flight,
   FlightAlert,
   RecentSearch,
-  ThemeMode,
   UserAccount,
 } from "./types";
 import type { DataSourceMode } from "./data-source";
@@ -65,14 +64,11 @@ interface PersistedState {
   flights: Flight[];
   alerts: FlightAlert[];
   recents: RecentSearch[];
-  themeMode: ThemeMode;
   offlineMode: boolean;
 }
 
 interface AppContextValue {
   hydrated: boolean;
-  themeMode: ThemeMode;
-  setThemeMode: (mode: ThemeMode) => void;
   flights: Flight[];
   watchlist: Flight[];
   upsertFlights: (incoming: Flight[], options?: { source?: "live" | "cloud" }) => void;
@@ -122,17 +118,6 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-/**
- * Resolved theme lives in its own context so map-rich components (which only
- * read the theme) stop re-rendering on every flight/telemetry update.
- */
-const ThemeContext = createContext<"light" | "dark">("dark");
-
-export function useResolvedTheme(): "light" | "dark" {
-  const value = useContext(ThemeContext);
-  return value ?? "dark";
-}
-
 const GUEST_ACCOUNT: UserAccount = {
   name: "Guest Aviator",
   email: "Sign in with Google to sync",
@@ -147,7 +132,6 @@ const defaultPersisted: PersistedState = {
   flights: [],
   alerts: [],
   recents: [],
-  themeMode: "SYSTEM",
   offlineMode: false,
 };
 
@@ -191,7 +175,6 @@ function readPersisted(key: string): PersistedState {
         : [],
       alerts: Array.isArray(parsed.alerts) ? parsed.alerts.slice(0, MAX_PERSISTED_ALERTS) : [],
       recents: Array.isArray(parsed.recents) ? parsed.recents.slice(0, 5) : [],
-      themeMode: parsed.themeMode ?? "SYSTEM",
       offlineMode: parsed.offlineMode ?? false,
     };
   } catch {
@@ -319,8 +302,6 @@ export function buildChangeAlerts(previous: Flight, next: Flight): FlightAlert[]
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
-  const [themeMode, setThemeModeState] = useState<ThemeMode>("SYSTEM");
-  const [systemDark, setSystemDark] = useState(true);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [alerts, setAlerts] = useState<FlightAlert[]>([]);
   const [recents, setRecents] = useState<RecentSearch[]>([]);
@@ -352,20 +333,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     alertsRef.current = alerts;
   }, [alerts]);
 
-  const resolvedTheme: "light" | "dark" =
-    themeMode === "SYSTEM"
-      ? systemDark
-        ? "dark"
-        : "light"
-      : themeMode === "DARK"
-        ? "dark"
-        : "light";
-
   useEffect(() => {
     const key = storageKeyFor(null);
     storageKeyRef.current = key;
     const persisted = readPersisted(key);
-    setThemeModeState(persisted.themeMode);
     setOfflineMode(persisted.offlineMode);
     setFlights(persisted.flights);
     flightsRef.current = persisted.flights;
@@ -382,7 +353,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (storageKeyRef.current === key) return;
     storageKeyRef.current = key;
     const persisted = readPersisted(key);
-    setThemeModeState(persisted.themeMode);
     setOfflineMode(persisted.offlineMode);
     flightsRef.current = persisted.flights;
     setFlights(persisted.flights);
@@ -390,25 +360,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAlerts(persisted.alerts);
     setRecents(persisted.recents);
   }, [hydrated, account.uid]);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    setSystemDark(media.matches);
-    const listener = (event: MediaQueryListEvent) => setSystemDark(event.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme;
-    // The pre-hydration inline script can only read a stable, non-scoped key.
-    try {
-      window.localStorage.setItem("skytrack.theme", JSON.stringify(themeMode));
-    } catch {
-      // Theme memory is cosmetic; namespace writes are handled elsewhere.
-    }
-  }, [resolvedTheme, themeMode]);
 
   useEffect(() => {
     fetch("/api/status")
@@ -455,14 +406,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         flights: flights.slice(0, MAX_PERSISTED_FLIGHTS),
         alerts: alerts.slice(0, MAX_PERSISTED_ALERTS),
         recents,
-        themeMode,
         offlineMode,
       };
       window.localStorage.setItem(storageKeyRef.current, JSON.stringify(value));
     } catch (error) {
       console.warn("local cache persist failed (storage may be full)", error);
     }
-  }, [hydrated, flights, alerts, recents, themeMode, offlineMode]);
+  }, [hydrated, flights, alerts, recents, offlineMode]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -807,10 +757,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [notify]);
 
-  const setThemeMode = useCallback((mode: ThemeMode) => {
-    setThemeModeState(mode);
-  }, []);
-
   // Account beat (Track I): plan tier, tracking limit, watchlist size, and
   // the month-to-date provider-unit budget, fetched from /v1/me through the
   // gateway. Fetched on demand (account dialog) and on user change.
@@ -899,7 +845,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Purge the device-local namespace; nothing user-owned lingers.
       try {
         window.localStorage.removeItem(storageKeyFor(uid));
-        window.localStorage.removeItem("skytrack.theme");
       } catch {
         // Storage cleanup is best-effort.
       }
@@ -1199,8 +1144,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: AppContextValue = {
     hydrated,
-    themeMode,
-    setThemeMode,
     flights,
     watchlist,
     upsertFlights,
@@ -1244,11 +1187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     startUpgrade,
   };
 
-  return (
-    <AppContext.Provider value={value}>
-      <ThemeContext.Provider value={resolvedTheme}>{children}</ThemeContext.Provider>
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {

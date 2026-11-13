@@ -8,8 +8,8 @@ import type {
 
 export type GlobalAirportNode = AirportNode & {
   /**
-   * Reference count from the bundled catalog. This is not a live route count
-   * and must not be presented as one.
+   * OpenFlights-derived reference count from the bundled catalog. This is not
+   * a live route count and must not be presented as one.
    */
   destCount?: number;
   /** True for airports that no longer accept commercial traffic. */

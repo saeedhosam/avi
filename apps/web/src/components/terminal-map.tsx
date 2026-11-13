@@ -8,20 +8,41 @@ import type {
   ConcourseFloor,
   TerminalAmenity,
 } from "@/lib/types";
+import { PALETTE } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 
 export const AMENITY_META: Record<
   AmenityCategory,
   { label: string; color: string; short: string }
 > = {
-  ALL: { label: "All", color: "#00E5FF", short: "ALL" },
-  GATE: { label: "Gates", color: "#00E5FF", short: "G" },
-  LOUNGE: { label: "Lounges", color: "#FFB300", short: "L" },
-  SECURITY: { label: "Security", color: "#FF5252", short: "S" },
-  DINING: { label: "Dining & Coffee", color: "#FF7043", short: "D" },
-  SHOPPING: { label: "Duty Free & Shops", color: "#AB47BC", short: "SH" },
-  RESTROOM: { label: "Restrooms", color: "#42A5F5", short: "WC" },
-  TRANSIT: { label: "Transit & Baggage", color: "#26A69A", short: "B" },
+  ALL: { label: "All", color: PALETTE.amenities.ALL, short: "ALL" },
+  GATE: { label: "Gates", color: PALETTE.amenities.GATE, short: "G" },
+  LOUNGE: { label: "Lounges", color: PALETTE.amenities.LOUNGE, short: "L" },
+  SECURITY: {
+    label: "Security",
+    color: PALETTE.amenities.SECURITY,
+    short: "S",
+  },
+  DINING: {
+    label: "Dining & Coffee",
+    color: PALETTE.amenities.DINING,
+    short: "D",
+  },
+  SHOPPING: {
+    label: "Duty Free & Shops",
+    color: PALETTE.amenities.SHOPPING,
+    short: "SH",
+  },
+  RESTROOM: {
+    label: "Restrooms",
+    color: PALETTE.amenities.RESTROOM,
+    short: "WC",
+  },
+  TRANSIT: {
+    label: "Transit & Baggage",
+    color: PALETTE.amenities.TRANSIT,
+    short: "B",
+  },
 };
 
 const W = 1000;
@@ -62,7 +83,7 @@ export function TerminalMap({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-line bg-[#081320]",
+        "relative overflow-hidden rounded-2xl border border-line bg-surface",
         className,
       )}
     >
@@ -101,8 +122,8 @@ export function TerminalMap({
       >
         <defs>
           <radialGradient id="terminal-bg" cx="50%" cy="45%" r="75%">
-            <stop offset="0%" stopColor="#102238" />
-            <stop offset="100%" stopColor="#081320" />
+            <stop offset="0%" stopColor="var(--surface-3)" />
+            <stop offset="100%" stopColor="var(--surface)" />
           </radialGradient>
           <filter id="amenity-glow" x="-80%" y="-80%" width="260%" height="260%">
             <feGaussianBlur stdDeviation="4" result="blur" />
@@ -115,7 +136,7 @@ export function TerminalMap({
             <path
               d="M 36 0 L 0 0 0 36"
               fill="none"
-              stroke="#00E5FF"
+              stroke="var(--accent)"
               strokeOpacity="0.05"
               strokeWidth="0.7"
             />
@@ -143,7 +164,7 @@ export function TerminalMap({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#081420"
+                    stroke="var(--surface)"
                     strokeWidth={width + 14}
                     strokeLinecap="round"
                   />
@@ -152,7 +173,7 @@ export function TerminalMap({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#17304C"
+                    stroke="var(--surface-3)"
                     strokeWidth={width + 6}
                     strokeLinecap="round"
                   />
@@ -161,7 +182,7 @@ export function TerminalMap({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#24425F"
+                    stroke="var(--border-strong)"
                     strokeWidth={width}
                     strokeLinecap="round"
                   />
@@ -170,7 +191,7 @@ export function TerminalMap({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#00E5FF"
+                    stroke="var(--accent)"
                     strokeOpacity={0.22}
                     strokeWidth={0.9}
                     strokeDasharray="8 7"
@@ -179,7 +200,7 @@ export function TerminalMap({
                     x={(x1 + x2) / 2}
                     y={(y1 + y2) / 2 - width / 2 - 6}
                     textAnchor="middle"
-                    fill="#8FB3C9"
+                    fill="var(--muted)"
                     fontSize={8}
                     fontWeight={700}
                   >
@@ -196,16 +217,16 @@ export function TerminalMap({
               cx={floor.centralHubCenter.x * W}
               cy={floor.centralHubCenter.y * H}
               r={26}
-              fill="#0F2740"
-              stroke="#264366"
+              fill="var(--surface-3)"
+              stroke="var(--border-strong)"
               strokeWidth={1.5}
             />
             <circle
               cx={floor.centralHubCenter.x * W}
               cy={floor.centralHubCenter.y * H}
               r={16}
-              fill="#13233A"
-              stroke="#38BDF8"
+              fill="var(--surface-2)"
+              stroke="var(--accent-2)"
               strokeOpacity={0.4}
               strokeWidth={0.8}
             />
@@ -213,7 +234,7 @@ export function TerminalMap({
               x={floor.centralHubCenter.x * W}
               y={floor.centralHubCenter.y * H + 3}
               textAnchor="middle"
-              fill="#94A3B8"
+              fill="var(--muted)"
               fontSize={6.5}
               fontWeight={700}
             >
@@ -224,16 +245,16 @@ export function TerminalMap({
               cx={floor.securityPosition.x * W}
               cy={floor.securityPosition.y * H}
               r={12}
-              fill="#FF5252"
+              fill="var(--accent-2)"
               fillOpacity={0.18}
-              stroke="#FF5252"
+              stroke="var(--accent-2)"
               strokeWidth={1.3}
             />
             <text
               x={floor.securityPosition.x * W}
               y={floor.securityPosition.y * H + 3}
               textAnchor="middle"
-              fill="#FF8A8A"
+              fill="var(--text)"
               fontSize={7}
               fontWeight={800}
             >
@@ -242,7 +263,7 @@ export function TerminalMap({
             <text
               x={floor.securityPosition.x * W + 17}
               y={floor.securityPosition.y * H + 2.5}
-              fill="#FF8A8A"
+              fill="var(--text)"
               fontSize={6.5}
               fontWeight={700}
             >
@@ -253,16 +274,16 @@ export function TerminalMap({
               cx={floor.entrancePosition.x * W}
               cy={floor.entrancePosition.y * H}
               r={9}
-              fill="#10B981"
+              fill="var(--muted)"
               fillOpacity={0.18}
-              stroke="#10B981"
+              stroke="var(--muted)"
               strokeWidth={1.2}
             />
             <text
               x={floor.entrancePosition.x * W}
               y={floor.entrancePosition.y * H + 26}
               textAnchor="middle"
-              fill="#5EE2B5"
+              fill="var(--muted)"
               fontSize={6.5}
               fontWeight={700}
             >
@@ -276,7 +297,7 @@ export function TerminalMap({
               <path
                 d={routePath}
                 fill="none"
-                stroke="#00E5FF"
+                stroke="var(--accent)"
                 strokeWidth={7}
                 strokeOpacity={0.16}
                 strokeLinecap="round"
@@ -284,7 +305,7 @@ export function TerminalMap({
               <path
                 d={routePath}
                 fill="none"
-                stroke="#00E5FF"
+                stroke="var(--accent)"
                 strokeWidth={2}
                 strokeDasharray="7 6"
                 strokeLinecap="round"
@@ -293,7 +314,7 @@ export function TerminalMap({
               <text
                 x={selected!.position.x * W + 12}
                 y={selected!.position.y * H - 20}
-                fill="#00E5FF"
+                fill="var(--accent)"
                 fontSize={7}
                 fontWeight={800}
               >
@@ -346,7 +367,7 @@ export function TerminalMap({
                   x={x}
                   y={y + 2.2}
                   textAnchor="middle"
-                  fill={isSelected ? "#071018" : meta.color}
+                  fill={isSelected ? "var(--bg)" : meta.color}
                   fontSize={isGate ? 6.5 : 5}
                   fontWeight={800}
                 >
@@ -357,7 +378,7 @@ export function TerminalMap({
                     x={x}
                     y={y + 17}
                     textAnchor="middle"
-                    fill="#B8CCDB"
+                    fill="var(--muted)"
                     fontSize={5.7}
                     fontWeight={700}
                   >
@@ -385,7 +406,7 @@ export function TerminalMap({
                 width={160}
                 height={27}
                 rx={5}
-                fill="rgba(7,16,26,0.94)"
+                fill="rgba(9,9,11,0.94)"
                 stroke={AMENITY_META[selected.category].color}
                 strokeOpacity={0.6}
                 strokeWidth={0.8}
@@ -394,7 +415,7 @@ export function TerminalMap({
                 x={selected.position.x * W}
                 y={selected.position.y * H - 65}
                 textAnchor="middle"
-                fill="#F8FAFC"
+                fill="var(--text)"
                 fontSize={7}
                 fontWeight={700}
               >

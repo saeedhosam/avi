@@ -32,12 +32,10 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.MockFlightData
 import com.example.data.local.RecentSearchEntity
-import com.example.data.preferences.ThemeMode
 import com.example.model.Flight
 import com.example.model.FlightStatus
 import com.example.ui.components.DataSourceStatusBanner
 import com.example.ui.components.FlightCard
-import com.example.ui.components.ThemeSelectionDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.FlightViewModel
 import com.example.ui.viewmodel.SearchMode
@@ -67,11 +65,9 @@ fun FlightSearchScreen(
     val watchlistFlights by viewModel.watchlistFlights.collectAsState()
     val unreadAlerts by viewModel.unreadAlertCount.collectAsState()
     val userAccount by viewModel.userAccount.collectAsState()
-    val themeMode by viewModel.themeMode.collectAsState()
     val dataSourceMode by viewModel.dataSourceMode.collectAsState()
     val isLiveLoading by viewModel.isLiveLoading.collectAsState()
 
-    var showThemeDialog by remember { mutableStateOf(false) }
     var showOriginPicker by remember { mutableStateOf(false) }
     var showDestPicker by remember { mutableStateOf(false) }
 
@@ -160,7 +156,7 @@ fun FlightSearchScreen(
                         }
                     }
 
-                    // Account / OAuth / Theme / Sync Avatar button
+                    // Account / OAuth / Sync avatar button
                     IconButton(
                         onClick = onOpenAccount,
                         modifier = Modifier.testTag("account_top_btn")
@@ -878,15 +874,6 @@ fun FlightSearchScreen(
         )
     }
 
-    if (showThemeDialog) {
-        ThemeSelectionDialog(
-            currentThemeMode = themeMode,
-            onSelectThemeMode = { newMode ->
-                viewModel.setThemeMode(newMode)
-            },
-            onDismiss = { showThemeDialog = false }
-        )
-    }
 }
 
 @Composable

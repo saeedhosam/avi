@@ -23,6 +23,7 @@ import type {
   FlightCategory,
   RealtimeAirportWeather,
 } from "@/lib/types";
+import { PALETTE } from "@/lib/palette";
 import { cn, weatherIcon } from "@/lib/utils";
 
 function WeatherGlyph({
@@ -50,11 +51,13 @@ function WeatherGlyph({
 
 function categoryColor(category: string) {
   if (!category || category === "UNKNOWN" || category.includes("Not reported")) {
-    return "#94A3B8";
+    return PALETTE.weather.UNKNOWN;
   }
-  if (category.includes("VFR") && !category.includes("MVFR")) return "#10B981";
-  if (category.includes("MVFR")) return "#F59E0B";
-  return "#EF4444";
+  if (category.includes("VFR") && !category.includes("MVFR")) {
+    return PALETTE.weather.VFR;
+  }
+  if (category.includes("MVFR")) return PALETTE.weather.MVFR;
+  return PALETTE.weather.IFR;
 }
 
 export function DestinationWeatherCard({

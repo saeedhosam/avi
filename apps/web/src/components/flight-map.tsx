@@ -20,7 +20,6 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
-import { useResolvedTheme } from "@/lib/store";
 import { cn, isFreshTimestamp } from "@/lib/utils";
 export function FlightMap({
   flight,
@@ -33,8 +32,7 @@ export function FlightMap({
   showAttribution?: boolean;
   recenterSignal?: number;
 }) {
-  const resolvedTheme = useResolvedTheme();
-  const { containerRef, map } = useMapLibre(resolvedTheme, {
+  const { containerRef, map } = useMapLibre({
     center: [10, 24],
     zoom: 2.4,
     minZoom: 1.4,
@@ -150,7 +148,7 @@ export function FlightMap({
       source: "avi-heading",
       layout: { "line-cap": "round" },
       paint: {
-        "line-color": MAP_COLORS.radarCyan,
+        "line-color": MAP_COLORS.accent,
         "line-width": 1.4,
         "line-opacity": 0.9,
       },
@@ -162,7 +160,7 @@ export function FlightMap({
       paint: {
         "circle-radius": 5,
         "circle-color": MAP_COLORS.routeTraveled,
-        "circle-stroke-color": MAP_COLORS.white,
+        "circle-stroke-color": MAP_COLORS.highlight,
         "circle-stroke-width": 2,
       },
     });
@@ -181,7 +179,7 @@ export function FlightMap({
       },
       paint: {
         "text-color": MAP_COLORS.ink,
-        "text-halo-color": MAP_COLORS.white,
+        "text-halo-color": MAP_COLORS.highlight,
         "text-halo-width": 2,
       },
     });
@@ -191,7 +189,7 @@ export function FlightMap({
       source: "avi-aircraft",
       paint: {
         "circle-radius": 7,
-        "circle-color": MAP_COLORS.radarCyan,
+        "circle-color": MAP_COLORS.accent,
         "circle-stroke-color": MAP_COLORS.ink,
         "circle-stroke-width": 2,
         "circle-opacity": 0.24,

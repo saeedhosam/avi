@@ -6,7 +6,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Box, Layers, LocateFixed, ZoomIn, ZoomOut } from "lucide-react";
 import type { AirportNode } from "@/lib/types";
 import { useMapLibre } from "@/lib/use-maplibre";
-import { useResolvedTheme } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export interface AirportGroundsMapProps {
@@ -22,8 +21,7 @@ export function AirportGroundsMap({
   onSelectTerminal,
   hasIndoorSchematic = false,
 }: AirportGroundsMapProps) {
-  const resolvedTheme = useResolvedTheme();
-  const { containerRef, map } = useMapLibre(resolvedTheme, {
+  const { containerRef, map } = useMapLibre({
     center: [airport.longitude, airport.latitude],
     zoom: 14.8,
     minZoom: 10,
@@ -58,9 +56,9 @@ export function AirportGroundsMap({
     const el = document.createElement("div");
     el.className = "group relative flex items-center justify-center cursor-pointer";
     el.innerHTML = `
-      <div class="absolute -inset-3 rounded-full bg-cyan-400/20 animate-ping"></div>
-      <div class="relative flex size-8 items-center justify-center rounded-full border-2 border-cyan-400 bg-slate-950 shadow-xl shadow-cyan-500/30">
-        <span class="font-mono text-[9px] font-black text-cyan-400 tracking-wider">${airport.iata}</span>
+      <div class="absolute -inset-3 rounded-full bg-accent/20 animate-ping"></div>
+      <div class="relative flex size-8 items-center justify-center rounded-full border-2 border-accent bg-bg shadow-xl shadow-accent/30">
+        <span class="font-mono text-[9px] font-black text-accent tracking-wider">${airport.iata}</span>
       </div>
       <div class="pointer-events-none absolute bottom-full mb-2 hidden -translate-x-1/2 left-1/2 whitespace-nowrap rounded-md border border-line bg-surface/95 px-2 py-1 text-[10px] font-bold text-ink shadow-lg group-hover:block backdrop-blur">
         ${airport.name} · ${airport.city}
@@ -115,7 +113,7 @@ export function AirportGroundsMap({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-line bg-[#081320]",
+        "relative overflow-hidden rounded-2xl border border-line bg-surface",
         className,
       )}
     >
@@ -124,7 +122,7 @@ export function AirportGroundsMap({
       {/* Floating HUD Badges */}
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1.5">
         <div className="flex items-center gap-1.5 rounded-lg border border-line/80 bg-surface/90 px-2.5 py-1 text-[10px] font-bold text-ink shadow-lg backdrop-blur">
-          <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="size-2 rounded-full bg-landed animate-pulse" />
           <span>Airfield & Grounds View</span>
           <span className="font-mono text-accent">Z{currentZoom}</span>
         </div>

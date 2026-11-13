@@ -54,8 +54,8 @@ export default function PrivacyPage() {
             cancellation, baggage) generated for your watched flights.</p>
           <p><strong className="text-ink">Push subscriptions</strong> — if you enable browser push, the
             browser-generated subscription endpoint and cryptographic keys (no personal data).</p>
-          <p><strong className="text-ink">Device-local data</strong> — your watchlist cache, recent searches,
-            and theme preference are also stored in your browser&apos;s local storage on your device.
+          <p><strong className="text-ink">Device-local data</strong> — your watchlist cache and recent
+            searches are also stored in your browser&apos;s local storage on your device.
             It never leaves your device beyond the cloud sync described above.</p>
           <p><strong className="text-ink">Reference and illustrative content</strong> — the bundled
             airport catalog, terminal layouts, and seat maps are reference material shipped with the

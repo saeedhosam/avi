@@ -6,21 +6,6 @@ const source = JSON.parse(
   readFileSync(resolve(root, "positron.source.json"), "utf8"),
 );
 
-const lightPalette = {
-  background: "#F2F3F5",
-  water: "#CBE7F9",
-  waterway: "#A5D8F3",
-  boundary: "#D3D8E0",
-  park: "#E8EDF2",
-  residential: "#EEF1F4",
-  building: "#E8ECF1",
-  label: "#334155",
-  labelHalo: "#FFFFFF",
-  road: "#FFFFFF",
-  roadCasing: "#D5D5D5",
-  rail: "#DDDDDD",
-};
-
 const darkPalette = {
   background: "#0B1A2A",
   water: "#07131F",
@@ -116,11 +101,25 @@ function buildVariant(name, palette, extra = {}) {
     highway_motorway_inner: { "line-color": palette.road },
     highway_motorway_bridge_casing: { "line-color": palette.roadCasing },
     highway_motorway_bridge_inner: { "line-color": palette.road },
+    highway_major_subtle: { "line-color": palette.road },
+    highway_motorway_subtle: { "line-color": palette.road },
     tunnel_motorway_casing: { "line-color": palette.roadCasing },
     tunnel_motorway_inner: { "line-color": palette.road },
+    "aeroway-taxiway": { "line-color": palette.roadCasing },
+    "aeroway-runway-casing": { "line-color": palette.boundary },
+    "aeroway-runway": { "line-color": palette.road },
     railway: { "line-color": palette.rail },
     railway_service: { "line-color": palette.rail },
     railway_transit: { "line-color": palette.rail },
+    railway_dashline: { "line-color": palette.background },
+    railway_service_dashline: { "line-color": palette.background },
+    railway_transit_dashline: { "line-color": palette.background },
+    "highway-name-path": {
+      "text-color": palette.label,
+      "text-halo-color": palette.labelHalo,
+    },
+    "highway-name-minor": { "text-color": palette.label },
+    "highway-name-major": { "text-color": palette.label },
     road_pier: { "line-color": palette.background },
     road_area_pier: { "fill-color": palette.background },
     ...extra,
@@ -150,14 +149,9 @@ function buildVariant(name, palette, extra = {}) {
   return style;
 }
 
-const light = buildVariant("Avi Positron Light", lightPalette);
 const dark = buildVariant("Avi Positron Dark", darkPalette, {
   "aeroway-area": { "fill-color": "#1E3A55" },
 });
 
-writeFileSync(resolve(root, "style.json"), `${JSON.stringify(light, null, 2)}\n`);
-writeFileSync(
-  resolve(root, "style-dark.json"),
-  `${JSON.stringify(dark, null, 2)}\n`,
-);
-console.log(`map styles written: ${light.layers.length} layers each`);
+writeFileSync(resolve(root, "style.json"), `${JSON.stringify(dark, null, 2)}\n`);
+console.log(`map style written: ${dark.layers.length} layers`);

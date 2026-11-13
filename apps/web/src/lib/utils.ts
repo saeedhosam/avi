@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { PALETTE } from "./palette";
 import type { FlightStatus, HaulCategory } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -12,38 +13,32 @@ export const STATUS_META: Record<
 > = {
   SCHEDULED: {
     label: "Scheduled",
-    color: "#94A3B8",
-    soft: "rgba(148,163,184,0.14)",
+    ...PALETTE.status.SCHEDULED,
     icon: "clock",
   },
   BOARDING: {
     label: "Boarding",
-    color: "#38BDF8",
-    soft: "rgba(56,189,248,0.14)",
+    ...PALETTE.status.BOARDING,
     icon: "ticket",
   },
   DEPARTED: {
     label: "En Route",
-    color: "#00E5FF",
-    soft: "rgba(0,229,255,0.13)",
+    ...PALETTE.status.DEPARTED,
     icon: "plane",
   },
   DELAYED: {
     label: "Delayed",
-    color: "#F59E0B",
-    soft: "rgba(245,158,11,0.14)",
+    ...PALETTE.status.DELAYED,
     icon: "alert",
   },
   LANDED: {
     label: "Landed",
-    color: "#10B981",
-    soft: "rgba(16,185,129,0.14)",
+    ...PALETTE.status.LANDED,
     icon: "landed",
   },
   CANCELLED: {
     label: "Cancelled",
-    color: "#EF4444",
-    soft: "rgba(239,68,68,0.14)",
+    ...PALETTE.status.CANCELLED,
     icon: "x",
   },
 };
@@ -52,14 +47,22 @@ export const HAUL_META: Record<
   HaulCategory,
   { label: string; range: string; color: string }
 > = {
-  ALL: { label: "All Ranges", range: "Any distance", color: "#94A3B8" },
-  SHORT_HAUL: { label: "Short-Haul", range: "< 1,500 km", color: "#10B981" },
+  ALL: { label: "All Ranges", range: "Any distance", color: PALETTE.haul.ALL },
+  SHORT_HAUL: {
+    label: "Short-Haul",
+    range: "< 1,500 km",
+    color: PALETTE.haul.SHORT_HAUL,
+  },
   MEDIUM_HAUL: {
     label: "Medium-Haul",
     range: "1,500 – 4,000 km",
-    color: "#38BDF8",
+    color: PALETTE.haul.MEDIUM_HAUL,
   },
-  LONG_HAUL: { label: "Long-Haul", range: "> 4,000 km", color: "#F59E0B" },
+  LONG_HAUL: {
+    label: "Long-Haul",
+    range: "> 4,000 km",
+    color: PALETTE.haul.LONG_HAUL,
+  },
 };
 
 export const REGION_META: Record<string, { label: string; short: string }> = {
@@ -74,17 +77,21 @@ export const REGION_META: Record<string, { label: string; short: string }> = {
 export const ALERT_META = {
   GATE_CHANGE: {
     label: "Gate Change",
-    color: "#00E5FF",
+    color: PALETTE.alerts.GATE_CHANGE,
     icon: "door",
   },
-  DELAY: { label: "Delay", color: "#F59E0B", icon: "clock" },
-  BOARDING: { label: "Boarding", color: "#38BDF8", icon: "ticket" },
+  DELAY: { label: "Delay", color: PALETTE.alerts.DELAY, icon: "clock" },
+  BOARDING: {
+    label: "Boarding",
+    color: PALETTE.alerts.BOARDING,
+    icon: "ticket",
+  },
   CANCELLATION: {
     label: "Cancellation",
-    color: "#EF4444",
+    color: PALETTE.alerts.CANCELLATION,
     icon: "x",
   },
-  BAGGAGE: { label: "Baggage", color: "#10B981", icon: "luggage" },
+  BAGGAGE: { label: "Baggage", color: PALETTE.alerts.BAGGAGE, icon: "luggage" },
 } as const;
 
 export function clamp(value: number, min: number, max: number) {

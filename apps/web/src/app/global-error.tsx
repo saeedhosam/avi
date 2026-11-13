@@ -1,5 +1,7 @@
 "use client";
 
+import { PALETTE } from "@/lib/palette";
+
 export default function GlobalError({
   error,
   reset,
@@ -8,25 +10,26 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en">
       <body
         style={{
           minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#071018",
-          color: "#EAF6FF",
+          background: PALETTE.background,
+          color: PALETTE.text,
           fontFamily: "system-ui, sans-serif",
           padding: "2rem",
           textAlign: "center",
+          colorScheme: "dark",
         }}
       >
         <div
           style={{
-            border: "1px solid #1E3A4F",
+            border: `1px solid ${PALETTE.border}`,
             borderRadius: "16px",
-            background: "#0D1B27",
+            background: PALETTE.surface,
             padding: "2.5rem",
             maxWidth: "420px",
           }}
@@ -37,7 +40,7 @@ export default function GlobalError({
               fontSize: "11px",
               letterSpacing: "0.25em",
               textTransform: "uppercase",
-              color: "#00E5FF",
+              color: PALETTE.accent,
             }}
           >
             AVI SYSTEM ERROR
@@ -45,14 +48,14 @@ export default function GlobalError({
           <h1 style={{ fontSize: "18px", marginBottom: "8px" }}>
             Avi could not start this session.
           </h1>
-          <p style={{ fontSize: "13px", color: "#93A9BA", marginBottom: "16px" }}>
+          <p style={{ fontSize: "13px", color: PALETTE.muted, marginBottom: "16px" }}>
             Reload to reconnect; your saved data stays on this device.
           </p>
           <button
             onClick={reset}
             style={{
-              background: "#00E5FF",
-              color: "#071018",
+              background: PALETTE.accent,
+              color: PALETTE.background,
               border: "none",
               borderRadius: "10px",
               padding: "8px 16px",
@@ -63,7 +66,7 @@ export default function GlobalError({
             Reload Avi
           </button>
           {error.digest && (
-            <p style={{ marginTop: "12px", fontSize: "10px", color: "#5E788C" }}>
+            <p style={{ marginTop: "12px", fontSize: "10px", color: PALETTE.subtle }}>
               Error ref: {error.digest}
             </p>
           )}

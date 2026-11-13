@@ -11,7 +11,6 @@ data class ProfileRow(
     @SerialName("email") val email: String = "",
     @SerialName("photo_url") val photoUrl: String? = null,
     @SerialName("home_airport") val homeAirport: String? = null,
-    @SerialName("theme_preference") val themePreference: String = "SYSTEM",
     @SerialName("plan") val plan: String = "FREE"
 )
 
@@ -21,8 +20,7 @@ data class ProfileUpsert(
     @SerialName("display_name") val displayName: String,
     @SerialName("email") val email: String,
     @SerialName("photo_url") val photoUrl: String? = null,
-    @SerialName("home_airport") val homeAirport: String? = null,
-    @SerialName("theme_preference") val themePreference: String = "SYSTEM"
+    @SerialName("home_airport") val homeAirport: String? = null
 )
 
 @Serializable

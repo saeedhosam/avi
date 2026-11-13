@@ -60,10 +60,10 @@ import org.maplibre.spatialk.geojson.Position
 
 /** Web parity: apps/web/src/lib/maplibre.ts MAP_COLORS. */
 private val MapInk = Color(0xFF071018)
-private val MapWhite = Color(0xFFFFFFFF)
+private val MapHighlight = Color(0xFFFFFFFF)
 private val MapRouteRemaining = Color(0xFFD94A6A)
 private val MapRouteTraveled = Color(0xFF0077FF)
-private val MapRadarCyan = Color(0xFF00E5FF)
+private val MapHeadingAccent = Color(0xFF00E5FF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +73,6 @@ fun FlightMapScreen(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val isDarkTheme = LocalDarkTheme.current
 
     val origin = LngLat(flight.origin.longitude, flight.origin.latitude)
     val destination = LngLat(flight.destination.longitude, flight.destination.latitude)
@@ -108,9 +107,7 @@ fun FlightMapScreen(
     val fitPadding = DpPadding(left = 70.dp, top = 70.dp, right = 70.dp, bottom = 70.dp)
 
     val mapState = rememberMapState(
-        baseStyle = BaseStyle.Uri(
-            if (isDarkTheme) "asset://map/style-dark.json" else "asset://map/style.json"
-        ),
+        baseStyle = BaseStyle.Uri("asset://map/style.json"),
         initialCameraPosition = CameraPosition(
             center = Position((origin.lon + destination.lon) / 2, (origin.lat + destination.lat) / 2),
             zoom = 2.6,
@@ -170,7 +167,7 @@ fun FlightMapScreen(
                 id = "avi-heading-line",
                 source = headingSource,
                 cap = const(LineCap.Round),
-                color = const(MapRadarCyan),
+                color = const(MapHeadingAccent),
                 width = const(1.4.dp),
                 opacity = const(0.9f),
             )
@@ -180,7 +177,7 @@ fun FlightMapScreen(
             source = airportsSource,
             radius = const(5.dp),
             color = const(MapRouteTraveled),
-            strokeColor = const(MapWhite),
+            strokeColor = const(MapHighlight),
             strokeWidth = const(2.dp),
         )
         SymbolLayer(
@@ -188,7 +185,7 @@ fun FlightMapScreen(
             source = airportsSource,
             textField = format(span(feature["iata"].asString())),
             textColor = const(MapInk),
-            textHaloColor = const(MapWhite),
+            textHaloColor = const(MapHighlight),
             textHaloWidth = const(2.dp),
             textAnchor = const(SymbolAnchor.Bottom),
             textSize = const(11.sp),
@@ -200,7 +197,7 @@ fun FlightMapScreen(
             id = "avi-aircraft-circle",
             source = aircraftSource,
             radius = const(7.dp),
-            color = const(MapRadarCyan),
+            color = const(MapHeadingAccent),
             strokeColor = const(MapInk),
             strokeWidth = const(2.dp),
             opacity = const(0.24f),

@@ -158,9 +158,8 @@ export async function saveUserProfile(account: UserAccount, uid: string) {
   if (!supabase) return;
   try {
     // Only write the fields the web owns. Re-upserting on every auth event
-    // (including token refreshes) previously clobbered `home_airport` and
-    // `theme_preference` saved by other clients — and now those columns are
-    // still user-writable but this call simply no longer touches them.
+    // (including token refreshes) previously clobbered `home_airport` saved by
+    // other clients, so this call deliberately touches only identity fields.
     await supabase.from("profiles").upsert(
       {
         id: uid,

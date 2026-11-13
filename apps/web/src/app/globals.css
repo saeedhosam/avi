@@ -5,7 +5,9 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
   --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
   --color-ink: var(--text);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
@@ -22,13 +24,21 @@
   --font-mono: var(--font-geist-mono);
 }
 
-:root,
-:root[data-theme="dark"] {
+/*
+ * Avi dark design tokens.
+ *
+ * This is the single source of truth for web colours. There is one fixed
+ * appearance: a deep-space cockpit theme with radar cyan, aero blue, and the
+ * universal flight-status palette. There is no light variant and no selector.
+ */
+:root {
   --bg: #070e17;
   --surface: #0c1929;
   --surface-2: #13233a;
   --surface-3: #1c314e;
+  --surface-4: #24405f;
   --border: #264366;
+  --border-strong: #315a85;
   --text: #f8fafc;
   --muted: #94a3b8;
   --subtle: #64748b;
@@ -43,28 +53,6 @@
   --status-scheduled: #94a3b8;
   --shadow-glow: 0 0 0 1px rgba(0, 229, 255, 0.18), 0 18px 50px -24px rgba(0, 229, 255, 0.45);
   color-scheme: dark;
-}
-
-:root[data-theme="light"] {
-  --bg: #f1f5f9;
-  --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --surface-3: #e2e8f0;
-  --border: #cbd5e1;
-  --text: #0f172a;
-  --muted: #475569;
-  --subtle: #64748b;
-  --accent: #0284c7;
-  --accent-2: #0284c7;
-  --accent-soft: rgba(2, 132, 199, 0.1);
-  --status-departed: #0284c7;
-  --status-boarding: #0ea5e9;
-  --status-landed: #059669;
-  --status-delayed: #d97706;
-  --status-cancelled: #dc2626;
-  --status-scheduled: #64748b;
-  --shadow-glow: 0 0 0 1px rgba(2, 132, 199, 0.16), 0 18px 50px -28px rgba(2, 132, 199, 0.35);
-  color-scheme: light;
 }
 
 * {
@@ -94,25 +82,6 @@ body {
     radial-gradient(ellipse 85% 55% at 12% -8%, rgba(0, 229, 255, 0.09), transparent 55%),
     radial-gradient(ellipse 60% 45% at 100% 0%, rgba(56, 189, 248, 0.06), transparent 55%),
     linear-gradient(180deg, rgba(12, 25, 41, 0.22) 0%, transparent 22%);
-}
-
-:root[data-theme="light"] .app-bg {
-  background-image:
-    radial-gradient(ellipse 85% 55% at 12% -8%, rgba(2, 132, 199, 0.08), transparent 55%),
-    radial-gradient(ellipse 60% 45% at 100% 0%, rgba(14, 165, 233, 0.06), transparent 55%);
-}
-
-.grid-overlay {
-  background-image:
-    linear-gradient(rgba(0, 229, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.035) 1px, transparent 1px);
-  background-size: 44px 44px;
-}
-
-:root[data-theme="light"] .grid-overlay {
-  background-image:
-    linear-gradient(rgba(2, 132, 199, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(2, 132, 199, 0.045) 1px, transparent 1px);
 }
 
 .hairline {
@@ -225,9 +194,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Range input */
-input[type="range"] {
+/* Native form controls follow the single dark palette. */
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"],
+progress {
   accent-color: var(--accent);
+}
+
+::placeholder {
+  color: var(--subtle);
 }
 
 /* MapLibre Attribution Control — collapsed by default */
@@ -271,4 +247,64 @@ input[type="range"] {
 
 .maplibregl-ctrl-attrib-button:hover {
   opacity: 1;
+}
+
+/* MapLibre navigation, scale, and popup controls */
+.maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.9) !important;
+}
+
+.maplibregl-ctrl-group button {
+  width: 30px !important;
+  height: 30px !important;
+  background-color: transparent !important;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: var(--surface-2) !important;
+}
+
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+.maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+.maplibregl-popup-content {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+}
+
+.maplibregl-popup-content .maplibregl-popup-close-button {
+  color: var(--muted);
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--surface) !important;
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--surface) !important;
+}
+
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--surface) !important;
+}
+
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--surface) !important;
 }

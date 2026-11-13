@@ -5,48 +5,18 @@ import {
   BadgeCheck,
   Cloud,
   CloudOff,
-  Laptop,
   LogIn,
   LogOut,
-  Moon,
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  Sun,
   Trash2,
   UserRound,
   Wifi,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import type { ThemeMode } from "@/lib/types";
 import { Button, Modal } from "./ui";
-
-const THEME_OPTIONS: Array<{
-  value: ThemeMode;
-  label: string;
-  description: string;
-  icon: typeof Sun;
-}> = [
-  {
-    value: "SYSTEM",
-    label: "System",
-    description: "Match your desktop appearance automatically",
-    icon: Laptop,
-  },
-  {
-    value: "LIGHT",
-    label: "Light",
-    description: "Crisp daytime high-visibility cockpit theme",
-    icon: Sun,
-  },
-  {
-    value: "DARK",
-    label: "Dark",
-    description: "Deep space aviation radar night theme",
-    icon: Moon,
-  },
-];
 
 export function AccountDialog({
   open,
@@ -60,8 +30,6 @@ export function AccountDialog({
     authBusy,
     signIn,
     signOut,
-    themeMode,
-    setThemeMode,
     offlineMode,
     toggleOffline,
     refreshData,
@@ -75,7 +43,6 @@ export function AccountDialog({
     deleteAccount,
     startUpgrade,
   } = useApp();
-  const [tab, setTab] = useState<"account" | "preferences">("account");
   const [usageLoading, setUsageLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -100,7 +67,7 @@ export function AccountDialog({
       open={open}
       onClose={onClose}
       title="Aviation Account & Settings"
-      subtitle="Identity, appearance, offline cache, and cloud sync"
+      subtitle="Identity, offline cache, and cloud sync"
       icon={<ShieldCheck className="size-4" />}
       size="md"
       footer={
@@ -188,30 +155,7 @@ export function AccountDialog({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-2 p-1">
-          {(
-            [
-              { value: "account", label: "Account & sync" },
-              { value: "preferences", label: "Appearance" },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.value}
-              onClick={() => setTab(item.value)}
-              className={cn(
-                "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
-                tab === item.value
-                  ? "bg-accent text-[color:var(--bg)]"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "account" ? (
-          <div className="space-y-3">
+        <div className="space-y-3">
             <div className="rounded-xl border border-line bg-surface-2 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-start gap-2.5">
@@ -470,59 +414,7 @@ export function AccountDialog({
                 )}
               </div>
             )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid gap-2 sm:grid-cols-3">
-              {THEME_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const active = themeMode === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => setThemeMode(option.value)}
-                    className={cn(
-                      "rounded-xl border p-3 text-left transition-all",
-                      active
-                        ? "border-accent bg-accent-soft"
-                        : "border-line bg-surface-2 hover:border-accent/40",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex size-8 items-center justify-center rounded-lg border",
-                        active
-                          ? "border-accent/50 bg-accent/15 text-accent"
-                          : "border-line bg-surface text-muted",
-                      )}
-                    >
-                      <Icon className="size-4" />
-                    </div>
-                    <p
-                      className={cn(
-                        "mt-2 text-xs font-bold",
-                        active ? "text-accent" : "text-ink",
-                      )}
-                    >
-                      {option.label}
-                    </p>
-                    <p className="mt-0.5 text-[10px] leading-relaxed text-subtle">
-                      {option.description}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="rounded-xl border border-line bg-surface-2 p-3.5">
-              <p className="label-caps text-subtle">Display theme</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                The Avi cockpit palette is preserved across both themes.
-                Dark mode is the default radar-night experience; light mode uses
-                the same aviation instrument language with high-contrast surfaces.
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </Modal>
   );

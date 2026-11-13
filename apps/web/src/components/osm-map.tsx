@@ -4,8 +4,13 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { LngLatBounds, Marker, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { AirportNode, DirectFlightConnection, Flight } from "@/lib/types";
-import { findAirportNode, routeAirports, type GlobalAirportNode } from "@/lib/data";
+import {
+  findAirportNode,
+  routeAirports,
+  type GlobalAirportNode,
+} from "@/lib/data";
 import { routeCoordinates } from "@/lib/geo";
+import { PALETTE } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import {
   collection,
@@ -16,7 +21,6 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { useMapLibre } from "@/lib/use-maplibre";
-import { useResolvedTheme } from "@/lib/store";
 import { FlightMap } from "./flight-map";
 import { RotateCcw, X, Info } from "lucide-react";
 
@@ -34,6 +38,45 @@ export interface OsmRouteMapProps {
 
 const routeCoordsCache = new Map<string, [number, number][]>();
 
+const NO_ROUTE_COUNT_RADIUS = 2.2;
+
+/** Hover treatment for routes: full-contrast white on the dark basemap. */
+const HOVER_COLOR = PALETTE.map.highlight;
+/** Airport circles turn red on hover without changing their outline. */
+const HOVER_CIRCLE_COLOR = PALETTE.status.CANCELLED.color;
+const HOVER_RADIUS_SCALE = 1.25;
+
+const ROUTE_COUNT_BUCKETS = [
+  { label: "1–3", radius: 2.6 },
+  { label: "4–8", radius: 3.2 },
+  { label: "9–15", radius: 3.8 },
+  { label: "16+", radius: 4.5 },
+] as const;
+
+/** Origin/selected emphasis bump on top of the tier radius. */
+const EMPHASIS_BOOST = 2;
+
+/**
+ * FlightConnections-style reference-count ramp: sparse airports in signal red,
+ * rising through amber to blue, with mega-hubs in deep navy. Radius encodes the
+ * same value, so colour and size reinforce each other.
+ */
+const ROUTE_COUNT_PALETTE = ["#f87171", "#fbbf24", "#60a5fa", "#3b82f6"];
+
+const NO_ROUTE_COUNT_COLOR = "#64748b";
+
+/** Basemap-matched outline so small circles stay crisp and separated. */
+const CIRCLE_STROKE = { color: "rgba(226, 239, 255, 0.65)", width: 0.5 };
+
+/** Each color tier has one fixed radius, so same-tier circles match. */
+function routeCountRadius(count: number): number {
+  if (!Number.isFinite(count) || count <= 0) return NO_ROUTE_COUNT_RADIUS;
+  if (count <= 3) return ROUTE_COUNT_BUCKETS[0].radius;
+  if (count <= 8) return ROUTE_COUNT_BUCKETS[1].radius;
+  if (count <= 15) return ROUTE_COUNT_BUCKETS[2].radius;
+  return ROUTE_COUNT_BUCKETS[3].radius;
+}
+
 export function OsmRouteMap({
   connections,
   origin,
@@ -45,8 +88,7 @@ export function OsmRouteMap({
   onReset,
   className,
 }: OsmRouteMapProps) {
-  const resolvedTheme = useResolvedTheme();
-  const { containerRef, map } = useMapLibre(resolvedTheme, {
+  const { containerRef, map } = useMapLibre({
     center: [10, 22],
     zoom: 2,
     minZoom: 1.4,
@@ -67,8 +109,14 @@ export function OsmRouteMap({
   const originMarkerRef = useRef<Marker | null>(null);
   const destMarkerRef = useRef<Marker | null>(null);
   const lastFitRef = useRef("");
-  const clickHandlerRef = useRef<((event: MapLayerMouseEvent) => void) | null>(null);
-  const lineClickHandlerRef = useRef<((event: MapLayerMouseEvent) => void) | null>(null);
+  const clickHandlerRef = useRef<((event: MapLayerMouseEvent) => void) | null>(
+    null,
+  );
+  const lineClickHandlerRef = useRef<
+    ((event: MapLayerMouseEvent) => void) | null
+  >(null);
+  const hoveredAirportIdRef = useRef<string | null>(null);
+  const hoveredRouteIdRef = useRef<string | null>(null);
 
   // Clear fit cache on map recreation
   useEffect(() => {
@@ -87,7 +135,7 @@ export function OsmRouteMap({
       const el = document.createElement("div");
       el.className =
         "pointer-events-auto flex items-center gap-1.5 rounded-lg bg-[#0077ff] px-2.5 py-1 text-white shadow-2xl text-[11px] font-black tracking-wide whitespace-nowrap select-none cursor-pointer border border-white/40 transform -translate-y-3";
-      
+
       const label = document.createElement("span");
       label.textContent = `${origin.city} (${origin.iata})`;
       el.appendChild(label);
@@ -135,7 +183,7 @@ export function OsmRouteMap({
 
       const header = document.createElement("div");
       header.className = "flex items-center justify-between gap-1.5";
-      
+
       const label = document.createElement("span");
       label.textContent = `${selected.city} (${selected.iata})`;
       header.appendChild(label);
@@ -218,6 +266,8 @@ export function OsmRouteMap({
         iata: airport.iata,
         city: airport.city,
         name: airport.name,
+        referenceRouteCount: airport.destCount ?? 0,
+        referenceRouteRadius: routeCountRadius(airport.destCount ?? 0),
         isOrigin: airport.iata === origin?.iata,
         isSelected: airport.iata === selected?.iata,
         isConnected: true,
@@ -246,27 +296,44 @@ export function OsmRouteMap({
       paint: {
         "line-color": [
           "case",
+          ["boolean", ["feature-state", "hover"], false],
+          HOVER_COLOR,
           ["get", "selected"],
-          resolvedTheme === "dark" ? "#38bdf8" : "#0284c7",
-          resolvedTheme === "dark" ? "#f87171" : "#ef4444",
+          "#38bdf8",
+          "#f87171",
         ],
-        "line-width": ["case", ["get", "selected"], 3.8, 1.2],
-        "line-opacity": ["case", ["get", "selected"], 1, 0.65],
+        "line-width": [
+          "case",
+          ["get", "selected"],
+          3.8,
+          ["boolean", ["feature-state", "hover"], false],
+          2.6,
+          1.2,
+        ],
+        "line-opacity": [
+          "case",
+          ["get", "selected"],
+          1,
+          ["boolean", ["feature-state", "hover"], false],
+          1,
+          0.65,
+        ],
       },
     });
 
     // 3. Set Airport Features
     setGeoJson(map, "avi-route-airports", collection(airportFeatures));
 
-    // FlightConnections tier colors & sizing
-    // Tier 1 (>100): Dark Navy Blue
-    // Tier 2 (>30): Light / Medium Blue
-    // Tier 3 (>7): Yellow / Amber
-    // Tier 4 (<=7): Red / Coral
+    // Circle fill and radius encode the bundled OpenFlights-derived reference
+    // route count. It is not live connectivity; the legend labels it as
+    // reference.
     ensureLayer(map, {
       id: "avi-route-airport-circles",
       type: "circle",
       source: "avi-route-airports",
+      // Larger circles sort above smaller ones within the layer, so busy hubs
+      // are never buried under specks.
+      layout: { "circle-sort-key": ["get", "referenceRouteRadius"] },
       paint: {
         "circle-radius": [
           "interpolate",
@@ -274,42 +341,69 @@ export function OsmRouteMap({
           ["zoom"],
           1.5,
           [
-            "case",
-            ["get", "isSelected"],
-            9.5,
-            ["get", "isOrigin"],
-            9.5,
-            4.0,
+            "*",
+            [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              HOVER_RADIUS_SCALE,
+              1,
+            ],
+            [
+              "case",
+              ["get", "isSelected"],
+              ["+", ["get", "referenceRouteRadius"], EMPHASIS_BOOST],
+              ["get", "isOrigin"],
+              ["+", ["get", "referenceRouteRadius"], EMPHASIS_BOOST],
+              ["get", "referenceRouteRadius"],
+            ],
           ],
           6,
           [
-            "case",
-            ["get", "isSelected"],
-            12.5,
-            ["get", "isOrigin"],
-            12.5,
-            6.5,
+            "*",
+            [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              HOVER_RADIUS_SCALE,
+              1,
+            ],
+            [
+              "case",
+              ["get", "isSelected"],
+              [
+                "+",
+                ["*", ["get", "referenceRouteRadius"], 1.15],
+                EMPHASIS_BOOST,
+              ],
+              ["get", "isOrigin"],
+              [
+                "+",
+                ["*", ["get", "referenceRouteRadius"], 1.15],
+                EMPHASIS_BOOST,
+              ],
+              ["*", ["get", "referenceRouteRadius"], 1.15],
+            ],
           ],
         ],
-        // Marker size/color encodes selection only. The bundled catalog's
-        // destination counts are not live connectivity and are not used.
         "circle-color": [
           "case",
-          ["get", "isSelected"],
-          "#0077ff",
-          ["get", "isOrigin"],
-          "#0077ff",
-          "#1e88e5",
+          ["boolean", ["feature-state", "hover"], false],
+          HOVER_CIRCLE_COLOR,
+          [
+            "step",
+            ["coalesce", ["get", "referenceRouteCount"], 0],
+            NO_ROUTE_COUNT_COLOR,
+            1,
+            ROUTE_COUNT_PALETTE[0],
+            4,
+            ROUTE_COUNT_PALETTE[1],
+            9,
+            ROUTE_COUNT_PALETTE[2],
+            16,
+            ROUTE_COUNT_PALETTE[3],
+          ],
         ],
-        "circle-stroke-color": "rgba(0, 0, 0, 0.25)",
-        "circle-stroke-width": [
-          "case",
-          ["get", "isSelected"],
-          2,
-          ["get", "isOrigin"],
-          2,
-          0.75,
-        ],
+        "circle-stroke-color": CIRCLE_STROKE.color,
+        "circle-stroke-width": CIRCLE_STROKE.width,
         "circle-opacity": 1.0,
       },
     });
@@ -350,6 +444,42 @@ export function OsmRouteMap({
     map.on("click", "avi-route-network-lines", handleLineClick);
 
     // 5. Hover Handling
+    const setAirportHover = (id: string | null) => {
+      if (!map.getStyle() || !map.getSource("avi-route-airports")) return;
+      if (hoveredAirportIdRef.current === id) return;
+      if (hoveredAirportIdRef.current && hoveredAirportIdRef.current !== id) {
+        map.setFeatureState(
+          { source: "avi-route-airports", id: hoveredAirportIdRef.current },
+          { hover: false },
+        );
+      }
+      hoveredAirportIdRef.current = id;
+      if (id) {
+        map.setFeatureState(
+          { source: "avi-route-airports", id },
+          { hover: true },
+        );
+      }
+    };
+
+    const setRouteHover = (id: string | null) => {
+      if (!map.getStyle() || !map.getSource("avi-route-network")) return;
+      if (hoveredRouteIdRef.current === id) return;
+      if (hoveredRouteIdRef.current && hoveredRouteIdRef.current !== id) {
+        map.setFeatureState(
+          { source: "avi-route-network", id: hoveredRouteIdRef.current },
+          { hover: false },
+        );
+      }
+      hoveredRouteIdRef.current = id;
+      if (id) {
+        map.setFeatureState(
+          { source: "avi-route-network", id },
+          { hover: true },
+        );
+      }
+    };
+
     const handleAirportMouseMove = (event: MapLayerMouseEvent) => {
       const feat = event.features?.[0];
       const iata = feat?.properties?.iata;
@@ -357,6 +487,7 @@ export function OsmRouteMap({
       const city = feat?.properties?.city;
 
       if (typeof iata === "string") {
+        setAirportHover(iata);
         map.getCanvas().style.cursor = "pointer";
         if (iata !== origin?.iata && iata !== selected?.iata) {
           setHoveredAirport((prev) => {
@@ -382,15 +513,24 @@ export function OsmRouteMap({
     };
 
     const handleAirportMouseLeave = () => {
+      setAirportHover(null);
       map.getCanvas().style.cursor = "";
       setHoveredAirport(null);
     };
 
-    const handleLineMouseEnter = () => {
+    const handleLineMouseEnter = (event: MapLayerMouseEvent) => {
+      const id = event.features?.[0]?.properties?.id;
+      if (typeof id === "string") setRouteHover(id);
       map.getCanvas().style.cursor = "pointer";
     };
 
+    const handleLineMouseMove = (event: MapLayerMouseEvent) => {
+      const id = event.features?.[0]?.properties?.id;
+      if (typeof id === "string") setRouteHover(id);
+    };
+
     const handleLineMouseLeave = () => {
+      setRouteHover(null);
       map.getCanvas().style.cursor = "";
     };
 
@@ -399,10 +539,12 @@ export function OsmRouteMap({
     map.on("mousemove", "avi-route-airport-circles", handleAirportMouseMove);
     map.on("mouseleave", "avi-route-airport-circles", handleAirportMouseLeave);
     map.on("mouseenter", "avi-route-network-lines", handleLineMouseEnter);
+    map.on("mousemove", "avi-route-network-lines", handleLineMouseMove);
     map.on("mouseleave", "avi-route-network-lines", handleLineMouseLeave);
 
     // 6. Camera Fitting with Responsive Mobile / Desktop Padding
-    const isIdle = connections.length === 0 && !origin && !selected && !selectedRoute;
+    const isIdle =
+      connections.length === 0 && !origin && !selected && !selectedRoute;
     const fitKey = `${origin?.iata ?? "idle"}:${selectedRoute?.id ?? "none"}:${connections.length}`;
     if (lastFitRef.current !== fitKey) {
       lastFitRef.current = fitKey;
@@ -422,8 +564,18 @@ export function OsmRouteMap({
             typeof window !== "undefined" && window.innerWidth < 640;
           map.fitBounds(bounds, {
             padding: isMobile
-              ? { top: 75, right: 30, bottom: selectedRoute ? 310 : 50, left: 30 }
-              : { top: 75, right: 65, bottom: 65, left: selectedRoute ? 430 : 65 },
+              ? {
+                  top: 75,
+                  right: 30,
+                  bottom: selectedRoute ? 310 : 50,
+                  left: 30,
+                }
+              : {
+                  top: 75,
+                  right: 65,
+                  bottom: 65,
+                  left: selectedRoute ? 430 : 65,
+                },
             maxZoom: selectedRoute ? 5.5 : 4.4,
             duration: 800,
           });
@@ -432,18 +584,41 @@ export function OsmRouteMap({
     }
 
     return () => {
+      try {
+        setAirportHover(null);
+        setRouteHover(null);
+      } catch {
+        // The map may already be disposed during cleanup.
+      }
       if (clickHandlerRef.current) {
         map.off("click", "avi-route-airport-hitboxes", clickHandlerRef.current);
         map.off("click", "avi-route-airport-circles", clickHandlerRef.current);
       }
       if (lineClickHandlerRef.current) {
-        map.off("click", "avi-route-network-lines", lineClickHandlerRef.current);
+        map.off(
+          "click",
+          "avi-route-network-lines",
+          lineClickHandlerRef.current,
+        );
       }
-      map.off("mousemove", "avi-route-airport-hitboxes", handleAirportMouseMove);
-      map.off("mouseleave", "avi-route-airport-hitboxes", handleAirportMouseLeave);
+      map.off(
+        "mousemove",
+        "avi-route-airport-hitboxes",
+        handleAirportMouseMove,
+      );
+      map.off(
+        "mouseleave",
+        "avi-route-airport-hitboxes",
+        handleAirportMouseLeave,
+      );
       map.off("mousemove", "avi-route-airport-circles", handleAirportMouseMove);
-      map.off("mouseleave", "avi-route-airport-circles", handleAirportMouseLeave);
+      map.off(
+        "mouseleave",
+        "avi-route-airport-circles",
+        handleAirportMouseLeave,
+      );
       map.off("mouseenter", "avi-route-network-lines", handleLineMouseEnter);
+      map.off("mousemove", "avi-route-network-lines", handleLineMouseMove);
       map.off("mouseleave", "avi-route-network-lines", handleLineMouseLeave);
     };
   }, [
@@ -452,7 +627,6 @@ export function OsmRouteMap({
     map,
     onSelectAirport,
     origin,
-    resolvedTheme,
     routeFeatures,
     selected,
     selectedRoute,
@@ -470,11 +644,16 @@ export function OsmRouteMap({
   }, [map, onReset]);
 
   return (
-    <div className={cn("relative overflow-hidden w-full h-full select-none", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden w-full h-full select-none",
+        className,
+      )}
+    >
       <div ref={containerRef} className="h-full w-full" />
 
       {/* Top-Right Recenter View Button - positioned to the left of the +/- navigation controls */}
-      <div className="absolute right-[48px] top-2.5 z-20 flex items-center gap-2">
+      <div className="absolute right-12 top-2.5 z-20 flex items-center gap-2">
         <button
           onClick={handleResetMap}
           className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-line/80 bg-surface/95 hover:bg-surface-2 text-ink px-2.5 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition-all active:scale-95 cursor-pointer"
@@ -495,7 +674,7 @@ export function OsmRouteMap({
           }}
         >
           <div className="flex items-center gap-1.5 rounded-lg border border-line/90 bg-surface/95 px-2.5 py-1 shadow-2xl backdrop-blur-md">
-            <span className="font-mono text-[10px] font-black text-accent">
+            <span className="font-mono text-[10px] font-black txt-accent">
               {hoveredAirport.iata}
             </span>
             <span className="text-xs font-bold text-ink">
@@ -507,7 +686,7 @@ export function OsmRouteMap({
 
       {/* Airport Legend (Positioned on bottom-right to avoid sidebar clash) */}
       {legendVisible ? (
-        <div className="pointer-events-auto absolute bottom-7 right-3 sm:bottom-8 sm:right-3.5 z-20 w-52 rounded-xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-md">
+        <div className="pointer-events-auto absolute bottom-7 right-3 sm:bottom-8 sm:right-3.5 z-20 w-56 rounded-xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-md">
           <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-line/60">
             <span className="text-xs font-bold tracking-tight text-ink">
               Airport Connectivity
@@ -521,16 +700,29 @@ export function OsmRouteMap({
             </button>
           </div>
           <div className="space-y-1.5 text-[10.5px] font-medium text-ink">
+            {ROUTE_COUNT_BUCKETS.map((bucket, index) => (
+              <div key={bucket.label} className="flex items-center gap-2">
+                <span
+                  className="size-3 rounded-full shrink-0 border border-black/20 shadow-sm"
+                  style={{
+                    backgroundColor: ROUTE_COUNT_PALETTE[index],
+                  }}
+                />
+                <span>{bucket.label} direct routes</span>
+              </div>
+            ))}
             <div className="flex items-center gap-2">
-              <span className="size-3 rounded-full bg-[#0077ff] shrink-0 border border-black/20 shadow-sm" />
-              <span>Origin / selected airport</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="size-2.5 rounded-full bg-[#1e88e5] shrink-0 border border-black/20 shadow-sm" />
-              <span>Destination airport</span>
+              <span
+                className="size-3 rounded-full shrink-0 border border-black/20 shadow-sm"
+                style={{ backgroundColor: NO_ROUTE_COUNT_COLOR }}
+              />
+              <span>0 / no reference count</span>
             </div>
             <p className="pt-1 text-[9px] leading-relaxed text-subtle">
-              Marker size does not encode live destination counts.
+              OpenFlights-derived reference counts, not live. Sparse airports
+              are red/amber; busy hubs are blue. Same-tier circles share a fixed
+              size; origin/selected are enlarged. Hover highlights and grows
+              airports and routes.
             </p>
           </div>
         </div>
@@ -546,7 +738,7 @@ export function OsmRouteMap({
 
       {/* Far bottom-right simple attribution */}
       <div className="pointer-events-none absolute bottom-1.5 right-2 z-10 text-[9.5px] font-medium text-muted/70 select-none">
-        © OpenStreetMap · OpenFreeMap · AeroDataBox
+        © OpenStreetMap · OpenFreeMap · AeroDataBox · OpenFlights
       </div>
     </div>
   );

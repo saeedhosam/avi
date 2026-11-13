@@ -98,7 +98,7 @@ val aviMapStyleDir = File(aviRootDir, "packages/map-style")
 val generatedMapAssets = layout.buildDirectory.dir("generated/aviMapStyles")
 val copyAviMapStyles = tasks.register("copyAviMapStyles", Copy::class) {
   from(aviMapStyleDir) {
-    include("style.json", "style-dark.json")
+    include("style.json")
     into("map")
   }
   into(generatedMapAssets)
@@ -122,7 +122,6 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)

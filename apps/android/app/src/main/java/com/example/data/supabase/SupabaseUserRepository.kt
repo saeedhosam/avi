@@ -32,10 +32,7 @@ class SupabaseUserRepository {
                 displayName = profile.displayName.ifBlank { "Aviation Navigator" }.take(100),
                 email = profile.email.ifBlank { "pilot@aviation.aero" }.take(150),
                 photoUrl = profile.photoUrl.takeIf { it.isNotBlank() },
-                homeAirport = profile.homeAirport.takeIf { it.isNotBlank() }?.take(10),
-                themePreference = profile.themePreference.takeIf {
-                    it in setOf("SYSTEM", "LIGHT", "DARK")
-                } ?: "SYSTEM"
+                homeAirport = profile.homeAirport.takeIf { it.isNotBlank() }?.take(10)
             )
         ) {
             onConflict = "id"

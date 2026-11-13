@@ -6,8 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.FlightRepository
 import com.example.data.local.RecentSearchEntity
 import com.example.data.local.ScheduledNotificationEntity
-import com.example.data.preferences.ThemeMode
-import com.example.data.preferences.ThemePreferences
 import com.example.data.remote.DataSourceMode
 import com.example.model.*
 import kotlinx.coroutines.Job
@@ -32,10 +30,6 @@ data class FlightSearchFilters(
 class FlightViewModel(application: Application) : AndroidViewModel(application) {
 
     val repository = FlightRepository(application)
-    private val themePreferences = ThemePreferences(application)
-
-    val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
     val dataSourceMode: StateFlow<DataSourceMode> = repository.dataSourceMode
     val planState: StateFlow<com.example.data.cloud.CloudPlanState> = repository.planState
@@ -314,20 +308,5 @@ class FlightViewModel(application: Application) : AndroidViewModel(application) 
 
     fun signOut() {
         repository.signOut()
-    }
-
-    fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch {
-            themePreferences.setThemeMode(mode)
-        }
-    }
-
-    fun cycleNextThemeMode() {
-        val next = when (themeMode.value) {
-            ThemeMode.SYSTEM -> ThemeMode.DARK
-            ThemeMode.DARK -> ThemeMode.LIGHT
-            ThemeMode.LIGHT -> ThemeMode.SYSTEM
-        }
-        setThemeMode(next)
     }
 }

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { PALETTE } from "@/lib/palette";
 
 /** Installs Avi as a home-screen web app (required for iOS web push). */
 export default function manifest(): MetadataRoute.Manifest {
@@ -10,8 +11,8 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     start_url: "/",
     display: "standalone",
-    background_color: "#071018",
-    theme_color: "#071018",
+    background_color: PALETTE.background,
+    theme_color: PALETTE.background,
     categories: ["travel", "navigation"],
     icons: [
       { src: "/icon.jpg", sizes: "512x512", type: "image/jpeg", purpose: "any" },

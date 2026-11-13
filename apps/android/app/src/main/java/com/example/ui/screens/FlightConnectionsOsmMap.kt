@@ -46,21 +46,26 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AirportNode
 import com.example.model.ConnectionDirection
 import com.example.model.DirectFlightConnection
+import com.example.ui.theme.CockpitDark
+import com.example.ui.theme.DeepSpace
+import com.example.ui.theme.InstrumentBorder
+import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextWhite
 import org.json.JSONArray
 import kotlin.math.*
 
-// FlightConnections.com + OpenStreetMap Positron Color Palette
-private val OsmOceanBlue = Color(0xFFCBE7F9)
-private val OsmLandLight = Color(0xFFF2F3F5)
-private val OsmBorderGray = Color(0xFFD3D8E0)
-private val OsmCountryLabelGray = Color(0xFF7B8592)
+// Dark cockpit vector map palette with vivid aviation accents.
+private val OsmOceanBlue = DeepSpace
+private val OsmLandLight = CockpitDark
+private val OsmBorderGray = InstrumentBorder
+private val OsmCountryLabelGray = TextMuted
 
 private val FcRouteArcCrimson = Color(0xFFD94A6A)
 private val FcRouteSelectedCrimson = Color(0xFFC2185B)
 private val FcPinBlue = Color(0xFF0077FF)
-private val FcPinDarkNavy = Color(0xFF0A335C)
+private val FcPinDarkNavy = Color(0xFF38BDF8)
 private val FcPinYellow = Color(0xFFFFB800)
-private val FcPinOutline = Color(0xFF141E2B)
+private val FcPinOutline = DeepSpace
 private val FcCalloutBlue = Color(0xFF1888F8)
 
 /**
@@ -143,8 +148,8 @@ private object WorldVectorMapCache {
  * Full-Screen FlightConnections.com + OpenStreetMap Positron Vector World Map Canvas.
  * Default zoom shows the entire globe with all 176 countries, borders, and labels rendered
  * natively in vector graphics (zero external tile requests or blocked tiles),
- * rose-crimson curved geodesic arcs, blue/navy/yellow destination dots,
- * and floating blue "City (IATA) ×" callout tags when an airport is selected.
+ * vivid geodesic arcs, frequency-tiered destination dots, and floating blue
+ * "City (IATA) ×" callout tags when an airport is selected.
  */
 @Composable
 fun FlightConnectionsOsmMapCanvas(
@@ -248,7 +253,7 @@ fun FlightConnectionsOsmMapCanvas(
             }
 
             clipRect(0f, 0f, w, h) {
-                // 1. Ocean Base Fill (#CBE7F9)
+                // 1. Ocean base fill
                 drawRect(color = OsmOceanBlue, size = Size(w, h))
 
                 // 2. Draw all 176 Real Country Polygons & Borders (with horizontal world wrapping -1..1)
@@ -328,7 +333,7 @@ fun FlightConnectionsOsmMapCanvas(
                 originCalloutCloseRect = null
                 destCalloutCloseRect = null
 
-                // 4. Draw Curved Geodesic Flight Route Arcs (FlightConnections Crimson-Rose Style)
+                // 4. Draw curved geodesic flight route arcs
                 connections.forEach { conn ->
                     val startOffset = projectLatLon(conn.origin.latitude, conn.origin.longitude)
                     val destOffset = projectLatLon(conn.destination.latitude, conn.destination.longitude)
@@ -375,7 +380,7 @@ fun FlightConnectionsOsmMapCanvas(
                     }
                 }
 
-                // 5. Draw Airport Dots (Blue / Dark Navy / Yellow with dark 1dp border)
+                // 5. Draw airport dots on a colour-tiered frequency ramp
                 val airportFreqMap = mutableMapOf<String, Int>()
                 val airportNodeMap = mutableMapOf<String, AirportNode>()
                 connections.forEach { conn ->
@@ -437,7 +442,7 @@ fun FlightConnectionsOsmMapCanvas(
                     )
                 }
 
-                // 6. Draw Origin Hub Bullseye + Floating Blue Callout Tag ("City (IATA)  ×")
+                // 6. Draw origin hub bullseye and floating callout tag ("City (IATA)  ×")
                 if (originAirport != null) {
                     val originPos = projectLatLon(originAirport.latitude, originAirport.longitude)
                     pinPositions[originAirport.iata] = originPos
@@ -517,7 +522,7 @@ fun FlightConnectionsOsmMapCanvas(
             )
         }
 
-        // Bottom-Left FlightConnections White Legend Card (Dismissible with ×)
+        // Bottom-left dark cockpit legend card (dismissible with ×)
         if (showLegendCard) {
             Surface(
                 modifier = Modifier
@@ -525,8 +530,8 @@ fun FlightConnectionsOsmMapCanvas(
                     .padding(start = 10.dp, bottom = 78.dp)
                     .shadow(4.dp, RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
-                color = Color.White.copy(alpha = 0.95f),
-                border = BorderStroke(0.8.dp, Color(0xFFD5DCE4))
+                color = CockpitDark.copy(alpha = 0.95f),
+                border = BorderStroke(0.8.dp, InstrumentBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
@@ -538,14 +543,14 @@ fun FlightConnectionsOsmMapCanvas(
                     ) {
                         Text(
                             text = "Route Legend",
-                            color = Color(0xFF2C3E50),
+                            color = TextWhite,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close Legend",
-                            tint = Color(0xFF7F8C8D),
+                            tint = TextMuted,
                             modifier = Modifier
                                 .size(13.dp)
                                 .clickable { showLegendCard = false }
@@ -561,7 +566,7 @@ fun FlightConnectionsOsmMapCanvas(
 }
 
 /**
- * Draws the signature FlightConnections floating blue callout tag: `[ City (IATA) | × ]`
+ * Draws the floating dark callout tag: `[ City (IATA) | × ]`
  * Returns the [Rect] of the `×` close button for tap hit-testing.
  */
 private fun DrawScope.drawFlightConnectionsBlueCallout(
@@ -662,7 +667,7 @@ private fun FcLegendRow(color: Color, label: String) {
         )
         Text(
             text = label,
-            color = Color(0xFF34495E),
+            color = TextMuted,
             fontSize = 9.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -685,14 +690,14 @@ private fun OsmMapControlButton(
             .clip(RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .testTag(tag),
-        color = Color.White.copy(alpha = 0.96f),
-        border = BorderStroke(0.8.dp, Color(0xFFCFD8DC))
+        color = CockpitDark.copy(alpha = 0.96f),
+        border = BorderStroke(0.8.dp, InstrumentBorder)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = Color(0xFF37474F),
+                tint = TextWhite,
                 modifier = Modifier.size(18.dp)
             )
         }

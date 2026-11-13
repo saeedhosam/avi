@@ -60,26 +60,6 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun themeModeValuesProvideExpectedOptions() {
-    val modes = com.example.data.preferences.ThemeMode.values()
-    assertEquals(3, modes.size)
-    assertTrue(modes.contains(com.example.data.preferences.ThemeMode.SYSTEM))
-    assertTrue(modes.contains(com.example.data.preferences.ThemeMode.LIGHT))
-    assertTrue(modes.contains(com.example.data.preferences.ThemeMode.DARK))
-  }
-
-  @Test
-  fun themeModeResolvesSystemDefaultOnInvalidValue() {
-    val raw = "UNKNOWN_MODE"
-    val resolved = try {
-      com.example.data.preferences.ThemeMode.valueOf(raw)
-    } catch (_: Exception) {
-      com.example.data.preferences.ThemeMode.SYSTEM
-    }
-    assertEquals(com.example.data.preferences.ThemeMode.SYSTEM, resolved)
-  }
-
-  @Test
   fun fcmTopicNamingConventionFormatsCorrectly() {
     val flightNumbers = listOf("AA 100", "BA 178", "DL 415", "AF006", "LH 400")
     val topics = flightNumbers.map { "flight_" + it.replace(" ", "").lowercase(java.util.Locale.ROOT) }

@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.preferences.ThemeMode
 import com.example.model.UserAccount
 import com.example.ui.theme.*
 import com.example.util.GoogleAuthManager
@@ -32,8 +31,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun OAuthLoginDialog(
     account: UserAccount,
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
-    onThemeModeChange: (ThemeMode) -> Unit = {},
     onDismiss: () -> Unit,
     onSignIn: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -134,108 +131,6 @@ fun OAuthLoginDialog(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                        }
-                    }
-                }
-
-                // Global Theme Selection Section
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, InstrumentBorder, RoundedCornerShape(12.dp)),
-                    color = InstrumentSurface
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = when (themeMode) {
-                                        ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                                        ThemeMode.LIGHT -> Icons.Default.LightMode
-                                        ThemeMode.DARK -> Icons.Default.DarkMode
-                                    },
-                                    contentDescription = null,
-                                    tint = RadarCyan,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "App Theme Mode",
-                                    color = TextWhite,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                            }
-
-                            Text(
-                                text = themeMode.title,
-                                color = RadarCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        }
-
-                        // 3 Option Buttons: System (Auto), Light, Dark
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            ThemeMode.values().forEach { mode ->
-                                val isSelected = themeMode == mode
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(
-                                            width = if (isSelected) 1.5.dp else 1.dp,
-                                            color = if (isSelected) RadarCyan else InstrumentBorder,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { onThemeModeChange(mode) }
-                                        .padding(vertical = 8.dp)
-                                        .testTag("theme_btn_${mode.name.lowercase()}"),
-                                    color = if (isSelected) InstrumentSurfaceElevated else CockpitDark
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = when (mode) {
-                                                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                                                ThemeMode.LIGHT -> Icons.Default.LightMode
-                                                ThemeMode.DARK -> Icons.Default.DarkMode
-                                            },
-                                            contentDescription = mode.title,
-                                            tint = if (isSelected) RadarCyan else TextMuted,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = when (mode) {
-                                                ThemeMode.SYSTEM -> "System"
-                                                ThemeMode.LIGHT -> "Light"
-                                                ThemeMode.DARK -> "Dark"
-                                            },
-                                            color = if (isSelected) TextWhite else TextMuted,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
