@@ -133,9 +133,10 @@ Implemented in `services/api/src/gateway/gateway-service.ts` and exposed from
 - Mobile screen has level switcher, quick filters, route polyline, sprint HUD,
   and session fog-of-war.
 - Gap: the graph is generated from stylized curated POIs; it is not an OSM
-  indoor survey. Add an Overpass ingestion job (`indoor=room`, `indoor=corridor`,
-  `aeroway=gate`, `amenity=toilets`, `amenity=charging_station`) and store the
-  resulting graph in Supabase with provenance.
+  indoor survey. An Overpass ingestion script now writes `terminal_graphs`
+  (`pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3`), but the API/SDK
+  and mobile screen still read the curated catalog. Wire the ingested graph in
+  and improve its geometry to use OSM way nodes instead of proximity edges.
 - Gap: mobile fog-of-war persists through `/v1/me/passport` when a Supabase
   session exists, but the mobile sign-in UI and offline queue are not built yet.
   Unsynced visits remain local to the session.
@@ -207,13 +208,13 @@ Expected current results:
 - `@avi/mobile`: `tsc --noEmit` succeeds
 - `@avi/ui`: `tsc --noEmit` succeeds
 
-Before deploying, apply the new migrations:
+Migrations have been applied to the linked `avi` project and verified
+`upToDate: true`. For a fresh environment:
 
 ```bash
 npx supabase@3.1.0 db push --remote --yes
 ```
 
-Applied to the linked `avi` project on 2026-11-14 and verified `upToDate: true`.
 Migration: `supabase/migrations/20261114000100_aeroquest_gateway.sql`
 (terminal alert type, `trip_pass_expires_at`, `cabin_layouts`, `gateway_cache`,
 `passport_visits`, `passport_aircraft_visits`) and
@@ -233,11 +234,14 @@ Environment variables are documented in `.env.example`,
 
 ## 7. Suggested next order
 
-1. Apply the AeroQuest migration in staging and verify RLS for passport visits.
-2. Wire real Supabase auth + Expo push registration into `apps/mobile`.
-3. Add a cached-route context to the mobile HUD and terminal screens.
-4. Build the Overpass indoor ingestion job and store graphs with provenance.
-5. Add RevenueCat/Stripe receipt verification behind `planFromProductId`.
-6. Migrate `/routes` to the shared explorer model and remove duplicated types.
-7. Add Postgres read-through for `gateway_cache` and Expo receipt polling.
-8. Add EAS build profiles and a mobile CI job (typecheck only today).
+1. Wire Supabase auth + Expo push registration into `apps/mobile` and add the
+   sign-in / token-refresh UI.
+2. Add the missing mobile flight search + tracked-flight detail screen and cache
+   its snapshot for the HUD and terminal context.
+3. Wire `terminal_graphs` into the gateway/SDK/mobile as an optional layer over
+   the curated graph; improve Overpass geometry.
+4. Add RevenueCat/Stripe receipt verification and a real trip-pass checkout.
+5. Add Postgres read-through for `gateway_cache` and Expo receipt polling.
+6. Consolidate `@avi/contracts` with `@avi/shared`, port the remaining web types,
+   and migrate `/routes` to the explorer model.
+7. Add CI coverage for an Expo export and a Docker image smoke test.
