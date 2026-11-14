@@ -163,9 +163,11 @@ Implemented in `services/api/src/gateway/gateway-service.ts` and exposed from
   after an international landing; terminal page shows the lounge hook.
 - Trip-pass checkout and verified Lemon Squeezy/Polar webhook grants are
   implemented; clients cannot grant the pass.
+- Mobile `/pricing` compares Free/Pro/Single-Trip Pass, opens the hosted web
+  checkout, and shows the configured/unavailable state without inventing a
+  purchase.
 - Gap: RevenueCat/Stripe receipt adapters are not wired. `planFromProductId` is
   the seam; the server must verify receipts/webhooks before granting.
-- Gap: mobile paywall UI and purchase flow are not built yet.
 
 ---
 
@@ -237,12 +239,11 @@ Environment variables are documented in `.env.example`,
    approval.
 2. Add airline-specific curated cabin layouts only with a provenance source;
    B738 parametric coverage and the override seam are already in place.
-3. Add RevenueCat/Stripe receipt adapters; Polar/Lemon Squeezy trip-pass grants
-   and the hosted checkout URL are already implemented.
-4. Add the mobile pricing/paywall UI and purchase flow.
-5. Port the remaining web-only types to `@avi/shared` and complete the `/routes`
+3. Add RevenueCat/Stripe receipt adapters; Polar/Lemon Squeezy trip-pass grants,
+   hosted checkout, and the mobile `/pricing` flow are already implemented.
+4. Port the remaining web-only types to `@avi/shared` and complete the `/routes`
    pivot.
-6. Add browser E2E tests and cache/push observability dashboards. Expo export
+5. Add browser E2E tests and cache/push observability dashboards. Expo export
    and Docker smoke jobs are now in CI.
-7. Optionally expose the ingested terminal graph as a switchable layer for
+6. Optionally expose the ingested terminal graph as a switchable layer for
    curated airports (the fallback path already works).

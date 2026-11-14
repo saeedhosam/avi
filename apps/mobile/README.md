@@ -19,6 +19,7 @@ The `start`/`android`/`ios` scripts build the workspace packages first.
 | Variable | Purpose |
 | --- | --- |
 | `EXPO_PUBLIC_AEROQUEST_API_URL` | Hetzner gateway origin, e.g. `https://api.2-31-110-53.sslip.io` |
+| `EXPO_PUBLIC_AEROQUEST_WEB_URL` | Web app origin for hosted pricing/checkout |
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (optional; auth/sync/status stay disabled without it) |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase publishable/anon key (or `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) |
 
@@ -30,6 +31,7 @@ Never put `AERODATABOX_API_KEY` or a Supabase secret key in the mobile bundle.
 | --- | --- |
 | `/` | Acquisition hub, account status, home-airport picker |
 | `/auth` | Supabase email/password sign-in, sign-up, session refresh, sign-out, push status |
+| `/pricing` | Free/Pro/Single-Trip Pass plans, hosted checkout, entitlement status |
 | `/flights` | Flight-number search, airport board, tracked-flight offline cache |
 | `/flight/[id]` | Live/cached flight detail, gates, aircraft, terminal + HUD actions |
 | `/explore/[iata]` | World route map, airline/haul filters, destination weather |

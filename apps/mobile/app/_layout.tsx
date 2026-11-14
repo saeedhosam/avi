@@ -23,6 +23,7 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" options={{ title: "AeroQuest" }} />
           <Stack.Screen name="auth" options={{ title: "Account" }} />
+          <Stack.Screen name="pricing" options={{ title: "Plans" }} />
           <Stack.Screen name="flights" options={{ title: "Flights" }} />
           <Stack.Screen name="flight/[id]" options={{ title: "Flight Detail" }} />
           <Stack.Screen name="explore/[iata]" options={{ title: "Route Explorer" }} />

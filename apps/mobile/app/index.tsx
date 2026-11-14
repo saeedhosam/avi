@@ -24,6 +24,15 @@ const FEATURES = [
     href: "/flights",
   },
   {
+    id: "pricing",
+    eyebrow: "FREE · PRO · $4.99 TRIP PASS",
+    title: "Plans",
+    detail:
+      "Compare the free tools, AeroQuest Pro, and the Single-Trip Pass. Checkout is hosted by the configured billing provider; nothing is charged when it is unavailable.",
+    action: "Compare plans",
+    href: "/pricing",
+  },
+  {
     id: "explore",
     eyebrow: "FREE · WEB + MOBILE",
     title: "Direct Route Explorer",

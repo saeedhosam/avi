@@ -58,6 +58,7 @@ gateway exclusively.
 | --- | --- | --- |
 | `AVI_API_BASE_URL` (web) | `http://localhost:8080` (or `:8180` if 8080 is occupied) | `https://api.codestep.org` or the staging API |
 | `EXPO_PUBLIC_AEROQUEST_API_URL` (mobile) | staging/LAN gateway URL | Hetzner gateway HTTPS URL |
+| `EXPO_PUBLIC_AEROQUEST_WEB_URL` (mobile) | `http://localhost:3000` | Production web origin for pricing/checkout |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated production web origins |
 | `PUBLIC_WEB_URL` | `http://localhost:3000` | Production web origin |
 | `REDIS_URL` | leave empty for in-process cache | `redis://redis:6379` in Docker |
