@@ -150,7 +150,9 @@ pnpm dev
 - OpenAPI: <http://localhost:8080/openapi.json>
 - Mobile: `pnpm --filter @avi/mobile start` (Expo Go / dev client)
 
-Copy root `.env.example` values as needed:
+Copy root `.env.example` values as needed. A full explanation of each value,
+including Supabase, AeroDataBox, VAPID, Expo Push, EAS, and affiliate setup, is
+in [`docs/environment.md`](docs/environment.md).
 
 ```bash
 cp apps/web/.env.example apps/web/.env.local
