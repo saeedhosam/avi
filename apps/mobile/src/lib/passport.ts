@@ -1,5 +1,5 @@
 import { GATEWAY_URL } from "./config";
-import { supabase } from "./supabase";
+import { getAccessToken } from "./supabase";
 
 export interface PassportVisitInput {
   airportCode: string;
@@ -16,9 +16,7 @@ export interface PassportVisitInput {
 export async function recordPassportVisit(
   input: PassportVisitInput,
 ): Promise<boolean> {
-  if (!supabase) return false;
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await getAccessToken();
   if (!token) return false;
   try {
     const controller = new AbortController();

@@ -170,6 +170,13 @@ are not banner ads and never block flight status.
 | `BILLING_PROVIDER` | `manual`, `lemon_squeezy`, or `polar` |
 | `POLAR_API_KEY`, `POLAR_PRICE_*`, `POLAR_WEBHOOK_SECRET` | Polar MoR checkout/webhook |
 | `LEMONSQUEEZY_*` | Legacy Lemon Squeezy adapter |
+| `TRIP_PASS_CHECKOUT_URL` | Hosted $4.99 Single-Trip Pass checkout URL |
+| `TRIP_PASS_PRODUCT_ID` | Provider product/variant/price id(s) that grant the pass |
+| `TRIP_PASS_DURATION_DAYS` | Pass validity in days (default 30) |
+
+The trip-pass endpoint returns a clear `503` when the checkout URL or product id
+is not configured. A pass can only be granted by a signature-verified provider
+webhook whose product id matches `TRIP_PASS_PRODUCT_ID`.
 
 `profiles.plan` is server-owned (`FREE`/`PLUS`/`PRO`). The `$4.99` trip pass is
 represented by `profiles.trip_pass_expires_at`; clients cannot write either

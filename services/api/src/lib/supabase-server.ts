@@ -69,6 +69,37 @@ export interface FlightSnapshotRow {
   fetched_at: string;
 }
 
+/** A Postgres-tier gateway payload (long-lived routes/aircraft responses). */
+export interface GatewayCacheRow {
+  payload: unknown;
+  source: string;
+  fetched_at: string;
+  fresh_until: string;
+  expires_at: string;
+}
+
+/** An ingested indoor graph row from `public.terminal_graphs`. */
+export interface TerminalGraphRow {
+  graph: unknown;
+  source: string;
+  fetched_at: string;
+  updated_at: string;
+}
+
+/** A persisted Expo push ticket awaiting its asynchronous receipt. */
+export interface ExpoPushReceiptRow {
+  ticket_id: string;
+  token: string;
+  alert_id: string | null;
+  created_at: string;
+}
+
+export interface ExpoPushReceiptInput {
+  ticketId: string;
+  token: string;
+  alertId?: string | null;
+}
+
 export interface WatchlistWrite {
   snapshot: unknown;
   status: string | null;
@@ -78,6 +109,8 @@ export interface WatchlistWrite {
   /** Engine priority band matching `next_poll_at`. */
   pollPriority: number | null;
 }
+
+const DAY_MS = 24 * 60 * 60_000;
 
 /**
  * Minimal PostgREST client for the server-owned trigger of the watch engine.
@@ -415,6 +448,43 @@ export class SupabaseServer {
     };
   }
 
+  /**
+   * Extends a trip pass from the current expiry (or now when expired). Only
+   * verified provider webhooks call this; clients cannot write the column.
+   */
+  async grantTripPass(
+    uid: string,
+    durationDays: number,
+    now = new Date(),
+  ): Promise<string> {
+    if (!this.ready) throw new Error("supabase not configured");
+    const state = await this.getBillingState(uid);
+    const currentMs = state.tripPassExpiresAt
+      ? Date.parse(state.tripPassExpiresAt)
+      : Number.NaN;
+    const baseMs =
+      Number.isFinite(currentMs) && currentMs > now.getTime()
+        ? currentMs
+        : now.getTime();
+    const expiresAt = new Date(
+      baseMs + Math.max(1, Math.round(durationDays)) * DAY_MS,
+    ).toISOString();
+    const search = new URLSearchParams({ id: `eq.${uid}` });
+    const response = await fetch(
+      `${this.base()}/rest/v1/profiles?${search.toString()}`,
+      {
+        method: "PATCH",
+        headers: this.headers(),
+        body: JSON.stringify({ trip_pass_expires_at: expiresAt }),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`trip pass update failed with HTTP ${response.status}`);
+    }
+    return expiresAt;
+  }
+
   // ── Gateway push fan-out (AeroQuest) ───────────────────────────────────────
 
   /**
@@ -519,6 +589,98 @@ export class SupabaseServer {
     if (!response.ok) {
       throw new Error(`flight snapshot upsert failed with HTTP ${response.status}`);
     }
+  }
+
+  // ── Gateway Postgres cache tier (long-lived routes/aircraft) ──────────────
+
+  /**
+   * Reads a non-expired `gateway_cache` row. Freshness is evaluated by the
+   * caller (`fresh_until`), because the routes and aircraft endpoints use
+   * different stale policies. Redis remains the hot tier; this is the
+   * read-through tier that survives a Redis flush.
+   */
+  async getGatewayCache(
+    cacheKey: string,
+    now = new Date(),
+  ): Promise<GatewayCacheRow | null> {
+    if (!this.ready) return null;
+    const search = new URLSearchParams({
+      select: "payload,source,fetched_at,fresh_until,expires_at",
+      cache_key: `eq.${cacheKey}`,
+      expires_at: `gt.${now.toISOString()}`,
+      limit: "1",
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/gateway_cache?${search.toString()}`,
+      {
+        headers: this.headers("text/plain"),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) return null;
+    const rows = (await response.json()) as GatewayCacheRow[];
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
+
+  /** Upserts a parsed gateway payload into the Postgres cache tier. */
+  async upsertGatewayCache(input: {
+    cacheKey: string;
+    payload: unknown;
+    source: "AERODATABOX" | "OPEN_METEO" | "SUPABASE";
+    fetchedAt: string;
+    freshUntil: string;
+    expiresAt: string;
+  }): Promise<void> {
+    if (!this.ready) return;
+    const response = await fetch(`${this.base()}/rest/v1/gateway_cache`, {
+      method: "POST",
+      headers: {
+        ...this.headers(),
+        Prefer: "return=minimal,resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        cache_key: input.cacheKey,
+        payload: input.payload,
+        source: input.source,
+        fetched_at: input.fetchedAt,
+        fresh_until: input.freshUntil,
+        expires_at: input.expiresAt,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(`gateway cache upsert failed with HTTP ${response.status}`);
+    }
+  }
+
+  // ── Ingested indoor terminal graphs ────────────────────────────────────────
+
+  /** The stored graph for exactly this airport/terminal, never a fallback. */
+  async getTerminalGraph(
+    airportCode: string,
+    terminalId: string,
+  ): Promise<TerminalGraphRow | null> {
+    if (!this.ready) return null;
+    const search = new URLSearchParams({
+      select: "graph,source,fetched_at,updated_at",
+      airport_code: `eq.${airportCode.trim().toUpperCase()}`,
+      terminal_id: `eq.${terminalId.trim()}`,
+      limit: "1",
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/terminal_graphs?${search.toString()}`,
+      {
+        headers: this.headers("text/plain"),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `terminal graph fetch failed with HTTP ${response.status}`,
+      );
+    }
+    const rows = (await response.json()) as TerminalGraphRow[];
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
   }
 
   // ── Aircraft cabin layout cache (Supabase) ─────────────────────────────────
@@ -655,6 +817,87 @@ export class SupabaseServer {
       byUser.set(row.user_id, entries);
     }
     return byUser;
+  }
+
+  // ── Expo push receipts (async ticket outcomes) ─────────────────────────────
+
+  /** Persists successful Expo ticket ids so their receipts can be polled. */
+  async insertExpoPushReceipts(
+    receipts: ExpoPushReceiptInput[],
+  ): Promise<void> {
+    if (!this.ready || !receipts.length) return;
+    const response = await fetch(`${this.base()}/rest/v1/expo_push_receipts`, {
+      method: "POST",
+      headers: {
+        ...this.headers(),
+        Prefer: "return=minimal,resolution=ignore-duplicates",
+      },
+      body: JSON.stringify(
+        receipts.map((receipt) => ({
+          ticket_id: receipt.ticketId,
+          token: receipt.token,
+          alert_id: receipt.alertId ?? null,
+        })),
+      ),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `expo receipt insert failed with HTTP ${response.status}`,
+      );
+    }
+  }
+
+  /** Unchecked tickets, oldest first (receipts arrive asynchronously). */
+  async listUncheckedExpoPushReceipts(
+    limit: number,
+  ): Promise<ExpoPushReceiptRow[]> {
+    if (!this.ready) return [];
+    const search = new URLSearchParams({
+      select: "ticket_id,token,alert_id,created_at",
+      checked_at: "is.null",
+      order: "created_at.asc",
+      limit: String(Math.max(1, limit)),
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/expo_push_receipts?${search.toString()}`,
+      {
+        headers: this.headers("text/plain"),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `expo receipt fetch failed with HTTP ${response.status}`,
+      );
+    }
+    const rows = (await response.json()) as ExpoPushReceiptRow[];
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  /** Marks ticket receipts as checked so they are polled at most once. */
+  async markExpoPushReceiptsChecked(ticketIds: string[]): Promise<void> {
+    if (!this.ready || !ticketIds.length) return;
+    for (let index = 0; index < ticketIds.length; index += 100) {
+      const chunk = ticketIds.slice(index, index + 100);
+      const search = new URLSearchParams({
+        ticket_id: `in.(${chunk.map((id) => `"${id}"`).join(",")})`,
+      });
+      const response = await fetch(
+        `${this.base()}/rest/v1/expo_push_receipts?${search.toString()}`,
+        {
+          method: "PATCH",
+          headers: this.headers(),
+          body: JSON.stringify({ checked_at: new Date().toISOString() }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      if (!response.ok) {
+        throw new Error(
+          `expo receipt mark failed with HTTP ${response.status}`,
+        );
+      }
+    }
   }
 
   /** Removes an Expo token the push service reports as no longer registered. */

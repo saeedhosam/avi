@@ -92,16 +92,18 @@ export function PrimaryButton({
   disabled,
   loading,
   tone = "radar",
+  style,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
   tone?: "radar" | "amber" | "muted";
+  style?: StyleProp<ViewStyle>;
 }) {
   const background =
     tone === "amber" ? COLORS.amber : tone === "muted" ? COLORS.surface2 : COLORS.radar;
-  const foreground = tone === "radar" ? COLORS.cockpit : COLORS.cockpit;
+  const foreground = tone === "muted" ? COLORS.text : COLORS.cockpit;
   return (
     <Pressable
       accessibilityRole="button"
@@ -110,6 +112,7 @@ export function PrimaryButton({
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: background, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 },
+        style,
       ]}
     >
       {loading ? (
@@ -124,15 +127,17 @@ export function PrimaryButton({
 export function GhostButton({
   label,
   onPress,
+  style,
 }: {
   label: string;
   onPress: () => void;
+  style?: StyleProp<ViewStyle>;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.ghost, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.ghost, pressed && { opacity: 0.6 }, style]}
     >
       <Text style={styles.ghostText}>{label}</Text>
     </Pressable>

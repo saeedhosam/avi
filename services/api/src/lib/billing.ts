@@ -16,6 +16,36 @@ export function billingUpgradeEnabled(provider: string | null | undefined): bool
   return value === "lemon_squeezy" || value === "polar";
 }
 
+/**
+ * Static hosted trip-pass checkout. The URL is deliberately server-configured:
+ * the API never fabricates a price or a purchase flow when no product exists.
+ */
+export function tripPassCheckoutUrl(config: AppConfig): string | null {
+  const value = config.TRIP_PASS_CHECKOUT_URL?.trim();
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:"
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface TripPassGrant {
+  durationDays: number;
+}
+
+function idListMatches(list: string | undefined, id: string): boolean {
+  if (!list || !id) return false;
+  return list
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .includes(id);
+}
+
 export interface BillingStatusPatch {
   plan: BillingPlanTier;
   billingCustomerId: string | null;
@@ -111,6 +141,36 @@ export function planPatchFromWebhook(
   }
 
   return null;
+}
+
+/**
+ * A verified Lemon Squeezy order for the configured trip-pass variant grants
+ * time-boxed access. This never runs for an unsigned request; the webhook
+ * route validates the signature before calling it.
+ */
+export function tripPassFromWebhook(
+  payload: LsSubscriptionEvent,
+  config: AppConfig,
+): TripPassGrant | null {
+  if (!config.TRIP_PASS_PRODUCT_ID) return null;
+  const eventName = (payload.meta?.event_name ?? "").toLowerCase();
+  if (eventName !== "order_created" && eventName !== "subscription_created") {
+    return null;
+  }
+  const attributes = payload.data?.attributes ?? {};
+  if (eventName === "subscription_created") {
+    const status = (attributes.status ?? "").toLowerCase();
+    if (["cancelled", "expired", "unpaid", "on_pause"].includes(status)) {
+      return null;
+    }
+  }
+  const variant = String(
+    attributes.first_subscription_item?.variant_id ??
+      attributes.variant_id ??
+      "",
+  );
+  if (!idListMatches(config.TRIP_PASS_PRODUCT_ID, variant)) return null;
+  return { durationDays: config.TRIP_PASS_DURATION_DAYS };
 }
 
 function variantToPlan(
@@ -395,4 +455,26 @@ export function planPatchFromPolarWebhook(
   }
 
   return null;
+}
+
+/** Verified Polar order for the configured trip-pass product/price id. */
+export function tripPassFromPolarWebhook(
+  payload: PolarWebhookEvent,
+  config: AppConfig,
+): TripPassGrant | null {
+  if (!config.TRIP_PASS_PRODUCT_ID) return null;
+  const type = (payload.type ?? "").toLowerCase();
+  if (type !== "order.created" && type !== "order.paid") return null;
+  const data = payload.data ?? {};
+  const status = (data.status ?? "").toLowerCase();
+  if (["refunded", "partially_refunded", "void", "failed"].includes(status)) {
+    return null;
+  }
+  const ids = [data.product_id, data.price_id].filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
+  if (!ids.some((id) => idListMatches(config.TRIP_PASS_PRODUCT_ID, id))) {
+    return null;
+  }
+  return { durationDays: config.TRIP_PASS_DURATION_DAYS };
 }

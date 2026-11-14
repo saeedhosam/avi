@@ -267,6 +267,10 @@ export interface TerminalGraphNode {
   point: PointF;
   label?: string;
   amenityId?: string;
+  /** Mapped amenity category for OSM-derived nodes; curated nodes omit it. */
+  category?: AmenityCategory;
+  /** Raw source tags for provenance (OSM indoor ingestion only). */
+  tags?: Record<string, string>;
 }
 
 export const terminalGraphNodeSchema: z.ZodType<TerminalGraphNode> = z.object({
@@ -276,6 +280,8 @@ export const terminalGraphNodeSchema: z.ZodType<TerminalGraphNode> = z.object({
   point: pointFSchema,
   label: z.string().optional(),
   amenityId: z.string().optional(),
+  category: z.enum(AMENITY_CATEGORIES).optional(),
+  tags: z.record(z.string(), z.string()).optional(),
 });
 
 export const TERMINAL_EDGE_KINDS = [

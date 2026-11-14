@@ -128,6 +128,9 @@ jobs:
           POLAR_PRICE_PLUS: ${{ secrets.POLAR_PRICE_PLUS }}
           POLAR_PRICE_PRO: ${{ secrets.POLAR_PRICE_PRO }}
           POLAR_WEBHOOK_SECRET: ${{ secrets.POLAR_WEBHOOK_SECRET }}
+          TRIP_PASS_CHECKOUT_URL: ${{ secrets.TRIP_PASS_CHECKOUT_URL }}
+          TRIP_PASS_PRODUCT_ID: ${{ secrets.TRIP_PASS_PRODUCT_ID }}
+          TRIP_PASS_DURATION_DAYS: ${{ secrets.TRIP_PASS_DURATION_DAYS || '30' }}
           APP_ORIGIN: ${{ secrets.APP_ORIGIN || 'https://avi.codestep.org' }}
           APP_API_ORIGIN: ${{ secrets.APP_API_ORIGIN || 'https://api.codestep.org' }}
         run: |
@@ -155,6 +158,9 @@ jobs:
           POLAR_PRICE_PLUS=$POLAR_PRICE_PLUS
           POLAR_PRICE_PRO=$POLAR_PRICE_PRO
           POLAR_WEBHOOK_SECRET=$POLAR_WEBHOOK_SECRET
+          TRIP_PASS_CHECKOUT_URL=$TRIP_PASS_CHECKOUT_URL
+          TRIP_PASS_PRODUCT_ID=$TRIP_PASS_PRODUCT_ID
+          TRIP_PASS_DURATION_DAYS=$TRIP_PASS_DURATION_DAYS
           # Provider auth/quotas (P2 Track A). Flip with PROVIDER_AUTH_MODE.
           PROVIDER_AUTH_MODE=$PROVIDER_AUTH_MODE
           EOF

@@ -17,6 +17,7 @@ import {
 } from "../lib/quota-request.js";
 import {
   GatewayServiceError,
+  gatewayTerminalGraphResponseSchema,
   type GatewayService,
 } from "../gateway/gateway-service.js";
 
@@ -31,6 +32,10 @@ const airportParams = z.object({
 
 const aircraftParams = z.object({
   regOrIcao: z.string().trim().min(3).max(12),
+});
+
+const terminalGraphQuery = z.object({
+  terminal: z.string().trim().min(1).max(32),
 });
 
 const BUDGET_EXHAUSTED = {
@@ -172,6 +177,44 @@ export const gatewayRoutes: FastifyPluginAsyncZod<GatewayRouteOptions> = async (
         return result;
       } catch (error) {
         await refundProviderQuota(request, options.userQuota, units);
+        return sendError(reply, error, request.log);
+      }
+    },
+  );
+
+  app.get(
+    "/api/gateway/airports/:iata/terminal-graph",
+    {
+      schema: {
+        tags: ["gateway"],
+        summary: "Ingested indoor navigation graph for one terminal",
+        params: airportParams,
+        querystring: terminalGraphQuery,
+        response: {
+          200: gatewayTerminalGraphResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+          429: errorResponseSchema,
+          502: errorResponseSchema,
+          503: errorResponseSchema,
+        },
+      },
+      config: PROVIDER_RATE_LIMIT,
+    },
+    async (request, reply) => {
+      try {
+        const result = await options.gateway.getTerminalGraph(
+          request.params.iata,
+          request.query.terminal,
+        );
+        // Ingested graphs change rarely; the curated catalog remains the
+        // client-side fallback rather than a server fabrication.
+        reply.header(
+          "Cache-Control",
+          "public, max-age=3600, stale-while-revalidate=86400",
+        );
+        return result;
+      } catch (error) {
         return sendError(reply, error, request.log);
       }
     },

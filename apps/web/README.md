@@ -49,12 +49,35 @@ Copy `.env.example` to `.env.local`:
 Server-side watch-engine and push settings are documented in
 `services/api/.env.example`.
 
+## Explorer vs. `/routes` planner
+
+`/explore/[iata]` is the shared direct-route explorer: globe projection, haul
+and airline filters, destination weather, JSON-LD/metadata, and a
+server-rendered route network when `AVI_API_BASE_URL` is configured. The route
+network is cached with Next Cache Components and validated against
+`@avi/shared`; an unavailable gateway renders an honest empty state, never a
+bundled static route dataset.
+
+`/routes` is deliberately retained for its live airport board (departures and
+arrivals), pivot history, route timetable, and full-screen map. It shows a
+prominent link to the shared explorer rather than duplicating the globe. The
+legacy `?origin=` deep link is still accepted alongside `?hub=`.
+
 ## Plans (server-enforced)
 
 Saving to the watchlist is unlimited on every plan; plans meter **concurrently
 live-tracked** flight days (3 / 15 / 50) enforced by the engine. Plans are
 assigned in Supabase Studio/SQL (`profiles.plan`); clients cannot write the
 column.
+
+`/pricing` shows Free, AeroQuest Pro, and the one-time $4.99 Single-Trip Pass.
+Plan checkout uses `/api/billing/checkout`; the trip pass uses
+`/api/billing/trip-pass`, which proxies the gateway's `/v1/billing/trip-pass`
+endpoint. The pricing UI enables Plus/Pro only after `/api/me` reports a
+configured subscription billing provider. The trip pass has its own hosted
+checkout on the gateway and returns a graceful 503 when it is not configured.
+Every non-success path states that nothing was charged. `/api/me` remains the
+source of the current plan and trip-pass state.
 
 ## Local development
 

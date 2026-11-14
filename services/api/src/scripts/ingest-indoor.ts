@@ -4,11 +4,13 @@
  * Usage:
  *   pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3 --radius=2500
  *
- * The resulting graph is a proximity graph over tagged indoor nodes and way
- * centres. It is explicitly `source: "osm_indoor"` and is *not* a certified
+ * The graph is built by the shared `buildOsmIndoorGraph` helper from OSM way
+ * geometry. It is explicitly `source: "osm_indoor"` and is not a certified
  * indoor survey. The curated catalog remains the deterministic fallback.
  */
+import "dotenv/config";
 import catalogAirports from "@avi/catalog/airports.json" with { type: "json" };
+import { buildOsmIndoorGraph } from "@avi/shared";
 import { loadConfig } from "../config.js";
 
 interface CatalogAirport {
@@ -23,48 +25,13 @@ interface OverpassElement {
   lat?: number;
   lon?: number;
   center?: { lat?: number; lon?: number };
+  nodes?: number[];
   tags?: Record<string, string>;
 }
 
-interface GraphNode {
-  id: string;
-  level: number;
-  kind: "poi" | "junction" | "gate" | "security" | "entrance" | "platform";
-  point: { x: number; y: number };
-  label?: string;
-  amenityId?: string;
-}
-
-interface GraphEdge {
-  id: string;
-  from: string;
-  to: string;
-  kind: "corridor" | "walkway" | "moving_walkway" | "train" | "stairs" | "escalator" | "elevator";
-  distanceMeters: number;
-  speedMps: number;
-  bidirectional: boolean;
-  accessible: boolean;
-}
-
-const EARTH_RADIUS_M = 6_371_000;
-
-function haversineMeters(
-  a: { lat: number; lon: number },
-  b: { lat: number; lon: number },
-): number {
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLon = toRad(b.lon - a.lon);
-  const rLat1 = toRad(a.lat);
-  const rLat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
-}
-
 function parseArgs(argv: string[]) {
-  const iata = argv[0]?.trim().toUpperCase();
+  const positionals = argv.filter((arg) => !arg.startsWith("--"));
+  const iata = positionals[0]?.trim().toUpperCase();
   let terminal = "T3";
   let radius = 2500;
   for (const arg of argv.slice(1)) {
@@ -75,27 +42,6 @@ function parseArgs(argv: string[]) {
     }
   }
   return { iata, terminal, radius };
-}
-
-function categoryFor(tags: Record<string, string>): {
-  category: string;
-  kind: GraphNode["kind"];
-} {
-  if (tags.aeroway === "gate") return { category: "GATE", kind: "gate" };
-  if (tags.amenity === "toilets") return { category: "RESTROOM", kind: "poi" };
-  if (tags.amenity === "charging_station") return { category: "CHARGING", kind: "poi" };
-  if (tags.amenity === "drinking_water") return { category: "WATER", kind: "poi" };
-  if (tags.amenity === "lounge") return { category: "LOUNGE", kind: "poi" };
-  if (tags.amenity === "restaurant" || tags.amenity === "cafe") {
-    return { category: "DINING", kind: "poi" };
-  }
-  if (tags.shop === "duty_free") return { category: "SHOPPING", kind: "poi" };
-  if (tags.barrier === "immigration") return { category: "IMMIGRATION", kind: "security" };
-  if (tags.amenity === "first_aid") return { category: "MEDICAL", kind: "poi" };
-  if (tags.railway === "station" || tags.aeroway === "baggage_claim") {
-    return { category: "TRANSIT", kind: "platform" };
-  }
-  return { category: "TRANSIT", kind: "junction" };
 }
 
 async function main() {
@@ -114,122 +60,54 @@ async function main() {
     throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY are required.");
   }
 
+  // `out body` returns the selected ways with their ordered node refs; the
+  // recursion then returns every geometry node needed to build corridor edges.
   const query = `[out:json][timeout:60];
 (
-  node["amenity"~"toilets|charging_station|drinking_water|lounge|restaurant|cafe|first_aid"](around:${radius},${airport.latitude},${airport.longitude});
+  node["amenity"~"toilets|charging_station|drinking_water|lounge|restaurant|cafe|food_court|fast_food|first_aid"](around:${radius},${airport.latitude},${airport.longitude});
   node["aeroway"="gate"](around:${radius},${airport.latitude},${airport.longitude});
   node["barrier"="immigration"](around:${radius},${airport.latitude},${airport.longitude});
+  node["railway"="station"](around:${radius},${airport.latitude},${airport.longitude});
   way["aeroway"="gate"](around:${radius},${airport.latitude},${airport.longitude});
   way["indoor"](around:${radius},${airport.latitude},${airport.longitude});
   way["shop"="duty_free"](around:${radius},${airport.latitude},${airport.longitude});
-  node["railway"="station"](around:${radius},${airport.latitude},${airport.longitude});
+  way["highway"~"corridor|footway|path|pedestrian|steps|elevator|escalator|moving_walkway"](around:${radius},${airport.latitude},${airport.longitude});
 );
-out center tags;`;
+out body;
+>;
+out skel qt;`;
   const response = await fetch("https://overpass-api.de/api/interpreter", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      "User-Agent": "AeroQuest-Indoor-Ingest/1.0 (ops@aeroquest.local)",
+    },
     body: new URLSearchParams({ data: query }),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) {
-    throw new Error(`Overpass returned HTTP ${response.status}`);
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Overpass returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
+    );
   }
   const payload = (await response.json()) as { elements?: OverpassElement[] };
-  const elements = (payload.elements ?? []).filter((element) => {
-    const lat = element.lat ?? element.center?.lat;
-    const lon = element.lon ?? element.center?.lon;
-    return lat != null && lon != null && element.tags;
-  });
+  const elements = payload.elements ?? [];
   if (!elements.length) {
-    throw new Error("Overpass returned no tagged indoor elements in that radius.");
+    throw new Error("Overpass returned no indoor elements in that radius.");
   }
 
-  const latSpan = radius / 111_320;
-  const lonSpan = radius / (111_320 * Math.max(0.2, Math.cos((airport.latitude * Math.PI) / 180)));
-  const minLat = airport.latitude - latSpan;
-  const maxLat = airport.latitude + latSpan;
-  const minLon = airport.longitude - lonSpan;
-  const maxLon = airport.longitude + lonSpan;
-  const clamp = (value: number) => Math.min(0.98, Math.max(0.02, value));
-
-  const rawNodes = elements.map((element) => {
-    const lat = element.lat ?? element.center!.lat!;
-    const lon = element.lon ?? element.center!.lon!;
-    const tags = element.tags ?? {};
-    const { category, kind } = categoryFor(tags);
-    return {
-      id: `OSM-${element.type}-${element.id}`,
-      lat,
-      lon,
-      tags,
-      category,
-      kind,
-      label:
-        tags.name ??
-        tags.ref ??
-        (tags.aeroway === "gate" ? `Gate ${tags.ref ?? ""}`.trim() : undefined) ??
-        category,
-    };
-  });
-
-  const nodes: GraphNode[] = rawNodes.map((node) => ({
-    id: node.id,
-    level: 1,
-    kind: node.kind,
-    point: {
-      x: clamp((node.lon - minLon) / (maxLon - minLon)),
-      y: clamp((maxLat - node.lat) / (maxLat - minLat)),
-    },
-    ...(node.label ? { label: node.label } : {}),
-    amenityId: node.id,
-  }));
-  const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const edges: GraphEdge[] = [];
-  const seen = new Set<string>();
-  const maxEdgeMeters = 450;
-  for (const source of rawNodes) {
-    const nearest = rawNodes
-      .filter((candidate) => candidate.id !== source.id)
-      .map((candidate) => ({
-        candidate,
-        distance: haversineMeters(
-          { lat: source.lat, lon: source.lon },
-          { lat: candidate.lat, lon: candidate.lon },
-        ),
-      }))
-      .filter((entry) => entry.distance <= maxEdgeMeters)
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 3);
-    for (const { candidate, distance } of nearest) {
-      const first = source.id < candidate.id ? source.id : candidate.id;
-      const second = source.id < candidate.id ? candidate.id : source.id;
-      const key = `${first}|${second}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const nodeA = nodeById.get(source.id);
-      const nodeB = nodeById.get(candidate.id);
-      if (!nodeA || !nodeB) continue;
-      edges.push({
-        id: `${first}->${second}:corridor`,
-        from: first,
-        to: second,
-        kind: "corridor",
-        distanceMeters: Math.round(distance * 10) / 10,
-        speedMps: 1.25,
-        bidirectional: true,
-        accessible: true,
-      });
-    }
-  }
-
-  const graph = {
+  const graph = buildOsmIndoorGraph(elements, {
     airportCode: iata,
     terminalId: terminal,
-    nodes,
-    edges,
-    source: "osm_indoor" as const,
-    updatedAt: new Date().toISOString(),
-  };
+    defaultLevel: 1,
+  });
+  if (!graph.nodes.length) {
+    throw new Error(
+      "OSM elements were returned but none had usable indoor geometry or tags.",
+    );
+  }
 
   const url = `${config.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/terminal_graphs?on_conflict=airport_code,terminal_id`;
   const write = await fetch(url, {
@@ -254,7 +132,7 @@ out center tags;`;
     throw new Error(`terminal_graphs upsert failed with HTTP ${write.status}`);
   }
   console.log(
-    `indoor graph written: ${iata} ${terminal} · ${nodes.length} nodes · ${edges.length} edges · source=osm_indoor`,
+    `indoor graph written: ${iata} ${terminal} · ${graph.nodes.length} nodes · ${graph.edges.length} edges · source=osm_indoor`,
   );
 }
 

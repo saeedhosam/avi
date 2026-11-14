@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  BadgeDollarSign,
   Bell,
   Building2,
   CheckCircle2,
@@ -52,6 +53,12 @@ const NAV_ITEMS = [
     tag: "Cabin seatmaps",
   },
   { href: "/watchlist", label: "Watchlist", icon: Glasses, tag: "Watched flights" },
+  {
+    href: "/pricing",
+    label: "Plans",
+    icon: BadgeDollarSign,
+    tag: "Pro · Trip Pass",
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

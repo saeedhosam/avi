@@ -78,6 +78,7 @@ export async function buildApp(config: AppConfig) {
         { name: "flights", description: "Live flight data" },
         { name: "airports", description: "Airport boards, routes, and search" },
         { name: "gateway", description: "AeroQuest Starter-safe caching gateway" },
+        { name: "billing", description: "Plans and the time-boxed trip pass" },
       ],
     },
     transform: jsonSchemaTransform,
@@ -118,6 +119,10 @@ export async function buildApp(config: AppConfig) {
     expoPush,
     log: app.log,
   });
+  expoPush.startReceiptPolling();
+  app.addHook("onClose", async () => {
+    expoPush.stopReceiptPolling();
+  });
 
   registerProviderAuth(app, {
     supabaseServer,
@@ -154,6 +159,8 @@ export async function buildApp(config: AppConfig) {
     engineStatus,
     cache,
     schedule,
+    gateway,
+    expoPush,
   });
   await app.register(flightRoutes, { provider, usage, userQuota, config });
   await app.register(consoleFlightRoutes, { consoleFlights, usage, userQuota, config });

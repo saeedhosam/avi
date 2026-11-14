@@ -41,3 +41,108 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+
+  mobile-bundle:
+    name: Expo iOS JS bundle
+    runs-on: ubuntu-latest
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.7.0 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build shared packages
+        run: |
+          pnpm --filter @avi/shared build
+          pnpm --filter @avi/ui build
+      - name: Export iOS bundle
+        working-directory: apps/mobile
+        run: |
+          pnpm exec expo export --platform ios --output-dir /tmp/avi-mobile-export
+      - name: Verify export output
+        run: test -d /tmp/avi-mobile-export
+
+  docker-smoke:
+    name: Docker API/web smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          docker system prune -af --volumes
+      # Full multi-stage builds are intentional: the job must prove the same
+      # Dockerfile used by deploy.yml still builds. Both targets share the
+      # pruner/BuildKit cache, and no registry or EAS/cloud credentials are used.
+      - name: Build API image
+        run: docker build --target api -f Dockerfile -t avi-api:ci .
+      - name: Build web image with dummy public env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://smoke.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: smoke-public-publishable-key
+          AVI_API_BASE_URL: ""
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: |
+          docker build \
+            --target web \
+            -f Dockerfile \
+            -t avi-web:ci \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --build-arg AVI_API_BASE_URL="$AVI_API_BASE_URL" \
+            --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$NEXT_PUBLIC_VAPID_PUBLIC_KEY" \
+            --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL" \
+            .
+      - name: Start API container
+        run: |
+          docker network create avi-smoke
+          docker run -d --name avi-api-smoke --network avi-smoke -p 8080:8080 \
+            -e NODE_ENV=production \
+            -e PORT=8080 \
+            avi-api:ci
+      - name: Check API /healthz
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs avi-api-smoke
+          exit 1
+      - name: Start web container
+        run: |
+          docker run -d --name avi-web-smoke --network avi-smoke -p 3000:3000 \
+            -e AVI_API_BASE_URL=http://avi-api-smoke:8080 \
+            avi-web:ci
+      - name: Check web root and status endpoint
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/; then
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS -o /dev/null -w "web root: %{http_code}\n" http://127.0.0.1:3000/
+          curl -fsS http://127.0.0.1:3000/api/status
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          docker logs avi-api-smoke || true
+          docker logs avi-web-smoke || true
+      - name: Stop containers
+        if: always()
+        run: |
+          docker rm -f avi-api-smoke avi-web-smoke || true
+          docker network rm avi-smoke || true

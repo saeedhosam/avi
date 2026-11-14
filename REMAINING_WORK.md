@@ -15,7 +15,7 @@ The repository is now a pnpm + Turborepo TypeScript monorepo:
 | Workspace | Status |
 | --- | --- |
 | `apps/web` | Next.js App Router; route explorer globe, 3D cabin page, terminal maps, gateway proxy, SEO metadata/sitemap, contextual monetisation cards |
-| `apps/mobile` | Expo Router scaffold with all five AeroQuest core screens (route map, terminal radar, 3D cabin, BCBP scanner, AR bag sizer, offline HUD) |
+| `apps/mobile` | Expo Router app with auth, flight search/boards, tracked-flight offline cache, route map, terminal radar, 3D cabin, BCBP scanner, AR bag sizer, offline HUD |
 | `packages/shared` | Strict models + Zod schemas, flight differ, weather client, terminal graph, cabin layouts, BCBP parser, in-flight HUD math, entitlements, gateway SDK |
 | `packages/ui` | React Three Fiber cabin viewer + shared 3D scene |
 | `services/api` | Fastify provider gateway; `/api/gateway/*` with dynamic TTL and request coalescing |
@@ -90,19 +90,15 @@ Implemented in `services/api/src/gateway/gateway-service.ts` and exposed from
 
 ### Follow-ups
 
-1. **Supabase `gateway_cache` is created but not yet read/written.** Redis is the
-   hot tier today. Add a Postgres read-through fallback for route/aircraft
-   payloads so a Redis flush does not spend provider units.
-2. **Aircraft lookup by ICAO type is not supported by AeroDataBox's
+1. **Aircraft lookup by ICAO type is not supported by AeroDataBox's
    registration endpoint.** The route currently accepts a registration. If the
    product needs type-only lookup, add a catalog table; do not fabricate a
    registration.
-3. **Dynamic TTL after a landed fetch.** The provider cache stores the first TTL
+2. **Dynamic TTL after a landed fetch.** The provider cache stores the first TTL
    (5 min for same-day). The Supabase settled-snapshot path covers the required
    7-day retention, but a `ProviderCache.extendTtl()` could simplify it later.
-4. **Expo push receipts.** The fan-out reads tickets, not the receipt endpoint.
-   Add receipt polling to prune `DeviceNotRegistered` tokens that only fail
-   asynchronously.
+3. **Postgres `gateway_cache` is now wired for routes/aircraft**; keep it in
+   sync if the gateway response shapes change.
 
 ---
 
@@ -132,30 +128,31 @@ Implemented in `services/api/src/gateway/gateway-service.ts` and exposed from
   trains, elevators, and stairs.
 - Mobile screen has level switcher, quick filters, route polyline, sprint HUD,
   and session fog-of-war.
-- Gap: the graph is generated from stylized curated POIs; it is not an OSM
-  indoor survey. An Overpass ingestion script now writes `terminal_graphs`
-  (`pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3`), but the API/SDK
-  and mobile screen still read the curated catalog. Wire the ingested graph in
-  and improve its geometry to use OSM way nodes instead of proximity edges.
-- Gap: mobile fog-of-war persists through `/v1/me/passport` when a Supabase
-  session exists, but the mobile sign-in UI and offline queue are not built yet.
-  Unsynced visits remain local to the session.
-- Gap: sprint mode needs to be opened from a real connection alert with gates
-  and times. The home link intentionally does not fabricate a connection.
+- The Overpass ingestion script writes `terminal_graphs`
+  (`pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3`), `buildOsmIndoorGraph`
+  creates real way-sequence corridors, and the gateway exposes the graph at
+  `/api/gateway/airports/:iata/terminal-graph`.
+- The mobile terminal screen uses the ingested OSM graph as a fallback when no
+  curated layout exists and a terminal id is supplied; curated layouts remain
+  the deterministic default.
+- Mobile auth and passport persistence are implemented. Unsynced visits remain
+  local-to-session when signed out or offline.
+- Gap: sprint mode still needs to be opened from a real connection alert with
+  gates and times. The home link intentionally does not fabricate a connection.
 
 ### Boarding Pass Scanner + AR Sizer
 - BCBP parser is pure and tested; scanner uses expo-camera and accepts PDF417,
   Aztec, and QR.
-- Gap: multi-leg passes only parse the first leg. Add per-leg parsing if needed.
-- Gap: AR bag measurement currently asks for dimensions after framing. Add card
+- Multi-leg BCBP parsing is implemented.
+- Gap: AR bag measurement still asks for dimensions after framing. Add card
   calibration + bounding-box capture on-device; never claim airline approval.
 - Gap: the bin envelope is parametric per aircraft type, not per airline retrofit.
 
 ### Offline In-Flight HUD
 - Barometer tracker, great-circle interpolation, cabin timeline, and landmark
   callouts are implemented in `packages/shared/src/services/inflight.ts`.
-- Gap: the HUD expects a cached route/time context. Wire it to tracked-flight
-  snapshots so it opens from the watchlist without manual parameters.
+- The mobile HUD now accepts `flightId` and reads the tracked-flight snapshot;
+  the sample route remains explicitly labelled.
 - Gap: cabin altitude is an estimate from pressure, not aircraft altitude. Keep
   that distinction in every UI string.
 
@@ -164,25 +161,24 @@ Implemented in `services/api/src/gateway/gateway-service.ts` and exposed from
 - `/v1/me` returns product, trip-pass state, and feature flags.
 - Web flight detail shows a lounge affiliate card at 2h+ delay and an eSIM card
   after an international landing; terminal page shows the lounge hook.
-- Gap: RevenueCat/Stripe purchase verification is not wired. `planFromProductId`
-  is the seam; the server must verify receipts/webhooks before granting.
+- Trip-pass checkout and verified Lemon Squeezy/Polar webhook grants are
+  implemented; clients cannot grant the pass.
+- Gap: RevenueCat/Stripe receipt adapters are not wired. `planFromProductId` is
+  the seam; the server must verify receipts/webhooks before granting.
 - Gap: mobile paywall UI and purchase flow are not built yet.
 
 ---
 
 ## 5. Migration clean-up
 
-- `packages/contracts` still owns the console `Flight` shape while
-  `packages/shared` owns the AeroQuest `Flight` shape. They are structurally
-  compatible, and the gateway validates provider output through the shared Zod
-  schema. Consolidate them when the remaining web code stops importing
-  `@avi/contracts` directly.
+- `packages/contracts` now re-exports the shared `Flight` domain types; it still
+  owns the console route/schedule request shapes used by the gateway mapping.
 - `apps/web/src/lib/types.ts` still carries web-only route/terminal/weather
   types. Move the route/terminal/weather portions to `@avi/shared` and delete the
   duplicates.
-- The web route planner (`/routes`) and the new explorer (`/explore/[iata]`) use
-  separate rendering paths. Consider making `/routes` pivot to the explorer once
-  the legacy filters are ported.
+- `/routes` now links prominently to the shared explorer while retaining the
+  airport-board/timetable planner. A full pivot can follow once the remaining
+  web-only filters are ported.
 - Design tokens no longer emit Kotlin/Swift files. Remove any stale generated
   native token files from local worktrees.
 
@@ -202,14 +198,15 @@ node packages/catalog/scripts/validate.mjs
 
 Expected current results:
 
-- `@avi/shared`: 38 unit tests
-- `@avi/api`: 147 tests across 13 files
-- `@avi/web`: Next.js production build succeeds with partial prerender
+- `@avi/shared`: 49 unit tests
+- `@avi/api`: 162 tests across 17 files
+- `@avi/web`: 38 tests; Next.js production build succeeds with partial prerender
 - `@avi/mobile`: `tsc --noEmit` succeeds
 - `@avi/ui`: `tsc --noEmit` succeeds
 
-Migrations have been applied to the linked `avi` project and verified
-`upToDate: true`. For a fresh environment:
+Migrations have been applied to the linked `avi` project, including
+`20261114000300_expo_push_receipts.sql`, and verified `upToDate: true`. For a
+fresh environment:
 
 ```bash
 npx supabase@3.1.0 db push --remote --yes
@@ -218,7 +215,9 @@ npx supabase@3.1.0 db push --remote --yes
 Migration: `supabase/migrations/20261114000100_aeroquest_gateway.sql`
 (terminal alert type, `trip_pass_expires_at`, `cabin_layouts`, `gateway_cache`,
 `passport_visits`, `passport_aircraft_visits`) and
-`supabase/migrations/20261114000200_terminal_graphs.sql` (`terminal_graphs`).
+`supabase/migrations/20261114000200_terminal_graphs.sql` (`terminal_graphs`), and
+`supabase/migrations/20261114000300_expo_push_receipts.sql`
+(`expo_push_receipts`).
 
 OSM indoor ingestion is available as a script:
 
@@ -234,14 +233,16 @@ Environment variables are documented in `.env.example`,
 
 ## 7. Suggested next order
 
-1. Wire Supabase auth + Expo push registration into `apps/mobile` and add the
-   sign-in / token-refresh UI.
-2. Add the missing mobile flight search + tracked-flight detail screen and cache
-   its snapshot for the HUD and terminal context.
-3. Wire `terminal_graphs` into the gateway/SDK/mobile as an optional layer over
-   the curated graph; improve Overpass geometry.
-4. Add RevenueCat/Stripe receipt verification and a real trip-pass checkout.
-5. Add Postgres read-through for `gateway_cache` and Expo receipt polling.
-6. Consolidate `@avi/contracts` with `@avi/shared`, port the remaining web types,
-   and migrate `/routes` to the explorer model.
-7. Add CI coverage for an Expo export and a Docker image smoke test.
+1. Add card-calibrated AR bag measurement and never present it as airline
+   approval.
+2. Add airline-specific curated cabin layouts only with a provenance source;
+   B738 parametric coverage and the override seam are already in place.
+3. Add RevenueCat/Stripe receipt adapters; Polar/Lemon Squeezy trip-pass grants
+   and the hosted checkout URL are already implemented.
+4. Add the mobile pricing/paywall UI and purchase flow.
+5. Port the remaining web-only types to `@avi/shared` and complete the `/routes`
+   pivot.
+6. Add browser E2E tests and cache/push observability dashboards. Expo export
+   and Docker smoke jobs are now in CI.
+7. Optionally expose the ingested terminal graph as a switchable layer for
+   curated airports (the fallback path already works).

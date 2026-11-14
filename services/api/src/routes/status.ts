@@ -2,6 +2,8 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { EngineStats, WatchEngine } from "../engine/watch-engine.js";
+import type { ExpoPushService } from "../gateway/expo-push.js";
+import type { GatewayService } from "../gateway/gateway-service.js";
 import { AeroDataBoxProvider } from "../providers/aerodatabox.js";
 import { EngineStatusStore } from "../lib/engine-status.js";
 import type { ProviderCache } from "../lib/provider-cache.js";
@@ -14,6 +16,8 @@ interface StatusOptions {
   engineStatus?: EngineStatusStore | null;
   cache?: ProviderCache | null;
   schedule?: ScheduleService | null;
+  gateway?: GatewayService | null;
+  expoPush?: ExpoPushService | null;
 }
 
 const cacheStatsSchema = z.object({
@@ -43,6 +47,22 @@ const statusResponse = z.object({
     }),
   }),
   cache: cacheStatsSchema,
+  gatewayCache: z.object({
+    configured: z.boolean(),
+    hits: z.number(),
+    misses: z.number(),
+    writes: z.number(),
+    errors: z.number(),
+  }),
+  expoPushReceipts: z.object({
+    enabled: z.boolean(),
+    lastPolledAt: z.string().nullable(),
+    polled: z.number(),
+    checked: z.number(),
+    tokensRemoved: z.number(),
+    errors: z.number(),
+    lastError: z.string().nullable(),
+  }),
   map: z.object({
     style: z.literal("positron"),
     tileProvider: z.literal("openfreemap"),
@@ -131,6 +151,22 @@ export const statusRoutes: FastifyPluginAsyncZod<StatusOptions> = async (
           stores: cacheStats?.stores ?? 0,
           errors: cacheStats?.errors ?? 0,
           entries: cacheStats?.entries ?? 0,
+        },
+        gatewayCache: options.gateway?.gatewayCacheStats() ?? {
+          configured: false,
+          hits: 0,
+          misses: 0,
+          writes: 0,
+          errors: 0,
+        },
+        expoPushReceipts: options.expoPush?.receiptStats() ?? {
+          enabled: false,
+          lastPolledAt: null,
+          polled: 0,
+          checked: 0,
+          tokensRemoved: 0,
+          errors: 0,
+          lastError: null,
         },
         map: {
           style: "positron" as const,

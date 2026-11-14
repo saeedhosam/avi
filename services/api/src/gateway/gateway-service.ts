@@ -1,6 +1,9 @@
 import type { FastifyBaseLogger } from "fastify";
+import { z } from "zod";
 import {
   OpenMeteoWeatherService,
+  aircraftCacheKey,
+  airportRoutesCacheKey,
   aircraftCabinLayoutSchema,
   diffFlights,
   estimateBlockMinutes,
@@ -12,6 +15,9 @@ import {
   kmToNm,
   mapToRealtimeAirportWeather,
   resolveCabinLayout,
+  gatewayAircraftResponseSchema,
+  gatewayRoutesResponseSchema,
+  terminalSpatialGraphSchema,
   type AircraftCabinLayout,
   type AirportNode,
   type DirectFlightConnection,
@@ -26,8 +32,15 @@ import {
 } from "@avi/shared";
 import catalogAirports from "@avi/catalog/airports.json" with { type: "json" };
 import type { AppConfig } from "../config.js";
-import { providerCacheFor, type ProviderCache } from "../lib/provider-cache.js";
-import type { SupabaseServer } from "../lib/supabase-server.js";
+import {
+  providerCacheFor,
+  type ProviderCache,
+  type ProviderCacheLoad,
+} from "../lib/provider-cache.js";
+import type {
+  SupabaseServer,
+  TerminalGraphRow,
+} from "../lib/supabase-server.js";
 import type {
   ConsoleAircraft,
   ConsoleFlightProvider,
@@ -61,6 +74,31 @@ const BOARD_STALE_MS = 5 * 60_000;
 const AIRCRAFT_TTL_MS = 30 * DAY_MS;
 const AIRCRAFT_STALE_MS = 30 * DAY_MS;
 
+/** Response shape for an ingested indoor graph (shared graph + row metadata). */
+export const gatewayTerminalGraphResponseSchema = z.object({
+  airportCode: z.string().length(3),
+  terminalId: z.string(),
+  graph: terminalSpatialGraphSchema,
+  source: z.enum(["osm_indoor", "curated", "parametric"]),
+  fetchedAt: z.string(),
+});
+
+export type GatewayTerminalGraphResponse = z.infer<
+  typeof gatewayTerminalGraphResponseSchema
+>;
+
+export interface GatewayCacheCounters {
+  hits: number;
+  misses: number;
+  writes: number;
+  errors: number;
+}
+
+interface GatewayCacheHit<T> {
+  payload: T;
+  fetchedAt: string;
+}
+
 export class GatewayServiceError extends Error {
   constructor(
     readonly statusCode: number,
@@ -93,6 +131,48 @@ function baseProvenance(
     cached: outcome.cached,
     stale: outcome.stale,
     cacheAgeSeconds: outcome.cacheAgeSeconds,
+    ttlSeconds,
+  };
+}
+
+/**
+ * Provenance for a response served from a cache tier. The payload's original
+ * retrieval time and attribution are preserved; only freshness changes.
+ */
+function cachedProvenance(
+  provenance: GatewayProvenance,
+  stale: boolean,
+  ttlSeconds: number,
+): GatewayProvenance {
+  const fetchedMs = Date.parse(provenance.fetchedAt);
+  return {
+    source: provenance.source,
+    attribution: provenance.attribution,
+    fetchedAt: provenance.fetchedAt,
+    cached: true,
+    stale: stale || provenance.stale,
+    cacheAgeSeconds: Number.isFinite(fetchedMs)
+      ? Math.max(0, Math.round((Date.now() - fetchedMs) / 1_000))
+      : provenance.cacheAgeSeconds,
+    ttlSeconds,
+  };
+}
+
+/** Provenance for a fresh payload read from the Postgres cache tier. */
+function postgresProvenance(
+  fetchedAt: string,
+  ttlSeconds: number,
+): GatewayProvenance {
+  const fetchedMs = Date.parse(fetchedAt);
+  return {
+    source: "AERODATABOX",
+    attribution: "AeroDataBox",
+    fetchedAt,
+    cached: true,
+    stale: false,
+    cacheAgeSeconds: Number.isFinite(fetchedMs)
+      ? Math.max(0, Math.round((Date.now() - fetchedMs) / 1_000))
+      : 0,
     ttlSeconds,
   };
 }
@@ -180,6 +260,12 @@ function flightTtlForDate(date: string, now = new Date()): {
 export class GatewayService {
   private readonly weather: OpenMeteoWeatherService;
   private readonly cache: ProviderCache;
+  private readonly gatewayCacheCounters: GatewayCacheCounters = {
+    hits: 0,
+    misses: 0,
+    writes: 0,
+    errors: 0,
+  };
 
   constructor(private readonly options: GatewayServiceOptions) {
     this.weather = options.weather ?? new OpenMeteoWeatherService();
@@ -375,6 +461,11 @@ export class GatewayService {
     }
   }
 
+  /**
+   * Long-lived route payloads are cached at two tiers: Redis (hot, via the
+   * shared provider cache) and Postgres `gateway_cache` (survives a Redis
+   * flush). Both are checked before spending an AeroDataBox unit.
+   */
   async getRoutes(iata: string): Promise<GatewayRoutesResponse> {
     const code = iata.trim().toUpperCase();
     const origin = catalogNode(code);
@@ -385,6 +476,41 @@ export class GatewayService {
         "No verified coordinates are available for that airport code.",
       );
     }
+    const key = airportRoutesCacheKey(code);
+    const loaded = await this.cache.getOrLoad<GatewayRoutesResponse>(
+      key,
+      {
+        ttlMs: ROUTES_TTL_MS,
+        staleTtlMs: ROUTES_STALE_MS,
+        source: "AERODATABOX",
+        attribution: "AeroDataBox",
+        query: key,
+        cacheable: (value) => value.routes.length > 0,
+      },
+      () => this.loadRoutes(code, origin, key),
+    );
+    return this.withCacheProvenance(loaded, ROUTES_TTL_MS / 1_000);
+  }
+
+  private async loadRoutes(
+    code: string,
+    origin: AirportNode,
+    cacheKey: string,
+  ): Promise<GatewayRoutesResponse> {
+    const cached = await this.readGatewayCache(
+      cacheKey,
+      gatewayRoutesResponseSchema,
+    );
+    if (cached) {
+      return {
+        ...cached.payload,
+        provenance: postgresProvenance(
+          cached.fetchedAt,
+          ROUTES_TTL_MS / 1_000,
+        ),
+      };
+    }
+
     const outcome = await this.options.consoleFlights.lookupAirportRoutes(code, {
       ttlMs: ROUTES_TTL_MS,
       staleTtlMs: ROUTES_STALE_MS,
@@ -459,11 +585,21 @@ export class GatewayService {
           a.distanceKm - b.distanceKm,
       );
 
-    return {
+    const response: GatewayRoutesResponse = {
       mode: outcome.mode,
       routes: connections,
-      provenance: baseProvenance(outcome, ROUTES_TTL_MS / 1000),
+      provenance: baseProvenance(outcome, ROUTES_TTL_MS / 1_000),
     };
+    if (!outcome.cached && connections.length > 0) {
+      await this.writeGatewayCache(
+        cacheKey,
+        response,
+        outcome.fetchedAt,
+        ROUTES_TTL_MS,
+        ROUTES_STALE_MS,
+      );
+    }
+    return response;
   }
 
   async getBoard(iata: string): Promise<GatewayBoardResponse> {
@@ -531,6 +667,41 @@ export class GatewayService {
   }
 
   async getAircraft(regOrIcao: string): Promise<GatewayAircraftResponse> {
+    const normalized = regOrIcao.replace(/[\s-]/g, "").toUpperCase();
+    const key = aircraftCacheKey(normalized);
+    const loaded = await this.cache.getOrLoad<GatewayAircraftResponse>(
+      key,
+      {
+        ttlMs: AIRCRAFT_TTL_MS,
+        staleTtlMs: AIRCRAFT_STALE_MS,
+        source: "AERODATABOX",
+        attribution: "AeroDataBox",
+        query: key,
+        cacheable: (value) => Boolean(value.aircraft.registration),
+      },
+      () => this.loadAircraft(regOrIcao, key),
+    );
+    return this.withCacheProvenance(loaded, AIRCRAFT_TTL_MS / 1_000);
+  }
+
+  private async loadAircraft(
+    regOrIcao: string,
+    cacheKey: string,
+  ): Promise<GatewayAircraftResponse> {
+    const cached = await this.readGatewayCache(
+      cacheKey,
+      gatewayAircraftResponseSchema,
+    );
+    if (cached) {
+      return {
+        ...cached.payload,
+        provenance: postgresProvenance(
+          cached.fetchedAt,
+          AIRCRAFT_TTL_MS / 1_000,
+        ),
+      };
+    }
+
     const outcome = await this.options.consoleFlights.lookupAircraft(regOrIcao, {
       ttlMs: AIRCRAFT_TTL_MS,
       staleTtlMs: AIRCRAFT_STALE_MS,
@@ -555,7 +726,7 @@ export class GatewayService {
     const aircraft = outcome.aircraft;
     const resolved = await this.resolveCachedCabinLayout(aircraft);
     const layout = resolved?.layout ?? null;
-    return {
+    const response: GatewayAircraftResponse = {
       aircraft: {
         registration: aircraft.reg,
         icaoCode: aircraft.icaoCode,
@@ -567,7 +738,196 @@ export class GatewayService {
         cabinLayoutCached: resolved?.fromCache ?? false,
       },
       layout,
-      provenance: baseProvenance(outcome, AIRCRAFT_TTL_MS / 1000),
+      provenance: baseProvenance(outcome, AIRCRAFT_TTL_MS / 1_000),
+    };
+    if (!outcome.cached) {
+      await this.writeGatewayCache(
+        cacheKey,
+        response,
+        outcome.fetchedAt,
+        AIRCRAFT_TTL_MS,
+        AIRCRAFT_STALE_MS,
+      );
+    }
+    return response;
+  }
+
+  /**
+   * Ingested OSM graphs are read exactly for the requested airport/terminal.
+   * There is deliberately no curated fallback here: the client already owns
+   * the curated catalog and must not be told an unrelated airport's graph is
+   * this airport's indoor layout.
+   */
+  async getTerminalGraph(
+    iata: string,
+    terminal: string,
+  ): Promise<GatewayTerminalGraphResponse> {
+    const airportCode = iata.trim().toUpperCase();
+    const terminalId = terminal.trim();
+    if (!this.options.supabase.ready) {
+      throw new GatewayServiceError(
+        503,
+        "terminal_graph_unavailable",
+        "Ingested terminal graphs are not configured on this gateway.",
+      );
+    }
+    let row: TerminalGraphRow | null;
+    try {
+      row = await this.options.supabase.getTerminalGraph(
+        airportCode,
+        terminalId,
+      );
+    } catch (error) {
+      this.options.log.warn(
+        { err: error, airport: airportCode, terminal: terminalId },
+        "terminal graph read failed",
+      );
+      throw new GatewayServiceError(
+        502,
+        "terminal_graph_unavailable",
+        "The ingested terminal graph store is temporarily unavailable.",
+      );
+    }
+    if (!row) {
+      throw new GatewayServiceError(
+        404,
+        "terminal_graph_not_found",
+        "No ingested indoor graph exists for that airport and terminal.",
+      );
+    }
+    const parsed = terminalSpatialGraphSchema.safeParse(row.graph);
+    if (
+      !parsed.success ||
+      parsed.data.airportCode.toUpperCase() !== airportCode ||
+      parsed.data.terminalId !== terminalId
+    ) {
+      this.options.log.warn(
+        { airport: airportCode, terminal: terminalId },
+        "terminal graph payload failed validation",
+      );
+      throw new GatewayServiceError(
+        502,
+        "terminal_graph_invalid",
+        "The stored terminal graph is invalid for that airport and terminal.",
+      );
+    }
+    const source =
+      row.source === "curated" ||
+      row.source === "parametric" ||
+      row.source === "osm_indoor"
+        ? row.source
+        : parsed.data.source;
+    return {
+      airportCode,
+      terminalId,
+      graph: parsed.data,
+      source,
+      fetchedAt: row.fetched_at,
+    };
+  }
+
+  /** Postgres read-through hit counters exposed by `/v1/status`. */
+  gatewayCacheStats(): GatewayCacheCounters & { configured: boolean } {
+    return {
+      configured: this.options.supabase.ready,
+      ...this.gatewayCacheCounters,
+    };
+  }
+
+  private async readGatewayCache<T>(
+    key: string,
+    schema: z.ZodType<T>,
+  ): Promise<GatewayCacheHit<T> | null> {
+    if (!this.options.supabase.ready) return null;
+    try {
+      const row = await this.options.supabase.getGatewayCache(key);
+      if (!row) {
+        this.gatewayCacheCounters.misses += 1;
+        return null;
+      }
+      const freshUntil = Date.parse(row.fresh_until);
+      const expiresAt = Date.parse(row.expires_at);
+      if (
+        !Number.isFinite(freshUntil) ||
+        freshUntil <= Date.now() ||
+        (Number.isFinite(expiresAt) && expiresAt <= Date.now())
+      ) {
+        this.gatewayCacheCounters.misses += 1;
+        return null;
+      }
+      const parsed = schema.safeParse(row.payload);
+      if (!parsed.success) {
+        this.gatewayCacheCounters.errors += 1;
+        this.options.log.warn(
+          { key },
+          "gateway cache payload failed validation",
+        );
+        return null;
+      }
+      this.gatewayCacheCounters.hits += 1;
+      return { payload: parsed.data, fetchedAt: row.fetched_at };
+    } catch (error) {
+      this.gatewayCacheCounters.errors += 1;
+      this.options.log.warn(
+        { err: error, key },
+        "gateway cache read failed",
+      );
+      return null;
+    }
+  }
+
+  private async writeGatewayCache(
+    key: string,
+    payload: GatewayRoutesResponse | GatewayAircraftResponse,
+    fetchedAt: string,
+    freshMs: number,
+    staleMs: number,
+  ): Promise<void> {
+    if (!this.options.supabase.ready) return;
+    try {
+      const fetchedMs = Date.parse(fetchedAt);
+      const baseMs = Number.isFinite(fetchedMs) ? fetchedMs : Date.now();
+      const freshUntil = baseMs + freshMs;
+      await this.options.supabase.upsertGatewayCache({
+        cacheKey: key,
+        payload,
+        source: "AERODATABOX",
+        fetchedAt: new Date(baseMs).toISOString(),
+        freshUntil: new Date(freshUntil).toISOString(),
+        expiresAt: new Date(freshUntil + staleMs).toISOString(),
+      });
+      this.gatewayCacheCounters.writes += 1;
+    } catch (error) {
+      this.gatewayCacheCounters.errors += 1;
+      this.options.log.warn(
+        { err: error, key },
+        "gateway cache write failed",
+      );
+    }
+  }
+
+  private withCacheProvenance(
+    loaded: ProviderCacheLoad<GatewayRoutesResponse>,
+    ttlSeconds: number,
+  ): GatewayRoutesResponse;
+  private withCacheProvenance(
+    loaded: ProviderCacheLoad<GatewayAircraftResponse>,
+    ttlSeconds: number,
+  ): GatewayAircraftResponse;
+  private withCacheProvenance(
+    loaded: ProviderCacheLoad<
+      GatewayRoutesResponse | GatewayAircraftResponse
+    >,
+    ttlSeconds: number,
+  ): GatewayRoutesResponse | GatewayAircraftResponse {
+    if (!loaded.cached) return loaded.value;
+    return {
+      ...loaded.value,
+      provenance: cachedProvenance(
+        loaded.value.provenance,
+        loaded.stale,
+        ttlSeconds,
+      ),
     };
   }
 

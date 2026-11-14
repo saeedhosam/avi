@@ -99,6 +99,21 @@ describe("readiness and cache status", () => {
       backend: "process",
       enabled: true,
     });
+    expect(body.gatewayCache).toEqual({
+      configured: false,
+      hits: 0,
+      misses: 0,
+      writes: 0,
+      errors: 0,
+    });
+    expect(body.expoPushReceipts).toMatchObject({
+      enabled: false,
+      lastPolledAt: null,
+      polled: 0,
+      checked: 0,
+      tokensRemoved: 0,
+      errors: 0,
+    });
     expect(body.providers.schedule).toEqual({
       provider: "none",
       configured: false,

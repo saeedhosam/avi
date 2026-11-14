@@ -1,5 +1,6 @@
 import type {
   AircraftCabinLayout,
+  AirlineCabinLayoutOverride,
   CabinDeck,
   CabinFeature,
   CabinSeat,
@@ -81,6 +82,56 @@ const PRESETS: CabinPreset[] = [
       depthCm: 25,
       carryOnCapacity: 3,
       note: "Approximate A320 Family overhead bin; actual fit varies by retrofit.",
+    },
+    isExact: false,
+  },
+  {
+    aircraftType: "B738",
+    aliases: [
+      "B738",
+      "B737",
+      "738",
+      "737-800",
+      "B737-800",
+      "BOEING 737-800",
+      "BOEING737800",
+      "737800",
+    ],
+    decks: [
+      {
+        name: "Main deck",
+        rows: 31,
+        columns: COLUMNS_3_3,
+        aisles: [3],
+        bands: [
+          {
+            fromRow: 1,
+            toRow: 4,
+            seatClass: "BUSINESS",
+            pitchInches: 36,
+            reclineInches: 6,
+            power: true,
+            usb: true,
+          },
+          {
+            fromRow: 5,
+            toRow: 31,
+            seatClass: "ECONOMY",
+            pitchInches: 30,
+            reclineInches: 4,
+            power: false,
+            usb: true,
+          },
+        ],
+        misalignedRows: [12, 13],
+      },
+    ],
+    bin: {
+      widthCm: 55,
+      heightCm: 40,
+      depthCm: 25,
+      carryOnCapacity: 3,
+      note: "Approximate 737-800 overhead bin; actual fit varies by retrofit.",
     },
     isExact: false,
   },
@@ -293,6 +344,43 @@ const GENERIC_PRESET: CabinPreset = {
   isExact: false,
 };
 
+/**
+ * Real airline-specific layouts with provenance.
+ *
+ * This registry is intentionally empty until the repo has a verifiable source
+ * for a carrier's cabin plan. Do not add a row just to make an airline look
+ * certified: the parametric fallback already covers unknown or unsourced
+ * airlines and remains `isExact: false`.
+ */
+export const CURATED_AIRLINE_CABIN_LAYOUTS: readonly AirlineCabinLayoutOverride[] =
+  [];
+
+function normalizeAirlineCode(raw: string | null | undefined): string {
+  return (raw ?? "").trim().toUpperCase();
+}
+
+/**
+ * Looks up an explicit airline override. Unknown airlines — and airlines with
+ * no curated row — return null so the caller falls back to the parametric
+ * aircraft preset.
+ */
+export function findCuratedAirlineLayout(
+  aircraftType: string | null | undefined,
+  airlineCode: string | null | undefined,
+  overrides: readonly AirlineCabinLayoutOverride[] = CURATED_AIRLINE_CABIN_LAYOUTS,
+): AirlineCabinLayoutOverride | null {
+  const code = normalizeAirlineCode(airlineCode);
+  if (!code) return null;
+  const normalizedType = normalizeAircraftType(aircraftType);
+  return (
+    overrides.find(
+      (entry) =>
+        normalizeAirlineCode(entry.airlineCode) === code &&
+        normalizeAircraftType(entry.aircraftType) === normalizedType,
+    ) ?? null
+  );
+}
+
 export function normalizeAircraftType(raw: string | null | undefined): string {
   if (!raw) return "GENERIC";
   const compact = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -319,7 +407,11 @@ export function normalizeAircraftType(raw: string | null | undefined): string {
   return "GENERIC";
 }
 
-function bandForRow(preset: CabinPreset, deckIndex: number, row: number): ClassBand {
+function bandForRow(
+  preset: CabinPreset,
+  deckIndex: number,
+  row: number,
+): ClassBand {
   const deck = preset.decks[deckIndex]!;
   return (
     deck.bands.find((band) => row >= band.fromRow && row <= band.toRow) ??
@@ -336,14 +428,18 @@ function windowAlignmentFor(
 ): WindowAlignment {
   const isWindowColumn = columnIndex === 0 || columnIndex === columnCount - 1;
   if (!isWindowColumn) return "NO_WINDOW";
-  if (preset.decks[deckIndex]?.windowlessRows?.includes(row)) return "NO_WINDOW";
+  if (preset.decks[deckIndex]?.windowlessRows?.includes(row))
+    return "NO_WINDOW";
   if (preset.decks[deckIndex]?.misalignedRows?.includes(row)) {
     return "MISALIGNED_WINDOW";
   }
   return "FULL_WINDOW";
 }
 
-function buildDeck(preset: CabinPreset, deckIndex: number): {
+function buildDeck(
+  preset: CabinPreset,
+  deckIndex: number,
+): {
   deck: CabinDeck;
   seats: CabinSeat[];
   features: CabinFeature[];
@@ -369,7 +465,8 @@ function buildDeck(preset: CabinPreset, deckIndex: number): {
         ? rowStartY
         : rowStartY + ((row - 1) / (source.rows - 1)) * (rowEndY - rowStartY);
     source.columns.forEach((letter, columnIndex) => {
-      const x = 0.1 + (columnIndex / Math.max(1, source.columns.length - 1)) * 0.8;
+      const x =
+        0.1 + (columnIndex / Math.max(1, source.columns.length - 1)) * 0.8;
       seats.push({
         id: `${row}${letter}`,
         deck: deckIndex,
@@ -457,20 +554,33 @@ function buildDeck(preset: CabinPreset, deckIndex: number): {
 
 export interface CabinLayoutOptions {
   source?: AircraftCabinLayout["source"];
+  /** Optional airline code; only a sourced CURATED override can change the plan. */
+  airlineCode?: string | null;
   now?: () => Date;
 }
 
 /**
  * Parametric, renderer-ready cabin layout.
  *
- * Aircraft types with a preset (A320, B789, B77W, A388) get an approximate deck
- * plan; unknown types fall back to a generic narrowbody. `isExact` is false for
- * every generated layout, and the disclaimer must remain visible in the UI.
+ * Aircraft types with a preset (A320, B738, B789, B77W, A388) get an
+ * approximate deck plan; unknown types fall back to a generic narrowbody.
+ * `isExact` is false for every generated layout, and the disclaimer must remain
+ * visible in the UI. An airline code is accepted only to check the explicit
+ * curated-override registry; unknown airlines still receive the parametric
+ * layout.
  */
 export function resolveCabinLayout(
   aircraftType: string | null | undefined,
   options: CabinLayoutOptions = {},
 ): AircraftCabinLayout {
+  const override = findCuratedAirlineLayout(aircraftType, options.airlineCode);
+  if (override) {
+    return {
+      ...override.layout,
+      source: "CURATED",
+    };
+  }
+
   const normalized = normalizeAircraftType(aircraftType);
   const preset =
     PRESETS.find((item) => item.aircraftType === normalized) ?? GENERIC_PRESET;
@@ -502,7 +612,10 @@ export function resolveCabinLayout(
 export function parseSeatNumber(
   seatNumber: string | null | undefined,
 ): { row: number; letter: string } | null {
-  const match = seatNumber?.trim().toUpperCase().match(/^(\d{1,3})\s*([A-K])$/);
+  const match = seatNumber
+    ?.trim()
+    .toUpperCase()
+    .match(/^(\d{1,3})\s*([A-K])$/);
   if (!match) return null;
   const row = Number(match[1]);
   if (!Number.isFinite(row) || row <= 0) return null;
@@ -526,10 +639,10 @@ export function resolveSeat(
   const seat =
     parsed == null
       ? null
-      : layout.seats.find(
+      : (layout.seats.find(
           (candidate) =>
             candidate.row === parsed.row && candidate.letter === parsed.letter,
-        ) ?? null;
+        ) ?? null);
 
   if (!seat) {
     return {
@@ -546,7 +659,10 @@ export function resolveSeat(
 
   const features = layout.features
     .filter((feature) => feature.deck === seat.deck)
-    .map((feature) => ({ feature, distance: seatDistanceMeters(seat, feature) }))
+    .map((feature) => ({
+      feature,
+      distance: seatDistanceMeters(seat, feature),
+    }))
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 4)
     .map((entry) => entry.feature);

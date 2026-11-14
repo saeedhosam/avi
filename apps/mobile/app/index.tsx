@@ -9,10 +9,20 @@ import {
   Subtitle,
   Title,
 } from "../src/components/ui";
+import { useAuth } from "../src/lib/auth";
 import { HOME_AIRPORTS } from "../src/lib/config";
 import { COLORS } from "../src/lib/theme";
 
 const FEATURES = [
+  {
+    id: "flights",
+    eyebrow: "LIVE GATEWAY · OFFLINE CACHE",
+    title: "Flight Search & Tracking",
+    detail:
+      "Find a flight by number or airport board, track its live snapshot, and open gate, aircraft, terminal, and offline HUD context.",
+    action: "Find a flight",
+    href: "/flights",
+  },
   {
     id: "explore",
     eyebrow: "FREE · WEB + MOBILE",
@@ -71,6 +81,7 @@ const FEATURES = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { configured, ready, user } = useAuth();
 
   return (
     <Screen>
@@ -82,6 +93,49 @@ export default function HomeScreen() {
           boarding passes, and offline flight awareness.
         </Subtitle>
       </View>
+
+      <Pressable
+        onPress={() => router.push("/auth")}
+        style={({ pressed }) => [pressed && { opacity: 0.82 }]}
+      >
+        <Card>
+          <Row style={{ justifyContent: "space-between" }}>
+            <View style={{ flex: 1 }}>
+              <Label>Account</Label>
+              <Text style={styles.accountTitle}>
+                {user
+                  ? user.email ?? "Signed in"
+                  : configured
+                    ? "Sign in to sync"
+                    : "Account unavailable"}
+              </Text>
+            </View>
+            <Badge
+              tone={
+                user ? "green" : configured && ready ? "muted" : "amber"
+              }
+            >
+              {user
+                ? "SIGNED IN"
+                : configured
+                  ? ready
+                    ? "SIGNED OUT"
+                    : "RESTORING"
+                  : "NOT CONFIGURED"}
+            </Badge>
+          </Row>
+          <Text style={styles.note}>
+            {user
+              ? "Tracked flights, device push tokens, and passport visits sync through Supabase. Local snapshots still work offline."
+              : configured
+                ? "Sign in with a real Supabase account to sync tracked flights and terminal passport visits. No demo account is created."
+                : "Supabase environment variables are missing. Local flights and the terminal map still work; account sync does not."}
+          </Text>
+          <Text style={styles.action}>
+            {user ? "Manage account →" : "Open account →"}
+          </Text>
+        </Card>
+      </Pressable>
 
       <Card>
         <Label>Choose your home airport</Label>
@@ -149,6 +203,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   hubCity: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  accountTitle: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 2,
+  },
   note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
   eyebrow: {
     color: COLORS.amber,

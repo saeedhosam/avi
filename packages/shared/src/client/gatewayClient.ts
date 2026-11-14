@@ -3,10 +3,12 @@ import {
   gatewayBoardResponseSchema,
   gatewayFlightsResponseSchema,
   gatewayRoutesResponseSchema,
+  gatewayTerminalGraphResponseSchema,
   type GatewayAircraftResponse,
   type GatewayBoardResponse,
   type GatewayFlightsResponse,
   type GatewayRoutesResponse,
+  type GatewayTerminalGraphResponse,
 } from "../models/gateway.js";
 
 export interface GatewayClientOptions {
@@ -157,6 +159,19 @@ export class AeroQuestGatewayClient {
     return this.request(
       `/api/gateway/aircraft/${encodeURIComponent(regOrIcao.trim().toUpperCase())}`,
       gatewayAircraftResponseSchema,
+      options,
+    );
+  }
+
+  getTerminalGraph(
+    iata: string,
+    terminalId: string,
+    options?: RequestOptions,
+  ): Promise<GatewayTerminalGraphResponse> {
+    const query = new URLSearchParams({ terminal: terminalId.trim() });
+    return this.request(
+      `/api/gateway/airports/${encodeURIComponent(iata.toUpperCase())}/terminal-graph?${query.toString()}`,
+      gatewayTerminalGraphResponseSchema,
       options,
     );
   }

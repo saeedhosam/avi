@@ -114,9 +114,7 @@ export const cabinFeatureSchema: z.ZodType<CabinFeature> = z.object({
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
   }),
-  rowRange: z
-    .tuple([z.number().int(), z.number().int()])
-    .optional(),
+  rowRange: z.tuple([z.number().int(), z.number().int()]).optional(),
 });
 
 export interface CabinDeck {
@@ -143,7 +141,7 @@ export const cabinDeckSchema: z.ZodType<CabinDeck> = z.object({
 });
 
 export interface AircraftCabinLayout {
-  /** Normalized IATA/ICAO type, e.g. `B77W`, `A388`, `A320`, `B789`. */
+  /** Normalized IATA/ICAO type, e.g. `B738`, `B77W`, `A388`, `A320`, `B789`. */
   aircraftType: string;
   layoutKey: string;
   source: "CURATED" | "PARAMETRIC" | "SUPABASE_CACHE";
@@ -169,6 +167,49 @@ export const aircraftCabinLayoutSchema: z.ZodType<AircraftCabinLayout> =
     overheadBins: z.array(overheadBinSpecSchema),
     isExact: z.boolean(),
     disclaimer: z.string(),
+  });
+
+/**
+ * Provenance for a curated airline layout. A layout may only be marked
+ * `CURATED` when the source document is real and verifiable; the source URL is
+ * required precisely so a parametric reconstruction cannot be smuggled in as
+ * a certified airline plan.
+ */
+export interface CabinLayoutProvenance {
+  /** Document or dataset name, e.g. `Airline A320 seat map (2026-10)`. */
+  document: string;
+  /** Public URL of the source, or null when it is a licensed offline document. */
+  url: string | null;
+  /** ISO date the layout was checked against the source. */
+  verifiedAt: string;
+}
+
+export const cabinLayoutProvenanceSchema: z.ZodType<CabinLayoutProvenance> =
+  z.object({
+    document: z.string().min(1),
+    url: z.string().url().nullable(),
+    verifiedAt: z.string(),
+  });
+
+export interface AirlineCabinLayoutOverride {
+  /** IATA two-letter or ICAO three-letter airline code. */
+  airlineCode: string;
+  airlineName: string;
+  aircraftType: string;
+  /** Only real, sourced layouts may use CURATED. */
+  source: "CURATED";
+  provenance: CabinLayoutProvenance;
+  layout: AircraftCabinLayout;
+}
+
+export const airlineCabinLayoutOverrideSchema: z.ZodType<AirlineCabinLayoutOverride> =
+  z.object({
+    airlineCode: z.string().min(2).max(3),
+    airlineName: z.string().min(1),
+    aircraftType: z.string().min(1),
+    source: z.literal("CURATED"),
+    provenance: cabinLayoutProvenanceSchema,
+    layout: aircraftCabinLayoutSchema,
   });
 
 export interface ResolvedSeat {

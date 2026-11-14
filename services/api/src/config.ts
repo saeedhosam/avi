@@ -81,6 +81,14 @@ const ConfigSchema = z.object({
   POLAR_PRICE_PLUS: z.string().optional(),
   POLAR_PRICE_PRO: z.string().optional(),
   POLAR_WEBHOOK_SECRET: z.string().optional(),
+  // ── Trip pass (one-time $4.99 entitlement) ────────────────────────
+  // Static hosted checkout URL. When unset the trip-pass endpoint returns an
+  // explicit 503 instead of pretending a purchase flow exists.
+  TRIP_PASS_CHECKOUT_URL: z.string().optional(),
+  // Provider product/variant/price id(s) that grant a trip pass. Comma-
+  // separated so monthly/annual or provider-specific ids can share a slot.
+  TRIP_PASS_PRODUCT_ID: z.string().optional(),
+  TRIP_PASS_DURATION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema> & {

@@ -52,6 +52,7 @@ export interface AccountUsage {
   watchlistCount: number;
   units: { unitsUsed: number; unitsBudget: number };
   billing: { provider: "manual" | "lemon_squeezy" | "polar"; upgradeEnabled: boolean };
+  tripPass?: { active: boolean; expiresAt: string | null };
 }
 
 export interface Toast {

@@ -1,6 +1,7 @@
 import type {
   BoardingPassData,
   BoardingPassFormat,
+  BoardingPassLeg,
 } from "../models/boardingPass.js";
 
 export interface ParseBoardingPassOptions {
@@ -11,6 +12,16 @@ export interface ParseBoardingPassOptions {
 }
 
 const BCBP_MANDATORY_LENGTH = 60;
+/** IATA RP 792 allows at most four legs in one barcode. */
+const BCBP_MAX_LEGS = 4;
+/**
+ * Per-leg block: PNR (7), from (3), to (3), carrier (3), flight (5), Julian
+ * date (3), compartment (1), seat (4), sequence (5), status (1), variable
+ * data size (2).
+ */
+const LEG_BLOCK_LENGTH = 37;
+/** Format (1) + leg count (1) + passenger name (20) + ET indicator (1). */
+const FIRST_LEG_OFFSET = 23;
 
 /** Compartment codes from IATA Resolution 792 / PSCRM. */
 const CABIN_BY_CODE: Record<string, string> = {
@@ -111,11 +122,112 @@ export function resolveJulianFlightDate(
       const time = Date.parse(`${iso}T00:00:00Z`);
       return { iso, time, distance: Math.abs(time - now.getTime()) };
     })
-    .filter((entry): entry is { iso: string; time: number; distance: number } =>
-      entry != null,
+    .filter(
+      (entry): entry is { iso: string; time: number; distance: number } =>
+        entry != null,
     )
     .sort((a, b) => a.distance - b.distance || b.time - a.time);
   return candidates[0]?.iso ?? null;
+}
+
+interface ParsedLegBlock {
+  leg: BoardingPassLeg;
+  /** Hex field size of the variable-data block that follows this leg. */
+  variableDataSize: number | null;
+}
+
+function parseVariableDataSize(raw: string): number | null {
+  const compact = raw.trim().toUpperCase();
+  if (!/^[0-9A-F]{1,2}$/.test(compact)) return null;
+  return Number.parseInt(compact, 16);
+}
+
+/**
+ * Parses one fixed-width leg block. The first block starts after the pass-level
+ * header; every later block starts after the preceding leg's variable data.
+ */
+function parseLegBlock(
+  text: string,
+  start: number,
+  index: number,
+  now?: Date,
+): ParsedLegBlock {
+  const warnings: string[] = [];
+  const prefix = index === 0 ? "" : `Leg ${index + 1}: `;
+  const warn = (message: string) => warnings.push(`${prefix}${message}`);
+
+  if (text.length < start + LEG_BLOCK_LENGTH) {
+    warn("Leg data is missing or truncated.");
+  }
+  const block = text
+    .slice(start, start + LEG_BLOCK_LENGTH)
+    .padEnd(LEG_BLOCK_LENGTH, " ");
+
+  const pnr = normalizePnr(block.slice(0, 7));
+  const origin = block.slice(7, 10).trim().toUpperCase();
+  const destination = block.slice(10, 13).trim().toUpperCase();
+  const airlineCode = block.slice(13, 16).trim().toUpperCase();
+  const flightNumber = normalizeFlightNumber(block.slice(16, 21));
+  const julianRaw = block.slice(21, 24).trim();
+  const julianValue = Number(julianRaw);
+  const julianValid =
+    Number.isInteger(julianValue) && julianValue >= 1 && julianValue <= 366;
+  const compartmentCode = block.slice(24, 25).trim().toUpperCase() || null;
+  const seatNumber = normalizeSeat(block.slice(25, 29));
+  const sequenceRaw = block.slice(29, 34).trim();
+  const sequenceNumber = /^\d{1,5}$/.test(sequenceRaw)
+    ? String(Number(sequenceRaw))
+    : null;
+  const passengerStatus = block.slice(34, 35).trim() || null;
+  const variableDataSize = parseVariableDataSize(block.slice(35, 37));
+  const flightDate = julianValid
+    ? resolveJulianFlightDate(julianValue, now)
+    : null;
+
+  if (!pnr) warn("Record locator (PNR) is missing.");
+  if (!/^[A-Z]{3}$/.test(origin)) warn("Origin is not a 3-letter IATA code.");
+  if (!/^[A-Z]{3}$/.test(destination)) {
+    warn("Destination is not a 3-letter IATA code.");
+  }
+  if (!/^[A-Z0-9]{2,3}$/.test(airlineCode)) {
+    warn("Operating carrier is missing.");
+  }
+  if (!flightNumber) warn("Flight number is missing.");
+  if (!julianValid) warn("Julian operating date is invalid.");
+  if (!seatNumber) warn("Seat number is missing or malformed.");
+  if (passengerStatus && !/[A-Z]/.test(passengerStatus)) {
+    warn("Passenger status is malformed.");
+  }
+
+  const valid =
+    /^[A-Z]{3}$/.test(origin) &&
+    /^[A-Z]{3}$/.test(destination) &&
+    /^[A-Z0-9]{2,3}$/.test(airlineCode) &&
+    Boolean(flightNumber) &&
+    flightDate != null;
+
+  return {
+    leg: {
+      index,
+      pnr,
+      airlineCode,
+      flightNumber: flightNumber ?? "",
+      julianDate: julianValid ? julianValue : null,
+      flightDate,
+      origin,
+      destination,
+      compartmentCode,
+      cabinClass: compartmentCode
+        ? (CABIN_BY_CODE[compartmentCode] ?? compartmentCode)
+        : null,
+      seatNumber,
+      sequenceNumber,
+      passengerStatus,
+      valid,
+      warnings,
+    },
+    variableDataSize,
+  };
 }
 
 /**
@@ -123,7 +235,8 @@ export function resolveJulianFlightDate(
  *
  * Pure function, no network, no API call. The parser is deliberately strict
  * about mandatory structural fields and returns `valid: false` with warnings
- * instead of inventing values.
+ * instead of inventing values. Multi-leg passes expose every leg in `legs`;
+ * the top-level flight fields remain the first leg for backwards compatibility.
  */
 export function parseBoardingPass(
   rawInput: string,
@@ -150,6 +263,7 @@ export function parseBoardingPass(
       boardingGroup: null,
       sequenceNumber: null,
       checkInSource: null,
+      legs: [],
       valid: false,
       warnings: ["No IATA BCBP header (M1) found."],
     };
@@ -157,79 +271,70 @@ export function parseBoardingPass(
 
   const text = located.text.padEnd(BCBP_MANDATORY_LENGTH, " ");
   const formatCode = text.slice(0, 1);
-  const legCount = Number(text.slice(1, 2));
+  const legCountRaw = text.slice(1, 2).trim();
+  const declaredLegCount = Number(legCountRaw);
+  const legCountValid =
+    /^\d$/.test(legCountRaw) &&
+    declaredLegCount >= 1 &&
+    declaredLegCount <= BCBP_MAX_LEGS;
+  const expectedLegCount = legCountValid ? declaredLegCount : 1;
   const passengerName = text.slice(2, 22).trim().replace(/0+$/, "");
-  const pnr = normalizePnr(text.slice(23, 30));
-  const origin = text.slice(30, 33).trim().toUpperCase();
-  const destination = text.slice(33, 36).trim().toUpperCase();
-  const airlineCode = text.slice(36, 39).trim().toUpperCase();
-  const flightNumber = normalizeFlightNumber(text.slice(39, 44));
-  const julianRaw = text.slice(44, 47).trim();
-  const julianDate = Number(julianRaw);
-  const compartment = text.slice(47, 48).trim().toUpperCase();
-  const seatNumber = normalizeSeat(text.slice(48, 52));
-  const sequenceRaw = text.slice(52, 56).trim();
-  const sequenceNumber = /^\d{1,4}$/.test(sequenceRaw)
-    ? String(Number(sequenceRaw))
-    : null;
-  const passengerStatus = text.slice(56, 57).trim();
-  // Optional check-in source follows the passenger status in M1 data. It is
-  // not mandatory, so a missing byte is not a failure.
-  const checkInSource = text.slice(58, 59).trim() || null;
+  // Check-in source lives in the packed conditional/airline variable data, not
+  // at a universal fixed offset. It stays null rather than exposing a hex
+  // field-size byte as if it were a source.
+  const checkInSource = null;
 
   if (formatCode !== "M") warnings.push("Format code is not M (M1).");
-  if (!Number.isInteger(legCount) || legCount < 1) {
-    warnings.push("Leg count is missing or invalid.");
-  } else if (legCount > 1) {
-    warnings.push("Multi-leg pass; only the first leg is parsed.");
-  }
+  if (!legCountValid) warnings.push("Leg count is missing or invalid.");
   if (!passengerName) warnings.push("Passenger name is missing.");
-  if (!pnr) warnings.push("Record locator (PNR) is missing.");
-  if (!/^[A-Z]{3}$/.test(origin)) warnings.push("Origin is not a 3-letter IATA code.");
-  if (!/^[A-Z]{3}$/.test(destination)) warnings.push("Destination is not a 3-letter IATA code.");
-  if (!/^[A-Z0-9]{2,3}$/.test(airlineCode)) warnings.push("Operating carrier is missing.");
-  if (!flightNumber) warnings.push("Flight number is missing.");
-  if (!Number.isInteger(julianDate) || julianDate < 1 || julianDate > 366) {
-    warnings.push("Julian operating date is invalid.");
+
+  const legs: BoardingPassLeg[] = [];
+  const first = parseLegBlock(text, FIRST_LEG_OFFSET, 0, options.now);
+  legs.push(first.leg);
+  warnings.push(...first.leg.warnings);
+
+  let cursor =
+    FIRST_LEG_OFFSET + LEG_BLOCK_LENGTH + (first.variableDataSize ?? 0);
+  for (let index = 1; index < expectedLegCount; index += 1) {
+    if (!text.slice(cursor).trim()) {
+      warnings.push(`Leg ${index + 1} is missing or truncated.`);
+      break;
+    }
+    const parsed = parseLegBlock(text, cursor, index, options.now);
+    legs.push(parsed.leg);
+    warnings.push(...parsed.leg.warnings);
+    cursor += LEG_BLOCK_LENGTH + (parsed.variableDataSize ?? 0);
   }
-  if (!seatNumber) warnings.push("Seat number is missing or malformed.");
+  if (legs.length < expectedLegCount) {
+    warnings.push(
+      `Multi-leg pass declares ${expectedLegCount} legs; only ${legs.length} could be parsed.`,
+    );
+  }
 
-  const flightDate =
-    Number.isInteger(julianDate) && julianDate >= 1 && julianDate <= 366
-      ? resolveJulianFlightDate(julianDate, options.now)
-      : null;
-
+  const firstLeg = legs[0]!;
   const valid =
     Boolean(passengerName) &&
-    /^[A-Z]{3}$/.test(origin) &&
-    /^[A-Z]{3}$/.test(destination) &&
-    /^[A-Z0-9]{2,3}$/.test(airlineCode) &&
-    Boolean(flightNumber) &&
-    flightDate != null;
-
-  if (passengerStatus && !/[A-Z]/.test(passengerStatus)) {
-    warnings.push("Passenger status is malformed.");
-  }
+    legCountValid &&
+    legs.length === expectedLegCount &&
+    legs.every((leg) => leg.valid);
 
   return {
     raw,
     format: options.format ?? "UNKNOWN",
     passengerName,
-    pnr,
-    airlineCode,
-    flightNumber: flightNumber ?? "",
-    julianDate:
-      Number.isInteger(julianDate) && julianDate >= 1 && julianDate <= 366
-        ? julianDate
-        : 1,
-    flightDate,
-    origin,
-    destination,
-    seatNumber,
-    cabinClass: compartment ? (CABIN_BY_CODE[compartment] ?? compartment) : null,
+    pnr: firstLeg.pnr,
+    airlineCode: firstLeg.airlineCode,
+    flightNumber: firstLeg.flightNumber,
+    julianDate: firstLeg.julianDate ?? 1,
+    flightDate: firstLeg.flightDate,
+    origin: firstLeg.origin,
+    destination: firstLeg.destination,
+    seatNumber: firstLeg.seatNumber,
+    cabinClass: firstLeg.cabinClass,
     boardingGroup: null,
-    sequenceNumber,
+    sequenceNumber: firstLeg.sequenceNumber,
     checkInSource,
+    legs,
     valid,
     warnings,
   };
@@ -241,7 +346,9 @@ export function boardingPassFlightQuery(pass: BoardingPassData): {
   date: string | null;
 } {
   return {
-    flightNumber: `${pass.airlineCode}${pass.flightNumber}`.replace(/\s+/g, "").toUpperCase(),
+    flightNumber: `${pass.airlineCode}${pass.flightNumber}`
+      .replace(/\s+/g, "")
+      .toUpperCase(),
     date: pass.flightDate,
   };
 }

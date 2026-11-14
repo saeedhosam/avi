@@ -1,4 +1,4 @@
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod, ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
@@ -8,6 +8,9 @@ import {
   createPolarCheckout,
   planPatchFromPolarWebhook,
   planPatchFromWebhook,
+  tripPassCheckoutUrl,
+  tripPassFromPolarWebhook,
+  tripPassFromWebhook,
   verifyLemonSqueezySignature,
   verifyPolarSignature,
   type PolarWebhookEvent,
@@ -36,6 +39,12 @@ const checkoutAccepted = z.object({
 const checkoutUnavailable = z.object({
   error: z.string(),
   message: z.string(),
+});
+
+const tripPassCheckout = z.object({
+  url: z.string(),
+  provider: z.enum(["manual", "lemon_squeezy", "polar"]),
+  durationDays: z.number().int().positive(),
 });
 
 /**
@@ -69,6 +78,51 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
     );
     return response.ok;
   };
+
+  /**
+   * Trip-pass checkout is a static hosted URL. It is available regardless of
+   * the subscription provider, but never pretends to be configured: unset →
+   * explicit 503, and no route grants the entitlement from a client request.
+   * Both GET and POST are accepted so older clients and checkout buttons can
+   * use the same seam without a provider-specific payload.
+   */
+  const tripPassHandler = async (
+    _request: FastifyRequest,
+    reply: FastifyReply,
+  ) => {
+    const url = tripPassCheckoutUrl(config);
+    if (!url) {
+      return reply.code(503).send({
+        error: "trip_pass_not_configured",
+        message:
+          "Trip-pass checkout isn't configured yet. Set TRIP_PASS_CHECKOUT_URL on the API.",
+      });
+    }
+    return {
+      url,
+      provider: config.BILLING_PROVIDER,
+      durationDays: config.TRIP_PASS_DURATION_DAYS,
+    };
+  };
+  const tripPassSchema = {
+    tags: ["billing"],
+    summary: "Configured $4.99 trip-pass checkout URL",
+    response: {
+      200: tripPassCheckout,
+      503: checkoutUnavailable,
+    },
+  };
+
+  app.get(
+    "/v1/billing/trip-pass",
+    { schema: tripPassSchema },
+    tripPassHandler,
+  );
+  app.post(
+    "/v1/billing/trip-pass",
+    { schema: tripPassSchema },
+    tripPassHandler,
+  );
 
   if (config.BILLING_PROVIDER === "manual") {
     // Advertised as unavailable so the UI can say "contact support" cleanly.
@@ -145,7 +199,8 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           return reply.code(200).send();
         }
         const patch = planPatchFromWebhook(payload, config);
-        if (!patch) {
+        const tripPass = tripPassFromWebhook(payload, config);
+        if (!patch && !tripPass) {
           return reply.code(200).send();
         }
 
@@ -157,16 +212,36 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           return reply.code(200).send();
         }
 
-        const applied = await applyPlanPatch(uid, patch);
-        if (!applied) {
-          request.log.error({ event: payload.meta?.event_name }, "billing webhook: plan write failed");
-          // Non-2xx makes Lemon Squeezy retry the delivery.
-          return reply.code(500).send({ error: "plan_update_failed" });
+        if (patch) {
+          const applied = await applyPlanPatch(uid, patch);
+          if (!applied) {
+            request.log.error({ event: payload.meta?.event_name }, "billing webhook: plan write failed");
+            // Non-2xx makes Lemon Squeezy retry the delivery.
+            return reply.code(500).send({ error: "plan_update_failed" });
+          }
+          request.log.info(
+            { uid: uid.slice(0, 8), plan: patch.plan },
+            "billing webhook updated plan",
+          );
         }
-        request.log.info(
-          { uid: uid.slice(0, 8), plan: patch.plan },
-          "billing webhook updated plan",
-        );
+        if (tripPass) {
+          try {
+            const expiresAt = await supabaseServer.grantTripPass(
+              uid,
+              tripPass.durationDays,
+            );
+            request.log.info(
+              { uid: uid.slice(0, 8), expiresAt },
+              "billing webhook granted trip pass",
+            );
+          } catch (grantError) {
+            request.log.error(
+              { err: grantError, event: payload.meta?.event_name },
+              "billing webhook: trip pass grant failed",
+            );
+            return reply.code(500).send({ error: "trip_pass_update_failed" });
+          }
+        }
         if (eventId) {
           try {
             await supabaseServer.recordWebhookEvent("lemon_squeezy", eventId);
@@ -239,7 +314,8 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
         }
 
         const patch = planPatchFromPolarWebhook(payload as PolarWebhookEvent, config);
-        if (!patch) {
+        const tripPass = tripPassFromPolarWebhook(payload as PolarWebhookEvent, config);
+        if (!patch && !tripPass) {
           return reply.code(200).send();
         }
 
@@ -258,19 +334,39 @@ export const billingRoutes: FastifyPluginAsyncZod<BillingOptions> = async (
           return reply.code(200).send();
         }
 
-        const applied = await applyPlanPatch(uid, patch);
-        if (!applied) {
-          request.log.error(
-            { type: (payload as PolarWebhookEvent).type },
-            "polar webhook: plan write failed",
+        if (patch) {
+          const applied = await applyPlanPatch(uid, patch);
+          if (!applied) {
+            request.log.error(
+              { type: (payload as PolarWebhookEvent).type },
+              "polar webhook: plan write failed",
+            );
+            // Non-2xx makes Polar retry the delivery.
+            return reply.code(500).send({ error: "plan_update_failed" });
+          }
+          request.log.info(
+            { uid: uid.slice(0, 8), plan: patch.plan, type: (payload as PolarWebhookEvent).type },
+            "polar webhook updated plan",
           );
-          // Non-2xx makes Polar retry the delivery.
-          return reply.code(500).send({ error: "plan_update_failed" });
         }
-        request.log.info(
-          { uid: uid.slice(0, 8), plan: patch.plan, type: (payload as PolarWebhookEvent).type },
-          "polar webhook updated plan",
-        );
+        if (tripPass) {
+          try {
+            const expiresAt = await supabaseServer.grantTripPass(
+              uid,
+              tripPass.durationDays,
+            );
+            request.log.info(
+              { uid: uid.slice(0, 8), expiresAt },
+              "polar webhook granted trip pass",
+            );
+          } catch (grantError) {
+            request.log.error(
+              { err: grantError, type: (payload as PolarWebhookEvent).type },
+              "polar webhook: trip pass grant failed",
+            );
+            return reply.code(500).send({ error: "trip_pass_update_failed" });
+          }
+        }
         if (eventId) {
           try {
             await supabaseServer.recordWebhookEvent("polar", eventId);

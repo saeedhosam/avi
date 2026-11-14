@@ -1,9 +1,12 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeftRight,
+  ArrowUpRight,
+  Globe2,
   Loader2,
   MapPin,
   Maximize2,
@@ -550,7 +553,9 @@ function RoutesContent() {
     if (initialMountRef.current) return;
     initialMountRef.current = true;
 
-    const hub = searchParams.get("hub");
+    // `origin` is accepted as a legacy alias: the explorer used to link here
+    // with `origin=<IATA>` before the shared hub parameter was standardised.
+    const hub = searchParams.get("hub") ?? searchParams.get("origin");
     const dest = searchParams.get("dest");
     const initialAirline = searchParams.get("airline");
     const initialHaul = searchParams.get("haul") as HaulCategory | null;
@@ -726,10 +731,34 @@ function RoutesContent() {
     (airlineCode ? 1 : 0) + (haul !== "ALL" ? 1 : 0) + (region !== "ALL" ? 1 : 0);
   const hasFilters = activeFilterCount > 0;
   const hubResults = useMemo(() => searchAirportNodes(hubQuery), [hubQuery]);
+  const explorerHref = originIata ? `/explore/${originIata}` : "/explore/CAI";
 
   return (
     <div className="mx-auto max-w-[1680px] px-2 py-2 sm:px-3 sm:py-3 lg:px-5">
-      <div className="relative h-[calc(100vh-140px)] min-h-[520px] sm:min-h-160 overflow-hidden rounded-xl border border-line">
+      {/*
+        Deliberate consolidation: the shared explorer owns the globe, airline
+        filters, and arrival weather. This page keeps the working airport board,
+        live timetable, and pivot history that /explore does not replace yet.
+      */}
+      <div className="mb-2 flex flex-col gap-2 rounded-xl border border-accent/35 bg-accent-soft px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2">
+          <Globe2 className="mt-0.5 size-4 shrink-0 text-accent" />
+          <p className="text-[11px] leading-relaxed text-muted">
+            <span className="font-bold text-ink">Looking for the shared globe?</span>{" "}
+            The AeroQuest explorer has airline filters and arrival weather. This
+            planner stays available for the live airport board and timetable.
+          </p>
+        </div>
+        <Link
+          href={explorerHref}
+          className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-accent/50 bg-surface px-3 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent hover:text-[color:var(--bg)]"
+        >
+          Open route explorer
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      </div>
+
+      <div className="relative h-[calc(100vh-196px)] min-h-[520px] sm:min-h-160 overflow-hidden rounded-xl border border-line">
         <OsmRouteMap
           connections={filteredConnections}
           origin={summary.originAirport}

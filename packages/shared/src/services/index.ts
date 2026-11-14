@@ -2,6 +2,7 @@ export * from "./geodesic.js";
 export * from "./flightStateDiffer.js";
 export * from "./weatherService.js";
 export * from "./terminalNavigation.js";
+export * from "./osmIndoorGraph.js";
 export * from "./cabinLayouts.js";
 export * from "./boardingPassParser.js";
 export * from "./inflight.js";

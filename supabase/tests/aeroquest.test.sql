@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(14);
 
 -- AeroQuest tables must all have RLS enabled.
 select is(
@@ -31,6 +31,18 @@ select is(
   (select relrowsecurity from pg_class where oid = 'public.passport_aircraft_visits'::regclass),
   true,
   'passport_aircraft_visits has RLS enabled'
+);
+
+select is(
+  (select relrowsecurity from pg_class where oid = 'public.expo_push_receipts'::regclass),
+  true,
+  'expo_push_receipts has RLS enabled'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.expo_push_receipts', 'SELECT'),
+  false,
+  'authenticated cannot read Expo push receipts'
 );
 
 -- Reference data is intentionally public.

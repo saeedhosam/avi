@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
 import {
   gatewayRoutesResponseSchema,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/maplibre";
 import { routeCoordinates } from "@/lib/geo";
 import { cn } from "@/lib/utils";
+import { UpgradeCta } from "@/components/upgrade-cta";
 
 const HAUL_COLORS: Record<string, string> = {
   SHORT_HAUL: "#34d399",
@@ -37,15 +39,31 @@ export interface ExploreGlobeProps {
   iata: string;
   airportName: string;
   city: string;
+  /**
+   * Route network rendered by the server. `null` means the gateway was
+   * unconfigured or unreachable; the client then retries on mount.
+   */
+  initialRoutes?: DirectFlightConnection[] | null;
 }
 
-export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
-  const [connections, setConnections] = useState<DirectFlightConnection[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ExploreGlobe({
+  iata,
+  airportName,
+  city,
+  initialRoutes,
+}: ExploreGlobeProps) {
+  const seededCount = initialRoutes?.length ?? 0;
+  const [connections, setConnections] = useState<DirectFlightConnection[]>(
+    initialRoutes ?? [],
+  );
+  const [loading, setLoading] = useState(seededCount === 0);
   const [error, setError] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
   const [airline, setAirline] = useState<string | null>(null);
   const [haul, setHaul] = useState<HaulCategory>("ALL");
-  const [selected, setSelected] = useState<DirectFlightConnection | null>(null);
+  const [selected, setSelected] = useState<DirectFlightConnection | null>(
+    initialRoutes?.[0] ?? null,
+  );
   const [weather, setWeather] = useState<DestinationArrivalForecast | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const { containerRef, map } = useMapLibre({
@@ -56,6 +74,11 @@ export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
   });
 
   useEffect(() => {
+    // The server already supplied cached gateway data for this render. Only
+    // refetch after the user asks (refresh button) or when the first render
+    // was an honest empty/unavailable state.
+    if (refreshToken === 0 && seededCount > 0) return;
+
     let active = true;
     setLoading(true);
     setError(null);
@@ -81,7 +104,11 @@ export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
       .then((routes) => {
         if (!active) return;
         setConnections(routes);
-        setSelected((current) => current ?? routes[0] ?? null);
+        setSelected((current) =>
+          current && routes.some((route) => route.id === current.id)
+            ? current
+            : routes[0] ?? null,
+        );
       })
       .catch((cause: unknown) => {
         if (active) {
@@ -98,7 +125,7 @@ export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
     return () => {
       active = false;
     };
-  }, [iata]);
+  }, [iata, refreshToken, seededCount]);
 
   const origin = connections[0]?.origin ?? null;
 
@@ -354,10 +381,19 @@ export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
               {origin ? `${origin.city} (${origin.iata})` : city}
             </p>
             <p className="text-[10px] text-subtle">
-              {loading
+              {loading && connections.length === 0
                 ? "Loading direct network…"
                 : `${visible.length} of ${connections.length} direct destinations`}
             </p>
+            <button
+              type="button"
+              onClick={() => setRefreshToken((value) => value + 1)}
+              disabled={loading}
+              className="pointer-events-auto mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] text-accent transition-colors hover:text-ink disabled:opacity-50"
+            >
+              <RefreshCw className={cn("size-2.5", loading && "animate-spin")} />
+              Refresh
+            </button>
           </div>
           <div className="pointer-events-auto flex max-w-[70%] flex-wrap justify-end gap-1.5">
             {(["ALL", "SHORT_HAUL", "MEDIUM_HAUL", "LONG_HAUL"] as HaulCategory[]).map(
@@ -514,6 +550,11 @@ export function ExploreGlobe({ iata, airportName, city }: ExploreGlobeProps) {
             unavailable. AeroQuest never fills them with a guessed value.
           </p>
         </section>
+
+        <UpgradeCta
+          title="Keep the globe. Unlock the trip."
+          body="The route explorer stays free. AeroQuest Pro or the $4.99 Single-Trip Pass adds live tracking, saved trip cabins, Sprint Mode, and the offline in-flight HUD."
+        />
       </div>
     </div>
   );

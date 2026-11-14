@@ -20,6 +20,7 @@ import {
   recordFogVisit,
   type AirportTerminalLayout,
   type AmenityCategory,
+  type Flight,
   type FogOfWarState,
   type PointF,
   type TerminalAmenity,
@@ -37,8 +38,17 @@ import {
   Subtitle,
   Title,
 } from "../../src/components/ui";
+import { useAuth } from "../../src/lib/auth";
+import {
+  displayText,
+  formatClock,
+  statusLabel,
+  statusTone,
+} from "../../src/lib/flightDisplay";
 import { recordPassportVisit } from "../../src/lib/passport";
 import { COLORS } from "../../src/lib/theme";
+import { getTrackedFlight } from "../../src/lib/trackedFlights";
+import OsmTerminalGraphScreen from "./OsmTerminalGraphScreen";
 
 const LAYOUTS = (terminalLayoutsJson as unknown[])
   .map((layout) => airportTerminalLayoutSchema.safeParse(layout))
@@ -58,17 +68,58 @@ function iso(point: PointF): [number, number] {
 export default function TerminalMapScreen() {
   const params = useLocalSearchParams() as {
     iata?: string;
+    terminal?: string;
+    flightId?: string;
     arrivalGate?: string;
     departureGate?: string;
     arrivalTime?: string;
     boardingTime?: string;
   };
-  const airportCode = (params.iata ?? "JFK").toUpperCase();
+  const flightId = params.flightId?.trim() ?? "";
+  const { configured, user } = useAuth();
+  const [flightContext, setFlightContext] = useState<Flight | null>(null);
+  const [flightContextState, setFlightContextState] = useState<
+    "idle" | "loading" | "found" | "missing"
+  >("idle");
+
+  useEffect(() => {
+    if (!flightId) {
+      setFlightContext(null);
+      setFlightContextState("idle");
+      return;
+    }
+    let active = true;
+    setFlightContext(null);
+    setFlightContextState("loading");
+    getTrackedFlight(flightId)
+      .then((entry) => {
+        if (!active) return;
+        if (entry) {
+          setFlightContext(entry.flight);
+          setFlightContextState("found");
+        } else {
+          setFlightContext(null);
+          setFlightContextState("missing");
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setFlightContext(null);
+        setFlightContextState("missing");
+      });
+    return () => {
+      active = false;
+    };
+  }, [flightId]);
+
+  const airportCode = (
+    params.iata ??
+    flightContext?.origin.code ??
+    "JFK"
+  ).toUpperCase();
   const layout = useMemo<AirportTerminalLayout | null>(
     () =>
-      LAYOUTS.find((candidate) => candidate.airportCode === airportCode) ??
-      LAYOUTS.find((candidate) => candidate.airportCode === "JFK") ??
-      null,
+      LAYOUTS.find((candidate) => candidate.airportCode === airportCode) ?? null,
     [airportCode],
   );
   const [level, setLevel] = useState<number>(layout?.availableLevels[0] ?? 1);
@@ -115,30 +166,81 @@ export default function TerminalMapScreen() {
     }
   }, [nearest]);
 
-  const sprint = useMemo(() => {
-    if (
-      !layout ||
-      !graph ||
-      !params.arrivalGate ||
-      !params.departureGate ||
-      !params.arrivalTime ||
-      !params.boardingTime
-    ) {
+  const sprintInput = useMemo(() => {
+    const arrivalGate = params.arrivalGate?.trim();
+    const departureGate =
+      params.departureGate?.trim() || flightContext?.gateDeparture?.trim();
+    const arrivalTime = params.arrivalTime?.trim();
+    const boardingTime = params.boardingTime?.trim();
+    if (!arrivalGate || !departureGate || !arrivalTime || !boardingTime) {
       return null;
     }
+    return { arrivalGate, departureGate, arrivalTime, boardingTime };
+  }, [
+    flightContext,
+    params.arrivalGate,
+    params.arrivalTime,
+    params.boardingTime,
+    params.departureGate,
+  ]);
+
+  const sprintMissingFields = useMemo(() => {
+    const missing: string[] = [];
+    if (!params.arrivalGate?.trim()) missing.push("arrival gate");
+    if (!(params.departureGate?.trim() || flightContext?.gateDeparture?.trim())) {
+      missing.push("departure gate");
+    }
+    if (!params.arrivalTime?.trim()) missing.push("arrival time");
+    if (!params.boardingTime?.trim()) missing.push("boarding time");
+    return missing;
+  }, [
+    flightContext,
+    params.arrivalGate,
+    params.arrivalTime,
+    params.boardingTime,
+    params.departureGate,
+  ]);
+
+  const partialConnection = [
+    params.arrivalGate,
+    params.departureGate,
+    params.arrivalTime,
+    params.boardingTime,
+  ].some((value) => Boolean(value?.trim()));
+
+  const sprint = useMemo(() => {
+    if (!layout || !graph || !sprintInput) return null;
     return evaluateSprintMode({
       layout,
       graph,
-      arrivalGate: params.arrivalGate,
-      departureGate: params.departureGate,
-      arrivalTime: params.arrivalTime,
-      boardingTime: params.boardingTime,
+      ...sprintInput,
     });
-  }, [layout, graph, params]);
+  }, [layout, graph, sprintInput]);
 
   const activeRoute = sprint?.active ? sprint.route : route;
+  const awaitingFlightContext = Boolean(
+    flightId && flightContextState === "loading" && !params.iata,
+  );
+
+  if (awaitingFlightContext) {
+    return (
+      <Screen>
+        <Title>Terminal map</Title>
+        <Subtitle>Loading the tracked-flight context from the local cache…</Subtitle>
+      </Screen>
+    );
+  }
 
   if (!layout || !floor || !graph) {
+    const ingestedTerminal = params.terminal?.trim();
+    if (ingestedTerminal) {
+      const normalized = /^\d+$/.test(ingestedTerminal)
+        ? `T${ingestedTerminal}`
+        : ingestedTerminal.toUpperCase();
+      return (
+        <OsmTerminalGraphScreen iata={airportCode} terminal={normalized} />
+      );
+    }
     return (
       <Screen>
         <Title>Terminal map unavailable</Title>
@@ -146,6 +248,13 @@ export default function TerminalMapScreen() {
           No curated indoor layout exists for {airportCode}. AeroQuest does not
           substitute another airport&apos;s terminal.
         </Subtitle>
+        <Card>
+          <Label>Ingested OSM graphs</Label>
+          <Subtitle>
+            Open this screen with a terminal id (for example T3) to use an
+            ingested OpenStreetMap indoor graph when one exists.
+          </Subtitle>
+        </Card>
       </Screen>
     );
   }
@@ -189,6 +298,63 @@ export default function TerminalMapScreen() {
         are approximate and not certified navigation.
       </Subtitle>
 
+      {flightContext ? (
+        <Card>
+          <Row style={{ justifyContent: "space-between" }}>
+            <View style={{ flex: 1 }}>
+              <Label>Tracked flight context</Label>
+              <Text style={styles.contextFlight}>
+                {flightContext.flightNumber}
+              </Text>
+              <Text style={styles.note}>
+                {flightContext.origin.code} → {flightContext.destination.code}
+              </Text>
+            </View>
+            <Badge tone={statusTone(flightContext)}>
+              {statusLabel(flightContext)}
+            </Badge>
+          </Row>
+          <Row>
+            <Stat
+              label="Departure terminal"
+              value={displayText(flightContext.terminalDeparture)}
+            />
+            <Stat
+              label="Departure gate"
+              value={displayText(flightContext.gateDeparture)}
+            />
+            <Stat
+              label="Estimated"
+              value={formatClock(flightContext.departureTimeEstimated)}
+            />
+          </Row>
+          {flightContext.origin.code !== airportCode ? (
+            <Text style={styles.note}>
+              The cached flight departs {flightContext.origin.code}, not{" "}
+              {airportCode}. Its gate is not placed on this map.
+            </Text>
+          ) : null}
+          {layout &&
+          flightContext.terminalDeparture.trim() &&
+          flightContext.terminalDeparture.trim().toUpperCase() !==
+            layout.terminalId.toUpperCase() ? (
+            <Text style={styles.note}>
+              This map covers terminal {layout.terminalId}; the flight reports
+              terminal {flightContext.terminalDeparture}. No gate pin is
+              fabricated.
+            </Text>
+          ) : null}
+        </Card>
+      ) : flightContextState === "missing" ? (
+        <Card>
+          <Label>Tracked flight unavailable</Label>
+          <Text style={styles.note}>
+            The requested flight is not in the local tracked-flight cache, so no
+            gate or connection context is shown.
+          </Text>
+        </Card>
+      ) : null}
+
       {sprint?.active ? (
         <Card style={styles.sprintCard}>
           <Row style={{ justifyContent: "space-between" }}>
@@ -203,6 +369,23 @@ export default function TerminalMapScreen() {
           <Text style={styles.sprintDetail}>{sprint.detail}</Text>
           <Text style={styles.sprintGates}>
             {sprint.arrivalGate} → {sprint.departureGate}
+          </Text>
+        </Card>
+      ) : sprint ? (
+        <Card>
+          <Label>Connection timing</Label>
+          <Text style={styles.contextFlight}>{sprint.headline}</Text>
+          <Text style={styles.note}>{sprint.detail}</Text>
+          <Text style={styles.sprintGates}>
+            {sprint.arrivalGate} → {sprint.departureGate}
+          </Text>
+        </Card>
+      ) : partialConnection && sprintMissingFields.length ? (
+        <Card style={styles.contextWarning}>
+          <Label>Connection context incomplete</Label>
+          <Text style={styles.note}>
+            Missing {sprintMissingFields.join(", ")}. Sprint Mode never estimates
+            a gate or boarding time.
           </Text>
         </Card>
       ) : null}
@@ -448,18 +631,23 @@ export default function TerminalMapScreen() {
           {fog.badges.length ? ` Badges: ${fog.badges.join(", ")}.` : ""}
         </Subtitle>
         <Text style={styles.note}>
-          Persisted passport visits require Supabase sign-in; this screen keeps
-          the current session state offline.
+          {user
+            ? `Signed in as ${user.email ?? "your account"}. New visits are sent to the passport sync endpoint in the background.`
+            : configured
+              ? "Sign in from Account to persist visits across devices. This session still tracks local fog-of-war."
+              : "Supabase is not configured, so passport visits stay local to this session."}
         </Text>
       </Card>
 
-      {!sprint ? (
+      {!sprint && !partialConnection ? (
         <Card>
           <Label>Tight-Connection Sprint Mode</Label>
           <Subtitle>
-            Open the terminal map from a connection alert with arrival gate,
-            departure gate, arrival time, and boarding time. Under 45 minutes,
-            this screen switches to the high-contrast sprint HUD.
+            Open the terminal map from a flight detail or connection alert with
+            arrival gate, departure gate, arrival time, and boarding time. A
+            tracked flight can supply only its own departure gate; the inbound
+            gate and times must be explicit. Under 45 minutes, this screen
+            switches to the high-contrast sprint HUD.
           </Subtitle>
         </Card>
       ) : null}
@@ -486,6 +674,13 @@ const styles = StyleSheet.create({
   sprintTitle: { color: COLORS.white, fontSize: 22, fontWeight: "900" },
   sprintDetail: { color: COLORS.amber, fontSize: 13, fontWeight: "600" },
   sprintGates: { color: COLORS.muted, fontSize: 12, letterSpacing: 1 },
+  contextFlight: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  contextWarning: { borderColor: COLORS.amber, backgroundColor: "#1a1408" },
   level: {
     borderRadius: 9,
     borderWidth: 1,

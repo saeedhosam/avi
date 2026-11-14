@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ArrowLeft, Globe2, MapPin } from "lucide-react";
 import { ExploreGlobe } from "@/components/explore-globe";
 import { findAirportNode } from "@/lib/data";
+import { getExploreRoutes } from "@/lib/explore-routes.server";
 
 const HUBS = ["CAI", "DXB", "LHR", "JFK", "IST", "DOH", "FRA", "CDG", "JED", "SIN", "HND", "SFO"];
 
@@ -62,6 +63,12 @@ async function ExploreContent({ params }: Props) {
   const node = findAirportNode(code);
   if (!node) notFound();
 
+  // Server-render the gateway route network so the static shell has real
+  // destination content for SEO. A `null` result means the gateway is
+  // unavailable or unconfigured; the client retries and shows an honest
+  // unavailable state rather than a bundled static route dataset.
+  const initialRoutes = await getExploreRoutes(code);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -100,10 +107,10 @@ async function ExploreContent({ params }: Props) {
               <MapPin className="size-3" /> {node.city}, {node.country}
             </span>
             <Link
-              href={`/routes?origin=${code}`}
+              href={`/routes?hub=${code}`}
               className="rounded-full border border-line px-2.5 py-1 font-semibold text-ink hover:border-accent/50"
             >
-              Open full route planner
+              Open airport board &amp; planner
             </Link>
             <Link
               href="/search"
@@ -123,7 +130,13 @@ async function ExploreContent({ params }: Props) {
           </p>
         </div>
       </header>
-      <ExploreGlobe iata={code} airportName={node.name} city={node.city} />
+      <ExploreGlobe
+        key={code}
+        iata={code}
+        airportName={node.name}
+        city={node.city}
+        initialRoutes={initialRoutes}
+      />
     </>
   );
 }

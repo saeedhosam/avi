@@ -4,6 +4,10 @@ import {
   type AircraftCabinLayout,
 } from "./cabin.js";
 import {
+  terminalSpatialGraphSchema,
+  type TerminalSpatialGraph,
+} from "./terminalMap.js";
+import {
   flightSchema,
   type AircraftInfo,
   type Airport,
@@ -390,6 +394,23 @@ export interface GatewayAircraftResponse {
   layout: AircraftCabinLayout | null;
   provenance: GatewayProvenance;
 }
+
+export interface GatewayTerminalGraphResponse {
+  airportCode: string;
+  terminalId: string;
+  graph: TerminalSpatialGraph;
+  source: "osm_indoor" | "curated" | "parametric";
+  fetchedAt: string;
+}
+
+export const gatewayTerminalGraphResponseSchema: z.ZodType<GatewayTerminalGraphResponse> =
+  z.object({
+    airportCode: z.string().length(3),
+    terminalId: z.string(),
+    graph: terminalSpatialGraphSchema,
+    source: z.enum(["osm_indoor", "curated", "parametric"]),
+    fetchedAt: z.string(),
+  });
 
 export const gatewayAircraftResponseSchema: z.ZodType<GatewayAircraftResponse> =
   z.object({

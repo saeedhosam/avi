@@ -60,6 +60,7 @@ shared cache and request coalescing:
 | `GET /api/gateway/airports/:iata/routes` | 7 days | Direct-route explorer; statistics are trailing 7-day averages, never a forward schedule |
 | `GET /api/gateway/airports/:iata/board` | 10 minutes | FIDS + Open-Meteo current weather merge |
 | `GET /api/gateway/aircraft/:regOrIcao` | 30+ days | Aircraft metadata + cached parametric cabin layout |
+| `GET /api/gateway/airports/:iata/terminal-graph` | 1 hour | Ingested OSM indoor graph for one terminal; no cross-airport fallback |
 
 Every response carries provenance (`source`, `fetchedAt`, `cached`, `stale`,
 `cacheAgeSeconds`, `ttlSeconds`). Failure and empty outcomes are never cached or
@@ -100,6 +101,10 @@ indoor tags into the `terminal_graphs` table:
 pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3 --radius=2500
 ```
 
+The gateway exposes the result at
+`/api/gateway/airports/:iata/terminal-graph`; the mobile terminal screen uses it
+as a fallback when no curated layout exists and a terminal id is supplied.
+
 ### 4. Boarding Pass Scanner + AR Carry-On Sizer
 BCBP (IATA Resolution 792) data from PDF417/Aztec/QR is parsed **on-device** by
 `packages/shared/src/services/boardingPassParser.ts`: PNR, flight, Julian date,
@@ -120,6 +125,14 @@ timeline and offline landmark callouts.
 - `$4.99 Single-Trip Pass`: trip-scoped access to the Pro travel features.
 - Contextual cards only: a 2h+ delay shows a lounge affiliate hook; a landed
   international flight shows an eSIM hook. No banner ads.
+- `/pricing` presents the plans; checkout stays explicitly unavailable until a
+  provider or hosted trip-pass URL is configured.
+
+### Mobile account and flights
+The Expo app has email/password Supabase auth, session refresh, Expo push
+registration after sign-in, a flight lookup/airport board screen, tracked-flight
+offline snapshots, and a flight dossier with Terminal Map / Offline HUD actions.
+Passport visits sync when signed in and remain local when offline.
 
 ---
 
