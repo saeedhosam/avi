@@ -207,12 +207,13 @@ Expected current results:
 - `@avi/mobile`: `tsc --noEmit` succeeds
 - `@avi/ui`: `tsc --noEmit` succeeds
 
-Before deploying, apply the new migration:
+Before deploying, apply the new migrations:
 
 ```bash
-supabase db push
+npx supabase@3.1.0 db push --remote --yes
 ```
 
+Applied to the linked `avi` project on 2026-11-14 and verified `upToDate: true`.
 Migration: `supabase/migrations/20261114000100_aeroquest_gateway.sql`
 (terminal alert type, `trip_pass_expires_at`, `cabin_layouts`, `gateway_cache`,
 `passport_visits`, `passport_aircraft_visits`) and

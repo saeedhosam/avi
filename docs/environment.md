@@ -56,7 +56,7 @@ gateway exclusively.
 
 | Variable | Local value | Production |
 | --- | --- | --- |
-| `AVI_API_BASE_URL` (web) | `http://localhost:8080` | `https://api.codestep.org` or the staging API |
+| `AVI_API_BASE_URL` (web) | `http://localhost:8080` (or `:8180` if 8080 is occupied) | `https://api.codestep.org` or the staging API |
 | `EXPO_PUBLIC_AEROQUEST_API_URL` (mobile) | staging/LAN gateway URL | Hetzner gateway HTTPS URL |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated production web origins |
 | `PUBLIC_WEB_URL` | `http://localhost:3000` | Production web origin |
@@ -67,6 +67,10 @@ gateway exclusively.
 
 `REDIS_URL` empty means the gateway uses its per-process L1 cache. With Redis
 set, all replicas share the cache and single-flight locks.
+
+If port `8080` is already occupied on your machine, change `PORT` in
+`services/api/.env` and point `AVI_API_BASE_URL` in `apps/web/.env.local` at the
+same port (for example `8180`).
 
 ---
 
