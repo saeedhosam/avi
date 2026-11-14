@@ -439,7 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           Notification.permission === "granted"
         ) {
           try {
-            new Notification(`Avi · ${alert.flightNumber}`, {
+            new Notification(`AeroQuest · ${alert.flightNumber}`, {
               body: alert.message,
               tag: alert.id,
             });
@@ -786,7 +786,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [account.uid]);
 
   // Opens the hosted Lemon Squeezy checkout for a plan upgrade. Card data
-  // never touches Avi; the webhook assigns profiles.plan after payment.
+  // never touches AeroQuest; the webhook assigns profiles.plan after payment.
   const startUpgrade = useCallback(
     async (target: "PLUS" | "PRO") => {
       const supabase = getSupabase();
@@ -851,7 +851,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await signOutSupabase();
       setAccount({ ...GUEST_ACCOUNT, isOfflineMode: false });
       setAccountUsage(null);
-      notify("Account deleted. Your data has been erased from Avi.", "success");
+      notify("Account deleted. Your data has been erased from AeroQuest.", "success");
     } catch {
       notify("Account deletion could not be completed. Please try again.", "warning");
     }

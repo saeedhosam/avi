@@ -80,6 +80,11 @@ export const ALERT_META = {
     color: PALETTE.alerts.GATE_CHANGE,
     icon: "door",
   },
+  TERMINAL_CHANGE: {
+    label: "Terminal Change",
+    color: PALETTE.alerts.TERMINAL_CHANGE,
+    icon: "terminal",
+  },
   DELAY: { label: "Delay", color: PALETTE.alerts.DELAY, icon: "clock" },
   BOARDING: {
     label: "Boarding",

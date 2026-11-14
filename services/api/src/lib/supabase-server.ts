@@ -45,6 +45,8 @@ export interface WatchRowPatchTarget {
 }
 
 export interface SupabaseAlertBody {
+  /** Optional client/gateway-generated alert id. */
+  id?: string;
   user_id: string;
   flight_number: string;
   flight_date?: string | null;
@@ -52,6 +54,19 @@ export interface SupabaseAlertBody {
   title: string;
   message: string;
   is_read: boolean;
+  /** Set when the gateway already delivered an Expo push for this alert. */
+  delivered_at?: string | null;
+}
+
+export interface ExpoDeviceToken {
+  user_id: string;
+  platform: string;
+  token: string;
+}
+
+export interface FlightSnapshotRow {
+  snapshot: unknown;
+  fetched_at: string;
 }
 
 export interface WatchlistWrite {
@@ -374,6 +389,242 @@ export class SupabaseServer {
     return plans;
   }
 
+  /** Plan + trip-pass expiry for the entitlement resolver. */
+  async getBillingState(uid: string): Promise<{
+    plan: string;
+    tripPassExpiresAt: string | null;
+  }> {
+    if (!this.ready) return { plan: "FREE", tripPassExpiresAt: null };
+    const search = new URLSearchParams({
+      select: "plan,trip_pass_expires_at",
+      id: `eq.${uid}`,
+      limit: "1",
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/profiles?${search.toString()}`,
+      { headers: this.headers("text/plain"), signal: AbortSignal.timeout(15_000) },
+    );
+    if (!response.ok) return { plan: "FREE", tripPassExpiresAt: null };
+    const rows = (await response.json()) as Array<{
+      plan?: string | null;
+      trip_pass_expires_at?: string | null;
+    }>;
+    return {
+      plan: rows[0]?.plan ?? "FREE",
+      tripPassExpiresAt: rows[0]?.trip_pass_expires_at ?? null,
+    };
+  }
+
+  // ── Gateway push fan-out (AeroQuest) ───────────────────────────────────────
+
+  /**
+   * Users tracking a specific flight on a specific operating date. Watchlist
+   * flight numbers are stored both compact (`BA117`) and display (`BA 117`)
+   * by different clients, so both forms are queried.
+   */
+  async listFlightSubscriberIds(
+    flightNumber: string,
+    flightDate: string,
+  ): Promise<string[]> {
+    if (!this.ready) return [];
+    const compact = flightNumber.replace(/\s+/g, "").toUpperCase();
+    const spaced = compact.replace(/^([A-Z0-9]{2,3})(\d.*)$/, "$1 $2");
+    const variants = [...new Set([compact, spaced])]
+      .map((value) => `"${value}"`)
+      .join(",");
+    const search = new URLSearchParams({
+      select: "user_id",
+      flight_number: `in.(${variants})`,
+      flight_date: `eq.${flightDate}`,
+      limit: "10000",
+    });
+    const response = await fetch(`${this.base()}/rest/v1/watchlist_items?${search.toString()}`, {
+      headers: this.headers("text/plain"),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(`flight subscriber fetch failed with HTTP ${response.status}`);
+    }
+    const rows = (await response.json()) as Array<{ user_id?: string }>;
+    return [...new Set((Array.isArray(rows) ? rows : []).map((row) => row.user_id).filter((id): id is string => typeof id === "string"))];
+  }
+
+  /** Native Expo push tokens for the given users. */
+  async listExpoTokens(userIds: string[]): Promise<ExpoDeviceToken[]> {
+    if (!this.ready || !userIds.length) return [];
+    const tokens: ExpoDeviceToken[] = [];
+    for (let index = 0; index < userIds.length; index += 200) {
+      const chunk = userIds.slice(index, index + 200);
+      const list = chunk.map((id) => `"${id}"`).join(",");
+      const search = new URLSearchParams({
+        select: "user_id,platform,token",
+        user_id: `in.(${list})`,
+        platform: "in.(android,ios)",
+        limit: "5000",
+      });
+      const response = await fetch(`${this.base()}/rest/v1/device_tokens?${search.toString()}`, {
+        headers: this.headers("text/plain"),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        throw new Error(`device token fetch failed with HTTP ${response.status}`);
+      }
+      const rows = (await response.json()) as ExpoDeviceToken[];
+      tokens.push(...(Array.isArray(rows) ? rows : []));
+    }
+    return tokens;
+  }
+
+  /** Last canonical flight snapshot used by the gateway differ. */
+  async getFlightSnapshot(flightKey: string): Promise<FlightSnapshotRow | null> {
+    if (!this.ready) return null;
+    const search = new URLSearchParams({
+      select: "snapshot,fetched_at",
+      flight_key: `eq.${flightKey}`,
+      limit: "1",
+    });
+    const response = await fetch(`${this.base()}/rest/v1/flight_snapshots?${search.toString()}`, {
+      headers: this.headers("text/plain"),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return null;
+    const rows = (await response.json()) as FlightSnapshotRow[];
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
+
+  /** Upserts the snapshot used for the next change diff. */
+  async upsertFlightSnapshot(
+    flightKey: string,
+    flightNumber: string,
+    snapshot: unknown,
+    expiresAt: string,
+  ): Promise<void> {
+    if (!this.ready) return;
+    const response = await fetch(`${this.base()}/rest/v1/flight_snapshots`, {
+      method: "POST",
+      headers: {
+        ...this.headers(),
+        Prefer: "return=minimal,resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        flight_key: flightKey,
+        flight_number: flightNumber,
+        snapshot,
+        provider: "aerodatabox",
+        fetched_at: new Date().toISOString(),
+        expires_at: expiresAt,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(`flight snapshot upsert failed with HTTP ${response.status}`);
+    }
+  }
+
+  // ── Aircraft cabin layout cache (Supabase) ─────────────────────────────────
+
+  async getCabinLayout(aircraftType: string): Promise<unknown | null> {
+    if (!this.ready) return null;
+    const search = new URLSearchParams({
+      select: "layout",
+      aircraft_type: `eq.${aircraftType.trim().toUpperCase()}`,
+      limit: "1",
+    });
+    const response = await fetch(`${this.base()}/rest/v1/cabin_layouts?${search.toString()}`, {
+      headers: this.headers("text/plain"),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return null;
+    const rows = (await response.json()) as Array<{ layout?: unknown }>;
+    return Array.isArray(rows) ? rows[0]?.layout ?? null : null;
+  }
+
+  async upsertCabinLayout(
+    aircraftType: string,
+    layout: unknown,
+    source: string,
+  ): Promise<void> {
+    if (!this.ready) return;
+    const response = await fetch(`${this.base()}/rest/v1/cabin_layouts`, {
+      method: "POST",
+      headers: {
+        ...this.headers(),
+        Prefer: "return=minimal,resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        aircraft_type: aircraftType.trim().toUpperCase(),
+        layout,
+        source,
+        fetched_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(`cabin layout upsert failed with HTTP ${response.status}`);
+    }
+  }
+
+  // ── Fog-of-war passport visits ─────────────────────────────────────────────
+
+  async recordPassportVisit(input: {
+    userId: string;
+    airportCode: string;
+    terminalId: string;
+    level: number;
+    aircraftType?: string | null;
+  }): Promise<void> {
+    if (!this.ready) return;
+    const onConflict = new URLSearchParams({
+      on_conflict: "user_id,airport_code,terminal_id,level",
+    });
+    const response = await fetch(
+      `${this.base()}/rest/v1/passport_visits?${onConflict.toString()}`,
+      {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          Prefer: "return=minimal,resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          user_id: input.userId,
+          airport_code: input.airportCode.trim().toUpperCase(),
+          terminal_id: input.terminalId,
+          level: input.level,
+          aircraft_type: input.aircraftType?.trim().toUpperCase() ?? null,
+          last_visited_at: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`passport visit write failed with HTTP ${response.status}`);
+    }
+    const aircraftType = input.aircraftType?.trim().toUpperCase();
+    if (!aircraftType) return;
+    const aircraftResponse = await fetch(
+      `${this.base()}/rest/v1/passport_aircraft_visits?on_conflict=user_id,aircraft_type`,
+      {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          Prefer: "return=minimal,resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          user_id: input.userId,
+          aircraft_type: aircraftType,
+          last_visited_at: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!aircraftResponse.ok) {
+      throw new Error(
+        `passport aircraft visit write failed with HTTP ${aircraftResponse.status}`,
+      );
+    }
+  }
+
   // ── Push delivery (P1 Track C) ─────────────────────────────────────────
 
   /** Alerts the engine wrote that no push delivery has claimed yet. */
@@ -404,6 +655,20 @@ export class SupabaseServer {
       byUser.set(row.user_id, entries);
     }
     return byUser;
+  }
+
+  /** Removes an Expo token the push service reports as no longer registered. */
+  async deleteDeviceToken(token: string): Promise<void> {
+    if (!this.ready) return;
+    const search = new URLSearchParams({ token: `eq.${token}` });
+    const response = await fetch(`${this.base()}/rest/v1/device_tokens?${search.toString()}`, {
+      method: "DELETE",
+      headers: this.headers("text/plain"),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new Error(`device token delete failed with HTTP ${response.status}`);
+    }
   }
 
   /** Removes an endpoint the push service reported as gone (404/410). */

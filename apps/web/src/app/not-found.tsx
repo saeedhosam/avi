@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: { absolute: "Not found · Avi" },
+  title: { absolute: "Not found · AeroQuest" },
 };
 
 export default function NotFound() {

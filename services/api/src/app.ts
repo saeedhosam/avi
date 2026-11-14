@@ -20,6 +20,9 @@ import { PushDelivery } from "./engine/push-delivery.js";
 import { ConsoleFlightProvider } from "./providers/console-flights.js";
 import { consoleFlightRoutes } from "./routes/console-flights.js";
 import { consoleAirportRoutes } from "./routes/console-airports.js";
+import { gatewayRoutes } from "./routes/gateway.js";
+import { GatewayService } from "./gateway/gateway-service.js";
+import { ExpoPushService } from "./gateway/expo-push.js";
 import { meRoutes } from "./routes/me.js";
 import { billingRoutes } from "./routes/billing.js";
 import { AeroDataBoxProvider } from "./providers/aerodatabox.js";
@@ -65,7 +68,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(swagger, {
     openapi: {
       info: {
-        title: "Avi API",
+        title: "AeroQuest API",
         description:
           "Provider gateway for live flights, airports, weather, maps, and alerts.",
         version: "1.1.0",
@@ -74,6 +77,7 @@ export async function buildApp(config: AppConfig) {
         { name: "system", description: "Health and configuration" },
         { name: "flights", description: "Live flight data" },
         { name: "airports", description: "Airport boards, routes, and search" },
+        { name: "gateway", description: "AeroQuest Starter-safe caching gateway" },
       ],
     },
     transform: jsonSchemaTransform,
@@ -105,6 +109,14 @@ export async function buildApp(config: AppConfig) {
   );
   const engineStatus = new EngineStatusStore(config.REDIS_URL, {
     warn: (message) => app.log.warn(message),
+  });
+  const expoPush = new ExpoPushService(config, supabaseServer, app.log);
+  const gateway = new GatewayService({
+    config,
+    consoleFlights,
+    supabase: supabaseServer,
+    expoPush,
+    log: app.log,
   });
 
   registerProviderAuth(app, {
@@ -146,6 +158,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(flightRoutes, { provider, usage, userQuota, config });
   await app.register(consoleFlightRoutes, { consoleFlights, usage, userQuota, config });
   await app.register(consoleAirportRoutes, { consoleFlights, usage, userQuota, config });
+  await app.register(gatewayRoutes, { gateway, usage, userQuota, config });
   await app.register(scheduleRoutes, { schedule, usage, userQuota, config });
   if (supabaseServer.ready) {
     await app.register(meRoutes, { supabaseServer, usage, userQuota, billingProvider: config.BILLING_PROVIDER });

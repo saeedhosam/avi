@@ -90,7 +90,7 @@ export default function AirplanesPage() {
         <Panel className="p-6 text-center">
           <p className="text-sm font-bold text-ink">Seatmap unavailable</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Avi does not have an illustrative configuration for this aircraft.
+            AeroQuest does not have an illustrative configuration for this aircraft.
             No substitute aircraft is shown.
           </p>
           <Link href="/airports" className="mt-3 inline-block">

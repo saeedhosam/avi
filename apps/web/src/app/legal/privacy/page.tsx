@@ -4,7 +4,7 @@ import { ShieldCheck } from "lucide-react";
 import { Panel } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: { absolute: "Privacy Policy · Avi" },
+  title: { absolute: "Privacy Policy · AeroQuest" },
 };
 
 const UPDATE = "November 11, 2026";
@@ -25,18 +25,18 @@ export default function PrivacyPage() {
         <p className="label-caps flex items-center gap-2 text-accent">
           <ShieldCheck className="size-4" /> Legal
         </p>
-        <h1 className="mt-2 text-xl font-black text-ink">Avi Privacy Policy</h1>
+        <h1 className="mt-2 text-xl font-black text-ink">AeroQuest Privacy Policy</h1>
         <p className="mt-1 text-[11px] text-subtle">Last updated: {UPDATE}</p>
 
         <Section title="1. Who we are">
           <p>
-            Avi (&quot;Avi&quot;, &quot;we&quot;, &quot;us&quot;) is a live flight-tracking
+            AeroQuest (&quot;AeroQuest&quot;, &quot;we&quot;, &quot;us&quot;) is a live flight-tracking
             service operated by <strong className="text-ink">Saeed Jumaa</strong>, an
             individual based in <strong className="text-ink">Egypt</strong>. You can reach
             us at <a className="text-accent underline" href="mailto:makymaky757@gmail.com">makymaky757@gmail.com</a>.
           </p>
           <p>
-            This policy describes the personal data Avi collects, why, how long it is
+            This policy describes the personal data AeroQuest collects, why, how long it is
             kept, and your rights. It applies to the web application at{" "}
             <Link className="text-accent underline" href="/">avi.codestep.org</Link> and its
             companion clients.
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             app. They are not live measurements, are not attributed to you, and are not used for
             profiling.</p>
           <p><strong className="text-ink">Payment data</strong> — handled entirely by Polar Software, Inc.
-            (our Merchant of Record). Avi does not receive or store card numbers or payment details.</p>
+            (our Merchant of Record). AeroQuest does not receive or store card numbers or payment details.</p>
         </Section>
 
         <Section title="3. What we do NOT collect">
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
         <Section title="10. Contact">
           <p>Saeed Jumaa — <a className="text-accent underline" href="mailto:makymaky757@gmail.com">makymaky757@gmail.com</a></p>
           <p className="mt-4">
-            <Link className="text-accent underline" href="/legal/terms">Avi Terms of Service →</Link>
+            <Link className="text-accent underline" href="/legal/terms">AeroQuest Terms of Service →</Link>
           </p>
         </Section>
       </Panel>

@@ -289,7 +289,7 @@ export function RouteTimetable({
           <Info className="mt-0.5 size-3.5 shrink-0 text-accent" />
           <p className="text-[10px] leading-relaxed text-muted">
             A weekly operating-day calendar is not shown because AeroDataBox
-            route statistics do not contain per-day schedules. Avi does not
+            route statistics do not contain per-day schedules. AeroQuest does not
             guess or synthesize those days. A verified forward schedule will be
             added only when a schedule source is available.
           </p>
@@ -303,7 +303,7 @@ export function RouteTimetable({
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent text-bg hover:opacity-90 font-extrabold text-xs py-3 shadow-lg transition-all hover:scale-[1.01]"
         >
           <Search className="size-3.5" />
-          <span>Search live flights on Avi</span>
+          <span>Search live flights on AeroQuest</span>
         </Link>
 
         <a

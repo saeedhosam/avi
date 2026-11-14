@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  aircraftCabinLayoutSchema,
+  type AircraftCabinLayout,
+} from "./cabin.js";
+import {
   flightSchema,
   type AircraftInfo,
   type Airport,
@@ -382,6 +386,8 @@ export interface GatewayAircraftCabinSummary {
 
 export interface GatewayAircraftResponse {
   aircraft: GatewayAircraftCabinSummary;
+  /** Resolved parametric/cached cabin layout, when an airframe type is known. */
+  layout: AircraftCabinLayout | null;
   provenance: GatewayProvenance;
 }
 
@@ -397,6 +403,7 @@ export const gatewayAircraftResponseSchema: z.ZodType<GatewayAircraftResponse> =
       cabinLayoutKey: z.string().nullable(),
       cabinLayoutCached: z.boolean(),
     }),
+    layout: aircraftCabinLayoutSchema.nullable(),
     provenance: gatewayProvenanceSchema,
   });
 

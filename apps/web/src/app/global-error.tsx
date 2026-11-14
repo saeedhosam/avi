@@ -46,7 +46,7 @@ export default function GlobalError({
             AVI SYSTEM ERROR
           </p>
           <h1 style={{ fontSize: "18px", marginBottom: "8px" }}>
-            Avi could not start this session.
+            AeroQuest could not start this session.
           </h1>
           <p style={{ fontSize: "13px", color: PALETTE.muted, marginBottom: "16px" }}>
             Reload to reconnect; your saved data stays on this device.
@@ -63,7 +63,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            Reload Avi
+            Reload AeroQuest
           </button>
           {error.digest && (
             <p style={{ marginTop: "12px", fontSize: "10px", color: PALETTE.subtle }}>

@@ -1,6 +1,0 @@
-{
-  "summary": "Implementation plan to redesign ConnectionsScreen into a full-screen interactive map with a compact floating top hub pill, collapsible filter drawer, and a compact floating bottom bar that expands when a route is tapped.",
-  "updatedAt": "2026-11-04T15:26:23.581788323Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

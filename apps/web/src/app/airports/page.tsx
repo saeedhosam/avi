@@ -35,6 +35,7 @@ import {
 import type { AmenityCategory, Flight, TerminalAmenity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AMENITY_META, TerminalMap } from "@/components/terminal-map";
+import { DelayLoungeCard } from "@/components/monetization-cards";
 import {
   Button,
   MetricTile,
@@ -308,7 +309,7 @@ export default function AirportsPage() {
         <Panel className="p-6 text-center">
           <p className="text-sm font-bold text-ink">Airport not found</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            {airportCode} is not in Avi&apos;s reference catalog. No airport data
+            {airportCode} is not in AeroQuest&apos;s reference catalog. No airport data
             is substituted.
           </p>
           <Link href="/airports" className="mt-3 inline-block">
@@ -437,6 +438,18 @@ export default function AirportsPage() {
             <span className="size-1.5 rounded-full bg-cyan-400" />
           </button>
         ))}
+      </div>
+
+      <div className="mb-3">
+        <DelayLoungeCard
+          compact
+          delayMinutes={Math.max(
+            0,
+            ...flights.map((flight) =>
+              flight.delayReported ? flight.delayMinutes : 0,
+            ),
+          )}
+        />
       </div>
 
       {/* Static terminal data is a guide, not live operational data. */}

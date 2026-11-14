@@ -55,7 +55,8 @@ export class IncompleteOpenMeteoDataError extends Error {
 // ── Pure code conversions ────────────────────────────────────────────────────
 
 export function mapWmoCodeToCondition(wmoCode: number | undefined | null): string {
-  switch (wmoCode ?? 0) {
+  if (wmoCode == null) return "Not reported";
+  switch (wmoCode) {
     case 0:
       return "Clear Sky";
     case 1:
@@ -292,10 +293,11 @@ export function mapToDestinationForecast(
   }
 
   const target = hourlyForecast.find((hour) => hour.isArrivalTarget);
-  const precipitationChance =
+  const reportedPrecip =
     target?.precipProbabilityPercent ??
     dto.daily?.precipitation_probability_max?.[0] ??
-    (condition.toLowerCase().includes("rain") ? 70 : 10);
+    null;
+  const precipitationChance = reportedPrecip == null ? 0 : Math.round(reportedPrecip);
 
   const dailyTimes = dto.daily?.time ?? [];
   const dailyHighs = dto.daily?.temperature_2m_max ?? [];
@@ -360,7 +362,10 @@ export function mapToDestinationForecast(
       runwayVisualRange: "Not reported",
       arrivalNotice: "Open-Meteo model forecast; not an operational observation.",
     },
-    packingAdvice: packingAdvice(tempC, precipitationChance),
+    packingAdvice:
+      reportedPrecip == null
+        ? `Arrival temperature ${tempC}°C. Precipitation probability was not reported.`
+        : packingAdvice(tempC, precipitationChance),
     lastUpdated: Date.now(),
     dataAvailable: true,
     source: "OPEN_METEO",
@@ -466,7 +471,9 @@ export class OpenMeteoWeatherService {
   private readonly timeoutMs: number;
 
   constructor(options: OpenMeteoServiceOptions = {}) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl =
+      options.fetchImpl ??
+      ((input, init) => fetch(input, init));
     this.cache = options.cache ?? new InMemoryWeatherCache();
     this.now = options.now ?? (() => Date.now());
     this.ttlMs = options.ttlMs ?? 15 * 60_000;
@@ -485,15 +492,25 @@ export class OpenMeteoWeatherService {
     for (const [key, value] of Object.entries(OPEN_METEO_PARAMS)) {
       url.searchParams.set(key, value);
     }
-    const timeout = AbortSignal.timeout(this.timeoutMs);
-    const response = await this.fetchImpl(url, {
-      headers: { Accept: "application/json" },
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-    });
-    if (!response.ok) {
-      throw new Error(`Open-Meteo returned HTTP ${response.status}`);
+    // AbortSignal.timeout/any are not available in every React Native runtime.
+    // Use a plain AbortController so web, Node, and Hermes behave identically.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      const response = await this.fetchImpl(url, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Open-Meteo returned HTTP ${response.status}`);
+      }
+      return (await response.json()) as OpenMeteoResponseDto;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
     }
-    return (await response.json()) as OpenMeteoResponseDto;
   }
 
   async getDestinationForecast(

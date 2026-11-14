@@ -35,6 +35,7 @@ export const PALETTE = {
   },
   alerts: {
     GATE_CHANGE: "#00E5FF",
+    TERMINAL_CHANGE: "#A78BFA",
     DELAY: "#F59E0B",
     BOARDING: "#38BDF8",
     CANCELLATION: "#EF4444",

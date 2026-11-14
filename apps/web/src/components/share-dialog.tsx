@@ -60,7 +60,7 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
   ].filter(Boolean);
 
   return [
-    "✈️ Avi Flight Status Update",
+    "✈️ AeroQuest Flight Status Update",
     "━━━━━━━━━━━━━━━━━━━━━",
     `Flight: ${flight.airline} (${flight.flightNumber})`,
     `Route: ${flight.origin.code} (${flight.origin.city}) ➔ ${flight.destination.code} (${flight.destination.city})`,
@@ -75,7 +75,7 @@ export function generateFlightSummary(flight: Flight, personalNote = "") {
       : "",
   ]
     .filter(Boolean)
-    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nView with Avi: ${flightLink}`;
+    .join("\n") + `${etaText}${noteText}` + `\n\n━━━━━━━━━━━━━━━━━━━━━\nView with AeroQuest: ${flightLink}`;
 }
 
 export function ShareFlightDialog({

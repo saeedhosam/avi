@@ -67,7 +67,7 @@ export class PushDelivery {
 
         const payload = JSON.stringify({
           alertId: alert.id,
-          title: `Avi · ${alert.flight_number}`,
+          title: `AeroQuest · ${alert.flight_number}`,
           body: alert.title,
           message: alert.message,
           tag: alert.id,

@@ -101,6 +101,8 @@ export interface DirectFlightConnection {
   /** Null when no verified schedule source reported a duration. */
   estimatedDurationMinutes: number | null;
   durationFormatted: string | null;
+  /** True when duration is a distance-derived estimate, not a schedule fact. */
+  durationEstimated: boolean;
   haulCategory: HaulCategory;
   /** Null when the provider did not report a daily average. */
   dailyFlightsCount: number | null;
@@ -122,6 +124,7 @@ export const directFlightConnectionSchema: z.ZodType<DirectFlightConnection> =
     distanceNm: z.number().positive(),
     estimatedDurationMinutes: z.number().positive().nullable(),
     durationFormatted: z.string().nullable(),
+    durationEstimated: z.boolean(),
     haulCategory: z.enum(HAUL_CATEGORIES),
     dailyFlightsCount: z.number().nonnegative().nullable(),
     hasDepartures: z.boolean(),

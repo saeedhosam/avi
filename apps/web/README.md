@@ -1,6 +1,6 @@
-# Avi Web
+# AeroQuest Web
 
-> This app is `@avi/web` in the Avi monorepo. The provider gateway lives in
+> This app is `@avi/web` in the AeroQuest monorepo. The provider gateway lives in
 > `../../services/api`, the schema in `../../supabase`, and the deployment
 > pipeline in `../../.github/workflows`. Firebase and Google Maps were removed;
 > this README describes the current build.

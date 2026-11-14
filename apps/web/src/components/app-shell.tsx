@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Glasses,
+  Globe2,
   Info,
   Network,
   Plane,
@@ -31,6 +32,12 @@ const NAV_ITEMS = [
     label: "Routes",
     icon: Network,
     tag: "Global connections",
+  },
+  {
+    href: "/explore/CAI",
+    label: "Explore",
+    icon: Globe2,
+    tag: "Direct route globe",
   },
   {
     href: "/airports",
@@ -75,10 +82,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="min-w-0">
             <p className="text-[17px] font-black leading-none tracking-tight text-ink">
-              Avi
+              AeroQuest
             </p>
             <p className="mt-1 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] text-accent">
-              Your sky companion
+              Route · Terminal · Cabin
             </p>
           </div>
         </div>

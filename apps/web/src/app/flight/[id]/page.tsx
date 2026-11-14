@@ -36,6 +36,10 @@ import { FlightMapPreview } from "@/components/flight-map-preview";
 import { ShareFlightDialog } from "@/components/share-dialog";
 import { DestinationWeatherCard, AirportWeatherCard } from "@/components/weather-cards";
 import {
+  ArrivalEsimCard,
+  DelayLoungeCard,
+} from "@/components/monetization-cards";
+import {
   AircraftInfoCard,
   FlightTimelineView,
   RouteProgress,
@@ -498,6 +502,17 @@ export default function FlightDetailPage() {
               </div>
             </div>
           </Panel>
+
+          <DelayLoungeCard
+            delayMinutes={flight.delayMinutes}
+            flightNumber={flight.flightNumber}
+          />
+          <ArrivalEsimCard
+            status={flight.status}
+            originCountry={flight.origin.country}
+            destinationCountry={flight.destination.country}
+            destinationCity={flight.destination.city}
+          />
 
           {/* Gates */}
           <div className="grid gap-2 sm:grid-cols-2">

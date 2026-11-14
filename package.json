@@ -2,7 +2,7 @@
   "name": "avi",
   "version": "0.0.0",
   "private": true,
-  "description": "Avi — flight tracking, route network, live radar, and indoor terminal wayfinding.",
+  "description": "AeroQuest — flight tracking, direct-route explorer, terminal wayfinding, 3D cabins, and offline in-flight HUD.",
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=24 <27"

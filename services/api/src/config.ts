@@ -49,6 +49,8 @@ const ConfigSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:alerts@avi.app"),
+  // Optional Expo push access token (required when push security is enabled).
+  EXPO_ACCESS_TOKEN: z.string().optional(),
   PUSH_BATCH_SIZE: z.coerce.number().int().min(1).default(100),
   WATCH_ENGINE_TICK_MS: z.coerce.number().int().min(5_000).default(30_000),
   WATCH_ENGINE_SWEEPS_PER_TICK: z.coerce.number().int().min(1).max(64).default(8),

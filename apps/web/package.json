@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "predev": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/contracts build",
-    "prebuild": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/contracts build",
+    "predev": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/shared build && pnpm --filter @avi/contracts build && pnpm --filter @avi/ui build",
+    "prebuild": "node scripts/copy-maplibre-assets.mjs && pnpm --filter @avi/shared build && pnpm --filter @avi/contracts build && pnpm --filter @avi/ui build",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
@@ -14,6 +14,9 @@
   },
   "dependencies": {
     "@avi/contracts": "workspace:*",
+    "@avi/shared": "workspace:*",
+    "@avi/ui": "workspace:*",
+    "@react-three/fiber": "^9.8.2",
     "@supabase/supabase-js": "^2.119.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.69.0",
@@ -21,7 +24,8 @@
     "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4.3.4",
@@ -35,6 +39,6 @@
     "typescript": "^5",
     "vitest": "^5.1.0"
   },
-  "description": "Avi web — live radar, flight tracking, route network, airport boards, terminal maps, alerts, and offline watchlist.",
+  "description": "AeroQuest web — direct-route globe, flight dossier, terminal maps, 3D cabin, alerts, and offline watchlist.",
   "packageManager": "pnpm@11.7.0"
 }

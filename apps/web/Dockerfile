@@ -21,6 +21,13 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/contracts/src packages/contracts/src
 COPY packages/contracts/tsconfig.json packages/contracts/tsconfig.json
 COPY packages/contracts/scripts packages/contracts/scripts
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/shared/src packages/shared/src
+COPY packages/shared/tsconfig.json packages/shared/tsconfig.json
+COPY packages/shared/scripts packages/shared/scripts
+COPY packages/ui/package.json packages/ui/package.json
+COPY packages/ui/src packages/ui/src
+COPY packages/ui/tsconfig.json packages/ui/tsconfig.json
 COPY packages/catalog/package.json packages/catalog/package.json
 COPY packages/catalog/airports.json packages/catalog/airports.json
 COPY packages/catalog/terminal-layouts.json packages/catalog/terminal-layouts.json
@@ -30,13 +37,18 @@ COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
 
 RUN pnpm install --frozen-lockfile --filter @avi/web...
-# `@avi/contracts` is consumed from source through the workspace symlink; build
-# its dist before the web bundle, exactly like `apps/web`'s prebuild step.
-RUN pnpm --filter @avi/contracts build
+# Workspace packages are consumed from source/dist through symlinks; build the
+# shared package + contract + 3D UI dist before the web bundle.
+RUN pnpm --filter @avi/shared build \
+  && pnpm --filter @avi/contracts build \
+  && pnpm --filter @avi/ui build
 
 COPY apps/web apps/web
 COPY packages packages
-RUN pnpm --filter @avi/contracts build && pnpm --filter @avi/web build
+RUN pnpm --filter @avi/shared build \
+  && pnpm --filter @avi/contracts build \
+  && pnpm --filter @avi/ui build \
+  && pnpm --filter @avi/web build
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production

@@ -1,5 +1,4 @@
 import type { HaulCategory } from "../models/routeConnection.js";
-
 const EARTH_RADIUS_KM = 6371.0088;
 
 const toRad = (degrees: number) => (degrees * Math.PI) / 180;
@@ -162,4 +161,18 @@ export function greatCircleGeoJsonLine(
     sample.position.longitude,
     sample.position.latitude,
   ]);
+}
+
+/** Shared coarse region inference used by the route catalog. */
+export function inferRegionFromCoords(
+  latitude: number,
+  longitude: number,
+): import("../models/routeConnection.js").RouteRegion {
+  if (longitude < -25) return "AMERICAS";
+  if (latitude >= 15 && latitude <= 38 && longitude >= -18 && longitude <= 60) {
+    return "MENA";
+  }
+  if (latitude < 15 && longitude >= -20 && longitude <= 55) return "AFRICA";
+  if (longitude > 60) return "ASIA_PACIFIC";
+  return "EUROPE";
 }

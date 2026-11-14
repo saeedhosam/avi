@@ -1,7 +1,7 @@
 /**
  * The "console" flight contract: the web client's `Flight` face, now served by
- * the gateway so every client (web today, Android/iOS later) consumes one
- * mapping. Ported verbatim from apps/web/src/lib/types.ts.
+ * the gateway so every client (web and Expo mobile) consumes one mapping.
+ * Ported verbatim from apps/web/src/lib/types.ts.
  */
 
 export type FlightStatus =

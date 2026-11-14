@@ -66,7 +66,7 @@ export function AccountDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="Aviation Account & Settings"
+      title="AeroQuest Account & Settings"
       subtitle="Identity, offline cache, and cloud sync"
       icon={<ShieldCheck className="size-4" />}
       size="md"
@@ -351,7 +351,7 @@ export function AccountDialog({
                       </div>
                     )}
                     <p className="text-[9px] leading-relaxed text-subtle">
-                      This budget covers all Avi users this month and pauses the
+                      This budget covers all AeroQuest users this month and pauses the
                       live engine at the cap — saved data and alerts keep working.
                     </p>
                   </div>
@@ -372,7 +372,7 @@ export function AccountDialog({
                 </div>
                 <p className="mt-1 text-[10px] leading-relaxed text-muted">
                   Deleting your account erases your profile, watchlist, notes,
-                  alerts, and push settings from Avi — immediately and
+                  alerts, and push settings from AeroQuest — immediately and
                   irreversibly.
                 </p>
                 {!confirmDelete ? (

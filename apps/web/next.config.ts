@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  transpilePackages: ["@avi/ui"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

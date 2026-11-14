@@ -1,5 +1,5 @@
 import type { FeatureCollection, MultiPolygon, Point } from "geojson";
-import rawCountries from "@/data/world_countries.json";
+import rawCountries from "@avi/shared/assets/world_countries.json";
 
 interface RawCountry {
   n: string;

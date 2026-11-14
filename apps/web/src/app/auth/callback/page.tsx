@@ -28,7 +28,7 @@ export default function AuthCallbackPage() {
       }
 
       if (!cancelled) {
-        setMessage("Signed in. Returning to Avi…");
+        setMessage("Signed in. Returning to AeroQuest…");
         router.replace("/");
         router.refresh();
       }
@@ -36,7 +36,7 @@ export default function AuthCallbackPage() {
 
     void finish().catch(() => {
       if (!cancelled) {
-        setMessage("Sign-in could not be completed. Returning to Avi…");
+        setMessage("Sign-in could not be completed. Returning to AeroQuest…");
         router.replace("/");
       }
     });

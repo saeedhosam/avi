@@ -489,6 +489,7 @@ export class ConsoleFlightProvider {
   async lookupFlight(
     rawNumber: string,
     date?: string,
+    ttl?: { ttlMs: number; staleTtlMs?: number },
   ): Promise<{
     mode: FlightDataMode;
     status: number;
@@ -499,8 +500,8 @@ export class ConsoleFlightProvider {
       ? `/flights/number/${flightNumber}/${date}?dateLocalRole=Departure&withAircraftImage=false&withLocation=true`
       : `/flights/number/${flightNumber}?withAircraftImage=false&withLocation=true`;
     const result = await this.client.get<AeroFlightDto[]>(path, {
-      ttlMs: PROVIDER_TTL_MS.flightStatus,
-      staleTtlMs: PROVIDER_STALE_MS.flightStatus,
+      ttlMs: ttl?.ttlMs ?? PROVIDER_TTL_MS.flightStatus,
+      staleTtlMs: ttl?.staleTtlMs ?? PROVIDER_STALE_MS.flightStatus,
     });
 
     if (result.data != null && !Array.isArray(result.data)) {
@@ -525,6 +526,7 @@ export class ConsoleFlightProvider {
 
   async lookupAirportFids(
     code: string,
+    ttl?: { ttlMs: number; staleTtlMs?: number },
   ): Promise<{
     mode: FlightDataMode;
     status: number;
@@ -536,8 +538,8 @@ export class ConsoleFlightProvider {
     const result = await this.client.get<AeroFidsResponseDto>(
       `/flights/airports/iata/${code}?offsetMinutes=-120&durationMinutes=720&direction=Both&withLeg=true&withCancelled=true&withCodeshared=false`,
       {
-        ttlMs: PROVIDER_TTL_MS.airportBoard,
-        staleTtlMs: PROVIDER_STALE_MS.airportBoard,
+        ttlMs: ttl?.ttlMs ?? PROVIDER_TTL_MS.airportBoard,
+        staleTtlMs: ttl?.staleTtlMs ?? PROVIDER_STALE_MS.airportBoard,
       },
     );
 
@@ -577,6 +579,7 @@ export class ConsoleFlightProvider {
 
   async lookupAirportRoutes(
     code: string,
+    ttl?: { ttlMs: number; staleTtlMs?: number },
   ): Promise<{
     mode: FlightDataMode;
     status: number;
@@ -592,8 +595,8 @@ export class ConsoleFlightProvider {
         operators?: Array<{ iata?: string; name?: string }>;
       }>;
     }>(`/airports/iata/${code}/stats/routes/daily`, {
-      ttlMs: PROVIDER_TTL_MS.routeStats,
-      staleTtlMs: PROVIDER_STALE_MS.routeStats,
+      ttlMs: ttl?.ttlMs ?? PROVIDER_TTL_MS.routeStats,
+      staleTtlMs: ttl?.staleTtlMs ?? PROVIDER_STALE_MS.routeStats,
     });
 
     if (result.data != null && !Array.isArray(result.data.routes)) {
@@ -758,6 +761,7 @@ export class ConsoleFlightProvider {
   /** Aircraft reference data by registration. */
   async lookupAircraft(
     rawReg: string,
+    ttl?: { ttlMs: number; staleTtlMs?: number },
   ): Promise<{
     mode: FlightDataMode;
     status: number;
@@ -767,8 +771,8 @@ export class ConsoleFlightProvider {
     const result = await this.client.get<AeroAircraftDto>(
       `/aircrafts/reg/${encodeURIComponent(reg)}`,
       {
-        ttlMs: PROVIDER_TTL_MS.aircraft,
-        staleTtlMs: PROVIDER_STALE_MS.aircraft,
+        ttlMs: ttl?.ttlMs ?? PROVIDER_TTL_MS.aircraft,
+        staleTtlMs: ttl?.staleTtlMs ?? PROVIDER_STALE_MS.aircraft,
       },
     );
     const aircraft = mapConsoleAircraft(result.data);

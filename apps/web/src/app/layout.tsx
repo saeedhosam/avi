@@ -18,19 +18,20 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Avi · Live Flight Tracking & Radar",
-    template: "%s · Avi",
+    default: "AeroQuest · Flight Tracking & Route Explorer",
+    template: "%s · AeroQuest",
   },
   description:
-    "Avi is a live flight tracking assistant with interactive radar, global route maps, airport boards, gate navigation, destination weather, and offline watchlists.",
-  applicationName: "Avi",
+    "AeroQuest is a travel companion for direct-route discovery, live flight tracking, terminal wayfinding, 3D cabin seat twins, boarding-pass import, and offline in-flight awareness.",
+  applicationName: "AeroQuest",
   keywords: [
     "flight tracker",
-    "live flight map",
-    "airport board",
-    "flight connections",
-    "terminal map",
+    "direct flights",
+    "route explorer",
+    "airport terminal map",
+    "3d cabin seat map",
     "aviation weather",
+    "boarding pass scanner",
   ],
 };
 

@@ -12,6 +12,10 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/contracts/src packages/contracts/src
 COPY packages/contracts/tsconfig.json packages/contracts/tsconfig.json
 COPY packages/contracts/scripts packages/contracts/scripts
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/shared/src packages/shared/src
+COPY packages/shared/tsconfig.json packages/shared/tsconfig.json
+COPY packages/shared/scripts packages/shared/scripts
 COPY packages/catalog/package.json packages/catalog/package.json
 COPY packages/catalog/airports.json packages/catalog/airports.json
 COPY packages/catalog/terminal-layouts.json packages/catalog/terminal-layouts.json
@@ -21,12 +25,13 @@ COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
 
 RUN pnpm install --frozen-lockfile --filter @avi/api...
-# Build the shared contract package first (the api imports its types+mapper).
-RUN pnpm --filter @avi/contracts build
+# Build the shared domain + contract packages first (the api imports both).
+RUN pnpm --filter @avi/shared build && pnpm --filter @avi/contracts build
 
 COPY services/api services/api
 COPY packages/catalog/ packages/catalog/
-RUN pnpm --filter @avi/api build
+COPY packages/shared/ packages/shared/
+RUN pnpm --filter @avi/shared build && pnpm --filter @avi/api build
 
 RUN pnpm --filter @avi/api deploy --prod --legacy /prod/api
 
@@ -37,6 +42,8 @@ RUN rm -rf /prod/api/node_modules/@avi/catalog \
   && cp -r /repo/packages/catalog /prod/api/node_modules/@avi/catalog
 RUN rm -rf /prod/api/node_modules/@avi/contracts \
   && cp -r /repo/packages/contracts /prod/api/node_modules/@avi/contracts
+RUN rm -rf /prod/api/node_modules/@avi/shared \
+  && cp -r /repo/packages/shared /prod/api/node_modules/@avi/shared
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production

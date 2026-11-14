@@ -2,7 +2,7 @@
   "name": "@avi/design-tokens",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared Avi design tokens for web, Android, and iOS.",
+  "description": "Shared AeroQuest design tokens for web and mobile.",
   "scripts": {
     "build": "node scripts/build-tokens.mjs",
     "typecheck": "node --check scripts/build-tokens.mjs",

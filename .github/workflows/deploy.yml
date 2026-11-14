@@ -76,7 +76,7 @@ jobs:
           ssh-keyscan -H "$HETZNER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Build API image
-        run: docker build -f services/api/Dockerfile -t "avi-api:${GITHUB_SHA}" .
+        run: docker build --target api -f Dockerfile -t "avi-api:${GITHUB_SHA}" .
 
       - name: Build web image
         env:
@@ -84,14 +84,17 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           AVI_API_BASE_URL: ${{ secrets.AVI_API_BASE_URL }}
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://avi.codestep.org' }}
         run: |
           docker build \
-            -f apps/web/Dockerfile \
+            --target web \
+            -f Dockerfile \
             -t "avi-web:${GITHUB_SHA}" \
             --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
             --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
             --build-arg AVI_API_BASE_URL="$AVI_API_BASE_URL" \
             --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$NEXT_PUBLIC_VAPID_PUBLIC_KEY" \
+            --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL" \
             .
 
       - name: Sync compose and Caddy config
@@ -118,6 +121,7 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
           BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER || 'manual' }}
           PROVIDER_AUTH_MODE: ${{ secrets.PROVIDER_AUTH_MODE || 'log' }}
           POLAR_API_KEY: ${{ secrets.POLAR_API_KEY }}
@@ -144,6 +148,7 @@ jobs:
           VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
           VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
           VAPID_SUBJECT=$VAPID_SUBJECT
+          EXPO_ACCESS_TOKEN=$EXPO_ACCESS_TOKEN
           # Billing (Polar.sh MoR; unset = manual plan assignment).
           BILLING_PROVIDER=$BILLING_PROVIDER
           POLAR_API_KEY=$POLAR_API_KEY
@@ -159,6 +164,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
           AVI_API_BASE_URL=$AVI_API_BASE_URL
           NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
           EOF
 
       - name: Transfer images

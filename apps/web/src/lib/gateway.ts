@@ -1,5 +1,5 @@
 /**
- * Server-side call helper for the Avi gateway (`services/api`).
+ * Server-side call helper for the AeroQuest gateway (`services/api`).
  *
  * When `AVI_API_BASE_URL` is configured, Next routes prefer the gateway so
  * AeroDataBox mapping/caching/quota accounting happen in one place. If the

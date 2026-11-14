@@ -10,7 +10,7 @@ interface CheckoutResult {
 /**
  * Billing checkout bridge: browser posts its access token + target plan, the
  * gateway validates the token and returns a Lemon Squeezy checkout URL (Pago
- * handled in the checkout page — no card data touches Avi).
+ * handled in the checkout page — no card data touches AeroQuest).
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {

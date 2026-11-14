@@ -327,10 +327,14 @@ export function findLandmarkCallouts(
 }
 
 export interface OfflineInflightInput {
-  flight: Pick<
-    Flight,
-    "id" | "flightNumber" | "origin" | "destination" | "departureTimeActual" | "arrivalTimeEstimated"
-  >;
+  flight: {
+    id: string;
+    flightNumber: string;
+    origin: { code: string };
+    destination: { code: string };
+    departureTimeActual?: string | null;
+    arrivalTimeEstimated?: string | null;
+  };
   origin: GeoPoint;
   destination: GeoPoint;
   takeoffAt: string;

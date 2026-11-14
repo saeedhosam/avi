@@ -28,7 +28,7 @@ interface GatewayProbe {
 }
 
 /**
- * Probes the Avi gateway so the web client knows whether live provider data is
+ * Probes the AeroQuest gateway so the web client knows whether live provider data is
  * maintained by the shared backend and server watch engine. Best effort: if
  * the gateway is not reachable, the client falls back to the local key (dev)
  * or reports provider data unavailable (production).
