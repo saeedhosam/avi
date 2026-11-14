@@ -24,7 +24,9 @@ COPY packages/map-style/package.json packages/map-style/package.json
 COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
 
-RUN pnpm install --frozen-lockfile --filter @avi/api...
+RUN pnpm config set fetch-timeout 300000 --location=project \
+  && pnpm config set fetch-retries 5 --location=project \
+  && pnpm install --frozen-lockfile --filter @avi/api...
 # Build the shared domain + contract packages first (the api imports both).
 RUN pnpm --filter @avi/shared build && pnpm --filter @avi/contracts build
 

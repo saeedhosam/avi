@@ -36,7 +36,9 @@ COPY packages/map-style/package.json packages/map-style/package.json
 COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY services/api/package.json services/api/package.json
 
-RUN pnpm install --frozen-lockfile --filter @avi/web...
+RUN pnpm config set fetch-timeout 300000 --location=project \
+  && pnpm config set fetch-retries 5 --location=project \
+  && pnpm install --frozen-lockfile --filter @avi/web...
 # Workspace packages are consumed from source/dist through symlinks; build the
 # shared package + contract + 3D UI dist before the web bundle.
 RUN pnpm --filter @avi/shared build \
