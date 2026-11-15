@@ -99,7 +99,7 @@ export default function PricingScreen() {
       </Subtitle>
 
       <Card>
-        <Label>Free</Label>
+        <Label>Free · forever</Label>
         <Text style={styles.price}>$0</Text>
         {FREE_FEATURES.map((feature) => (
           <Text key={feature} style={styles.feature}>
@@ -113,8 +113,8 @@ export default function PricingScreen() {
       </Card>
 
       <Card style={styles.proCard}>
-        <Label>Pro</Label>
-        <Text style={styles.price}>Subscription</Text>
+        <Label>Pro · monthly</Label>
+        <Text style={styles.price}>$9.99 / month</Text>
         {PRO_FEATURES.map((feature) => (
           <Text key={feature} style={styles.feature}>
             ✓ {feature}
@@ -138,7 +138,7 @@ export default function PricingScreen() {
       </Card>
 
       <Card>
-        <Label>Single-Trip Pass</Label>
+        <Label>Single-trip pass · one-time</Label>
         <Text style={styles.price}>
           $4.99 {tripPass?.durationDays ? `· ${tripPass.durationDays} days` : ""}
         </Text>
@@ -195,9 +195,15 @@ export default function PricingScreen() {
 }
 
 const styles = StyleSheet.create({
-  price: { color: COLORS.white, fontSize: 26, fontWeight: "900", marginTop: 2 },
-  feature: { color: COLORS.text, fontSize: 12, lineHeight: 19 },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  warning: { color: COLORS.amber, fontSize: 11, lineHeight: 17 },
-  proCard: { borderColor: COLORS.amber, backgroundColor: "#171307" },
+  price: {
+    color: COLORS.white,
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+    marginTop: 2,
+  },
+  feature: { color: COLORS.text, fontSize: 13, lineHeight: 20 },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  warning: { color: COLORS.amber, fontSize: 13, lineHeight: 19 },
+  proCard: { borderColor: `${COLORS.amber}66`, backgroundColor: COLORS.amberSurface },
 });

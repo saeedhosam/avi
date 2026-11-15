@@ -42,8 +42,8 @@ const NO_ROUTE_COUNT_RADIUS = 2.2;
 
 /** Hover treatment for routes: full-contrast white on the dark basemap. */
 const HOVER_COLOR = PALETTE.map.highlight;
-/** Airport circles turn red on hover without changing their outline. */
-const HOVER_CIRCLE_COLOR = PALETTE.status.CANCELLED.color;
+/** Hover is an active state: highlight with the single accent hue. */
+const HOVER_CIRCLE_COLOR = PALETTE.accent;
 const HOVER_RADIUS_SCALE = 1.25;
 
 const ROUTE_COUNT_BUCKETS = [
@@ -61,9 +61,14 @@ const EMPHASIS_BOOST = 2;
  * rising through amber to blue, with mega-hubs in deep navy. Radius encodes the
  * same value, so colour and size reinforce each other.
  */
-const ROUTE_COUNT_PALETTE = ["#f87171", "#fbbf24", "#60a5fa", "#3b82f6"];
+const ROUTE_COUNT_PALETTE = [
+  PALETTE.status.CANCELLED.color,
+  PALETTE.status.DELAYED.color,
+  PALETTE.accentMuted,
+  PALETTE.map.routeTraveled,
+];
 
-const NO_ROUTE_COUNT_COLOR = "#64748b";
+const NO_ROUTE_COUNT_COLOR = PALETTE.subtle;
 
 /** Basemap-matched outline so small circles stay crisp and separated. */
 const CIRCLE_STROKE = { color: "rgba(226, 239, 255, 0.65)", width: 0.5 };
@@ -134,7 +139,7 @@ export function OsmRouteMap({
     if (origin) {
       const el = document.createElement("div");
       el.className =
-        "pointer-events-auto flex items-center gap-1.5 rounded-lg bg-[#0077ff] px-2.5 py-1 text-white shadow-2xl text-[11px] font-black tracking-wide whitespace-nowrap select-none cursor-pointer border border-white/40 transform -translate-y-3";
+        "pointer-events-auto flex items-center gap-1.5 rounded-lg border border-accent/45 bg-surface/95 px-2.5 py-1 text-xs font-medium tracking-wide text-ink shadow-xl backdrop-blur whitespace-nowrap select-none cursor-pointer transform -translate-y-3";
 
       const label = document.createElement("span");
       label.textContent = `${origin.city} (${origin.iata})`;
@@ -145,7 +150,7 @@ export function OsmRouteMap({
         closeBtn.innerHTML = "✕";
         closeBtn.title = "Clear origin";
         closeBtn.className =
-          "ml-1 flex size-3.5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-[9px] leading-none transition-colors";
+          "ml-1 flex size-5 items-center justify-center rounded-full bg-surface-2 text-xs leading-none text-muted transition-colors hover:bg-surface-3 hover:text-ink";
         closeBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           onClearOrigin();
@@ -179,7 +184,7 @@ export function OsmRouteMap({
     if (selected) {
       const el = document.createElement("div");
       el.className =
-        "pointer-events-auto flex flex-col rounded-lg bg-[#0077ff] px-2.5 py-1 text-white shadow-2xl text-[11px] font-black tracking-wide whitespace-nowrap select-none cursor-pointer border border-white/40 transform -translate-y-3";
+        "pointer-events-auto flex flex-col rounded-lg border border-accent/45 bg-surface/95 px-2.5 py-1 text-xs font-medium tracking-wide text-ink shadow-xl backdrop-blur whitespace-nowrap select-none cursor-pointer transform -translate-y-3";
 
       const header = document.createElement("div");
       header.className = "flex items-center justify-between gap-1.5";
@@ -193,7 +198,7 @@ export function OsmRouteMap({
         closeBtn.innerHTML = "✕";
         closeBtn.title = "Deselect destination";
         closeBtn.className =
-          "flex size-3.5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-[9px] leading-none transition-colors";
+          "flex size-5 items-center justify-center rounded-full bg-surface-2 text-xs leading-none text-muted transition-colors hover:bg-surface-3 hover:text-ink";
         closeBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           onClearDestination();
@@ -203,7 +208,7 @@ export function OsmRouteMap({
       el.appendChild(header);
 
       const sub = document.createElement("span");
-      sub.className = "text-[9px] text-blue-100 font-semibold mt-0.5";
+      sub.className = "mt-0.5 text-xs font-medium text-accent";
       sub.textContent = "View route details ›";
       el.appendChild(sub);
 
@@ -299,8 +304,8 @@ export function OsmRouteMap({
           ["boolean", ["feature-state", "hover"], false],
           HOVER_COLOR,
           ["get", "selected"],
-          "#38bdf8",
-          "#f87171",
+          PALETTE.accent,
+          PALETTE.map.routeTraveled,
         ],
         "line-width": [
           "case",
@@ -316,7 +321,7 @@ export function OsmRouteMap({
           1,
           ["boolean", ["feature-state", "hover"], false],
           1,
-          0.65,
+          0.5,
         ],
       },
     });
@@ -655,12 +660,13 @@ export function OsmRouteMap({
       {/* Top-Right Recenter View Button - positioned to the left of the +/- navigation controls */}
       <div className="absolute right-12 top-2.5 z-20 flex items-center gap-2">
         <button
+          type="button"
           onClick={handleResetMap}
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-line/80 bg-surface/95 hover:bg-surface-2 text-ink px-2.5 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+          className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line/70 bg-surface/95 px-3 text-[13px] font-medium text-ink shadow-md backdrop-blur transition-colors hover:bg-surface-2 active:scale-95"
           title="Reset map view"
         >
-          <span>Reset View</span>
-          <RotateCcw className="size-3 text-accent" />
+          <span>Reset view</span>
+          <RotateCcw className="size-3.5 text-accent" />
         </button>
       </div>
 
@@ -673,11 +679,11 @@ export function OsmRouteMap({
             top: `${hoveredAirport.y}px`,
           }}
         >
-          <div className="flex items-center gap-1.5 rounded-lg border border-line/90 bg-surface/95 px-2.5 py-1 shadow-2xl backdrop-blur-md">
-            <span className="font-mono text-[10px] font-black txt-accent">
+          <div className="flex items-center gap-2 rounded-lg border border-line/80 bg-surface/95 px-2.5 py-1.5 shadow-2xl backdrop-blur">
+            <span className="font-mono text-[13px] font-semibold text-accent">
               {hoveredAirport.iata}
             </span>
-            <span className="text-xs font-bold text-ink">
+            <span className="text-xs font-medium text-ink">
               {hoveredAirport.city}
             </span>
           </div>
@@ -686,20 +692,21 @@ export function OsmRouteMap({
 
       {/* Airport Legend (Positioned on bottom-right to avoid sidebar clash) */}
       {legendVisible ? (
-        <div className="pointer-events-auto absolute bottom-7 right-3 sm:bottom-8 sm:right-3.5 z-20 w-56 rounded-xl border border-line/80 bg-surface/95 p-2.5 shadow-2xl backdrop-blur-md">
-          <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-line/60">
-            <span className="text-xs font-bold tracking-tight text-ink">
-              Airport Connectivity
+        <div className="pointer-events-auto absolute bottom-7 right-3 z-20 w-60 rounded-lg border border-line/70 bg-surface/95 p-3 shadow-2xl backdrop-blur sm:bottom-8 sm:right-3.5">
+          <div className="mb-2 flex items-center justify-between border-b border-line/50 pb-2">
+            <span className="text-[13px] font-medium text-ink">
+              Airport connectivity
             </span>
             <button
+              type="button"
               onClick={() => setLegendVisible(false)}
-              className="text-muted hover:text-ink transition-colors p-0.5 cursor-pointer"
+              className="flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-ink"
               aria-label="Hide airport legend"
             >
-              <X className="size-3.5" />
+              <X className="size-4" />
             </button>
           </div>
-          <div className="space-y-1.5 text-[10.5px] font-medium text-ink">
+          <div className="space-y-1.5 text-xs text-ink">
             {ROUTE_COUNT_BUCKETS.map((bucket, index) => (
               <div key={bucket.label} className="flex items-center gap-2">
                 <span
@@ -718,26 +725,26 @@ export function OsmRouteMap({
               />
               <span>0 / no reference count</span>
             </div>
-            <p className="pt-1 text-[9px] leading-relaxed text-subtle">
+            <p className="pt-1.5 text-xs leading-relaxed text-subtle">
               OpenFlights-derived reference counts, not live. Sparse airports
-              are red/amber; busy hubs are blue. Same-tier circles share a fixed
-              size; origin/selected are enlarged. Hover highlights and grows
-              airports and routes.
+              are red/amber, busy hubs blue. Origin and selected airports are
+              enlarged.
             </p>
           </div>
         </div>
       ) : (
         <button
+          type="button"
           onClick={() => setLegendVisible(true)}
-          className="pointer-events-auto absolute bottom-7 right-3 sm:bottom-8 sm:right-3.5 z-20 flex items-center gap-1.5 rounded-lg border border-line bg-surface/95 px-2.5 py-1 text-xs font-semibold text-muted hover:text-ink shadow-md backdrop-blur-md transition-colors cursor-pointer"
+          className="pointer-events-auto absolute bottom-7 right-3 z-20 flex h-9 items-center gap-1.5 rounded-lg border border-line/70 bg-surface/95 px-3 text-xs font-medium text-muted shadow-md backdrop-blur transition-colors hover:text-ink sm:bottom-8 sm:right-3.5"
         >
-          <Info className="size-3 text-accent" />
+          <Info className="size-3.5 text-accent" />
           <span>Legend</span>
         </button>
       )}
 
       {/* Far bottom-right simple attribution */}
-      <div className="pointer-events-none absolute bottom-1.5 right-2 z-10 text-[9.5px] font-medium text-muted/70 select-none">
+      <div className="pointer-events-none absolute bottom-1.5 right-2 z-10 select-none text-[11px] text-muted/70">
         © OpenStreetMap · OpenFreeMap · AeroDataBox · OpenFlights
       </div>
     </div>

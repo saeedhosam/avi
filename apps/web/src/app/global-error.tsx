@@ -20,7 +20,7 @@ export default function GlobalError({
           background: PALETTE.background,
           color: PALETTE.text,
           fontFamily: "system-ui, sans-serif",
-          padding: "2rem",
+          padding: "1.5rem",
           textAlign: "center",
           colorScheme: "dark",
         }}
@@ -28,28 +28,37 @@ export default function GlobalError({
         <div
           style={{
             border: `1px solid ${PALETTE.border}`,
-            borderRadius: "16px",
+            borderRadius: "14px",
             background: PALETTE.surface,
-            padding: "2.5rem",
+            padding: "2rem",
             maxWidth: "420px",
+            width: "100%",
           }}
         >
           <p
             style={{
-              fontFamily: "monospace",
               fontSize: "11px",
-              letterSpacing: "0.25em",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
               textTransform: "uppercase",
               color: PALETTE.accent,
+              margin: 0,
             }}
           >
-            AVI SYSTEM ERROR
+            System error
           </p>
-          <h1 style={{ fontSize: "18px", marginBottom: "8px" }}>
+          <h1 style={{ fontSize: "20px", margin: "10px 0 6px", fontWeight: 600 }}>
             AeroQuest could not start this session.
           </h1>
-          <p style={{ fontSize: "13px", color: PALETTE.muted, marginBottom: "16px" }}>
-            Reload to reconnect; your saved data stays on this device.
+          <p
+            style={{
+              fontSize: "14px",
+              lineHeight: 1.6,
+              color: PALETTE.muted,
+              margin: "0 0 20px",
+            }}
+          >
+            Reload to reconnect. Your saved data stays on this device.
           </p>
           <button
             onClick={reset}
@@ -57,16 +66,25 @@ export default function GlobalError({
               background: PALETTE.accent,
               color: PALETTE.background,
               border: "none",
-              borderRadius: "10px",
-              padding: "8px 16px",
-              fontWeight: 700,
+              borderRadius: "8px",
+              minHeight: "44px",
+              padding: "0 20px",
+              fontSize: "14px",
+              fontWeight: 600,
               cursor: "pointer",
             }}
           >
             Reload AeroQuest
           </button>
           {error.digest && (
-            <p style={{ marginTop: "12px", fontSize: "10px", color: PALETTE.subtle }}>
+            <p
+              style={{
+                marginTop: "14px",
+                marginBottom: 0,
+                fontSize: "11px",
+                color: PALETTE.subtle,
+              }}
+            >
               Error ref: {error.digest}
             </p>
           )}

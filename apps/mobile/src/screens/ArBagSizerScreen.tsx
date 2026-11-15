@@ -25,7 +25,7 @@ import {
   Subtitle,
   Title,
 } from "../../src/components/ui";
-import { COLORS } from "../../src/lib/theme";
+import { COLORS, RADIUS, TOUCH } from "../../src/lib/theme";
 
 const AIRCRAFT = ["A320", "B789", "B77W", "A388"] as const;
 
@@ -73,6 +73,8 @@ export default function ArBagSizerScreen() {
           {AIRCRAFT.map((type) => (
             <Pressable
               key={type}
+              accessibilityRole="button"
+              accessibilityState={{ selected: aircraft === type }}
               onPress={() => {
                 setAircraft(type);
                 setResult(null);
@@ -122,9 +124,30 @@ export default function ArBagSizerScreen() {
       <Card>
         <Label>Measured dimensions (cm)</Label>
         <Row>
-          <DimensionInput label="Width" value={width} onChange={setWidth} />
-          <DimensionInput label="Height" value={height} onChange={setHeight} />
-          <DimensionInput label="Depth" value={depth} onChange={setDepth} />
+          <DimensionInput
+            label="Width"
+            value={width}
+            onChange={(value) => {
+              setWidth(value);
+              setResult(null);
+            }}
+          />
+          <DimensionInput
+            label="Height"
+            value={height}
+            onChange={(value) => {
+              setHeight(value);
+              setResult(null);
+            }}
+          />
+          <DimensionInput
+            label="Depth"
+            value={depth}
+            onChange={(value) => {
+              setDepth(value);
+              setResult(null);
+            }}
+          />
         </Row>
         <PrimaryButton label="Check overhead-bin fit" onPress={measure} />
         <Text style={styles.note}>
@@ -197,7 +220,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   cameraCard: { padding: 8, gap: 8 },
-  camera: { height: 280, borderRadius: 16, overflow: "hidden" },
+  camera: { height: 280, borderRadius: RADIUS.md, overflow: "hidden" },
   overlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
@@ -210,48 +233,51 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.radar,
     borderRadius: 14,
-    backgroundColor: "rgba(34,211,238,0.05)",
+    backgroundColor: `${COLORS.radar}0D`,
   },
   overlayText: {
     color: COLORS.radar,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.6,
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.4,
   },
   pill: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 14,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   pillActive: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  pillText: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  pillText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
   dimension: { flex: 1, minWidth: 80, gap: 4 },
   dimensionLabel: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    backgroundColor: COLORS.surface2,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 12,
+    minHeight: TOUCH,
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   stat: { flex: 1, minWidth: 80 },
   statLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  statValue: { color: COLORS.white, fontSize: 15, fontWeight: "800" },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  warning: { color: COLORS.amber, fontSize: 12, fontWeight: "700" },
+  statValue: { color: COLORS.white, fontSize: 15, fontWeight: "600" },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  warning: { color: COLORS.amber, fontSize: 13, lineHeight: 19, fontWeight: "600" },
 });

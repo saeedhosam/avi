@@ -6,8 +6,10 @@ import {
   type ThreeElements,
 } from "@react-three/fiber";
 import {
+  useEffect,
   useMemo,
   useRef,
+  useState,
   type ComponentType,
   type ReactNode,
 } from "react";
@@ -22,6 +24,8 @@ import type {
 export interface CabinViewer3DProps {
   layout: AircraftCabinLayout;
   selectedSeat?: string | null;
+  /** Deck of the selected seat. Seat labels repeat across decks on widebodies. */
+  selectedDeck?: number | null;
   onSeatSelect?: (seat: CabinSeat) => void;
   /** Rotate the whole cabin slowly; disabled in screenshots/tests. */
   autoRotate?: boolean;
@@ -39,10 +43,10 @@ export interface CabinViewer3DProps {
 }
 
 const CLASS_COLORS: Record<SeatClass, string> = {
-  FIRST: "#f4c95d",
-  BUSINESS: "#7bdff2",
-  PREMIUM_ECONOMY: "#b2f7ef",
-  ECONOMY: "#5f6c7b",
+  FIRST: "#E0A24C",
+  BUSINESS: "#5BA7D9",
+  PREMIUM_ECONOMY: "#35C48F",
+  ECONOMY: "#5F6C7B",
 };
 
 const FEATURE_COLORS: Record<CabinFeature["kind"], string> = {
@@ -55,6 +59,19 @@ const FEATURE_COLORS: Record<CabinFeature["kind"], string> = {
   CREW_REST: "#90a4ae",
   WINDOW: "#e1f5fe",
 };
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return reduced;
+}
 
 const DECK_GAP = 8;
 const DECK_WIDTH = 5.4;
@@ -109,7 +126,7 @@ function SeatMesh({
         <boxGeometry args={[0.34, selected ? 0.62 : 0.42, 0.34]} />
         <meshStandardMaterial
           color={selected ? "#f8fafc" : CLASS_COLORS[seat.seatClass]}
-          emissive={selected ? new Color("#22d3ee") : new Color("#000000")}
+          emissive={selected ? new Color("#35D3E6") : new Color("#000000")}
           emissiveIntensity={selected ? 1.4 : 0}
           roughness={0.55}
           metalness={0.15}
@@ -131,7 +148,7 @@ function SelectedSeatRing() {
   return (
     <mesh ref={ref} position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <torusGeometry args={[0.42, 0.045, 10, 28]} />
-      <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={2} />
+      <meshStandardMaterial color="#35D3E6" emissive="#35D3E6" emissiveIntensity={2} />
     </mesh>
   );
 }
@@ -182,16 +199,18 @@ function FeatureMesh({
 export function CabinScene({
   layout,
   selectedSeat,
+  selectedDeck,
   onSeatSelect,
   autoRotate = true,
 }: Omit<CabinViewer3DProps, "className" | "canvas">) {
   const groupRef = useRef<Group>(null);
+  const reducedMotion = usePrefersReducedMotion();
   const deckCount = Math.max(1, layout.decks.length);
   const seats = useMemo(() => layout.seats, [layout.seats]);
   const features = useMemo(() => layout.features, [layout.features]);
 
   useFrame((_, delta) => {
-    if (autoRotate && groupRef.current) {
+    if (autoRotate && !reducedMotion && groupRef.current) {
       groupRef.current.rotation.y += delta * 0.12;
     }
   });
@@ -211,7 +230,7 @@ export function CabinScene({
           {/* Aisle centreline */}
           <mesh position={[0, 0.06, 0]}>
             <boxGeometry args={[0.08, 0.02, DECK_LENGTH - 0.6]} />
-            <meshStandardMaterial color="#22d3ee" emissive="#0e7490" emissiveIntensity={0.6} />
+            <meshStandardMaterial color="#35D3E6" emissive="#1C7B86" emissiveIntensity={0.6} />
           </mesh>
         </group>
       ))}
@@ -222,7 +241,10 @@ export function CabinScene({
         <SeatMesh
           key={`${seat.deck}-${seat.id}`}
           seat={seat}
-          selected={selectedSeat?.toUpperCase() === seat.id}
+          selected={
+            selectedSeat?.toUpperCase() === seat.id &&
+            (selectedDeck == null || seat.deck === selectedDeck)
+          }
           deckCount={deckCount}
           onSelect={onSeatSelect}
         />
@@ -238,6 +260,7 @@ export function CabinScene({
 export function CabinViewer3D({
   layout,
   selectedSeat,
+  selectedDeck,
   onSeatSelect,
   autoRotate = true,
   className,
@@ -251,13 +274,14 @@ export function CabinViewer3D({
         shadows={false}
         dpr={[1, 2]}
       >
-        <color attach="background" args={["#050b14"]} />
+        <color attach="background" args={["#070B11"]} />
         <ambientLight intensity={0.8} />
         <directionalLight position={[8, 18, 10]} intensity={1.4} color="#bae6fd" />
         <directionalLight position={[-10, 8, -12]} intensity={0.5} color="#fbbf24" />
         <CabinScene
           layout={layout}
           selectedSeat={selectedSeat}
+          selectedDeck={selectedDeck}
           onSeatSelect={onSeatSelect}
           autoRotate={autoRotate}
         />

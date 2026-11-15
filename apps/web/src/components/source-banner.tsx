@@ -1,17 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  RadioTower,
-  Cloud,
-  Info,
-  RefreshCw,
-  WifiOff,
-} from "lucide-react";
+import { Info, RadioTower, RefreshCw } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { DATA_SOURCE_META } from "@/lib/data-source";
 import { cn } from "@/lib/utils";
-import { Button, Modal } from "./ui";
+import { Button, Callout, Modal } from "./ui";
 
 export function SourceBanner({ className }: { className?: string }) {
   const { dataSourceMode, syncing, refreshData, aeroConfigured, offlineMode } =
@@ -23,13 +17,12 @@ export function SourceBanner({ className }: { className?: string }) {
     <>
       <div
         className={cn(
-          "flex w-full items-center gap-2 rounded-xl border bg-surface-2/80 px-3 py-2 text-left transition-colors hover:border-accent/40",
+          "flex w-full items-center gap-2 rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2",
           className,
         )}
-        style={{ borderColor: `${meta.color}66` }}
       >
         {syncing ? (
-          <RefreshCw className="size-3 animate-spin text-accent" />
+          <RefreshCw className="size-3.5 animate-spin text-accent" />
         ) : (
           <span
             className="size-1.5 shrink-0 rounded-full"
@@ -43,26 +36,23 @@ export function SourceBanner({ className }: { className?: string }) {
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-label="Open data and sync status details"
         >
-          <span
-            className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.1em]"
-            style={{ color: meta.color }}
-          >
-            {syncing ? "SYNCING…" : meta.badge}
+          <span className="shrink-0 text-xs font-semibold text-ink">
+            {syncing ? "Syncing…" : meta.badge}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[10px] text-muted">
-            · {meta.summary}
+          <span className="min-w-0 flex-1 truncate text-xs text-muted">
+            {meta.summary}
           </span>
-          <Info className="size-3 shrink-0 text-subtle" />
+          <Info className="size-3.5 shrink-0 text-subtle" />
         </button>
         <button
           type="button"
           onClick={() => {
             void refreshData();
           }}
-          className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-3"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md text-subtle transition-colors hover:bg-surface-3 hover:text-ink"
           aria-label="Refresh data"
         >
-          <RefreshCw className={cn("size-3", syncing && "animate-spin")} />
+          <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
         </button>
       </div>
 
@@ -79,49 +69,48 @@ export function SourceBanner({ className }: { className?: string }) {
               Close
             </Button>
             <Button size="sm" onClick={refreshData} disabled={syncing}>
-              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
-              Refresh
+              <RefreshCw className={cn("size-4", syncing && "animate-spin")} />
+              {syncing ? "Refreshing…" : "Refresh"}
             </Button>
           </>
         }
       >
-        <div className="space-y-3">
-          <p className="text-xs leading-relaxed text-muted">{meta.subtitle}</p>
-          <div className="space-y-2">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-muted">{meta.subtitle}</p>
+          <div className="divide-y divide-line/60 rounded-lg border border-line/60">
             <DiagnosticRow
               title="Live flight data"
-              detail="Flights, airport boards, delays, daily route stats"
+              detail="Flights, boards, delays, daily route stats"
               active={dataSourceMode === "LIVE_AERODATABOX"}
               value={
                 offlineMode
-                  ? "OFFLINE"
+                  ? "Offline"
                   : dataSourceMode === "LIVE_AERODATABOX"
-                    ? "LIVE RESPONSE"
+                    ? "Live"
                     : dataSourceMode === "CONFIGURED_IDLE"
-                      ? "READY · NO DATA"
+                      ? "Ready · no data"
                       : dataSourceMode === "QUOTA_FALLBACK"
-                        ? "PAUSED"
-                        : "UNAVAILABLE"
+                        ? "Paused"
+                        : "Unavailable"
               }
             />
             <DiagnosticRow
               title="Destination weather"
               detail="Open-Meteo model forecast, fetched on demand"
               active={false}
-              value="ON DEMAND"
+              value="On demand"
             />
             <DiagnosticRow
-              title="Local cache + background sync"
-              detail="Saved flight records, watchlist, notes, alerts"
+              title="Local cache & background sync"
+              detail="Saved flights, watchlist, notes, alerts"
               active
-              value="ACTIVE"
+              value="Active"
             />
           </div>
-          <div className="space-y-1.5 rounded-xl border border-line/70 bg-surface px-3 py-2.5">
-            <p className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-subtle">
-              Data sources
-            </p>
-            <p className="text-[9px] leading-relaxed text-subtle">
+
+          <div className="rounded-lg border border-line/60 px-3.5 py-3">
+            <p className="label-caps text-subtle">Sources</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
               Flight data by{" "}
               <a
                 href="https://aerodatabox.com/"
@@ -131,14 +120,14 @@ export function SourceBanner({ className }: { className?: string }) {
               >
                 AeroDataBox
               </a>
-              .{" "}
+              . Weather by{" "}
               <a
                 href="https://open-meteo.com/"
                 target="_blank"
                 rel="noreferrer"
                 className="underline underline-offset-2 hover:text-accent"
               >
-                Weather model by Open-Meteo
+                Open-Meteo
               </a>
               . Map data ©{" "}
               <a
@@ -157,37 +146,37 @@ export function SourceBanner({ className }: { className?: string }) {
                 className="underline underline-offset-2 hover:text-accent"
               >
                 OpenFreeMap
-              </a> .
+              </a>
+              .
             </p>
-            <p className="mt-2 flex items-center gap-2 border-t border-line/60 pt-2 text-[9px] text-muted">
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line/50 pt-2.5 text-xs text-muted">
               <a
                 href="/legal/privacy"
                 className="underline underline-offset-2 hover:text-accent"
               >
-                Privacy Policy
+                Privacy
               </a>
               <span className="text-subtle">·</span>
               <a
                 href="/legal/terms"
                 className="underline underline-offset-2 hover:text-accent"
               >
-                Terms of Service
+                Terms
               </a>
-              <span className="text-subtle">· Not for operational navigation. Contact: makymaky757@gmail.com</span>
+              <span className="text-subtle">· Not for operational navigation.</span>
             </p>
           </div>
+
           {offlineMode ? (
-            <p className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
-              <WifiOff className="mt-0.5 size-3.5 shrink-0 text-accent" />
-              You’re offline. Live lookups are paused and
-              your saved data is being used across all screens.
-            </p>
+            <Callout tone="info">
+              You’re offline. Live lookups are paused and your saved data is
+              used across all screens.
+            </Callout>
           ) : !aeroConfigured ? (
-            <p className="flex items-start gap-2 rounded-lg border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-              <Cloud className="mt-0.5 size-3.5 shrink-0 text-delayed" />
-              Live flight lookups aren’t connected in this build.
-              Saved flights and boards are shown from your last sync. Weather is live.
-            </p>
+            <Callout tone="attention" title="Live flight data is not connected">
+              Saved flights and boards come from your last sync. Weather is
+              live.
+            </Callout>
           ) : null}
         </div>
       </Modal>
@@ -207,17 +196,17 @@ function DiagnosticRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-surface-2 px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 px-3.5 py-3">
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold text-ink">{title}</p>
-        <p className="mt-0.5 truncate text-[9px] text-subtle">{detail}</p>
+        <p className="truncate text-[13px] font-medium text-ink">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-subtle">{detail}</p>
       </div>
       <span
         className={cn(
-          "shrink-0 rounded-md border px-1.5 py-1 text-[8px] font-extrabold tracking-wide",
+          "shrink-0 rounded-md border px-2 py-1 text-xs font-semibold",
           active
-            ? "border-landed/35 bg-landed/10 text-landed"
-            : "border-delayed/35 bg-delayed/10 text-delayed",
+            ? "border-landed/30 bg-landed/10 text-landed"
+            : "border-delayed/30 bg-delayed/10 text-delayed",
         )}
       >
         {value}

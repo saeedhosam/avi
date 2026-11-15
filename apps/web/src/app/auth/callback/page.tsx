@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
 
 export default function AuthCallbackPage() {
@@ -47,13 +48,19 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#071018] px-6 text-center text-[#EAF6FF]">
-      <div className="rounded-2xl border border-[#1E3A4F] bg-[#0D1B27] px-8 py-10">
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#00E5FF]">
-          AVI AUTH
-        </p>
-        <p className="mt-4 text-sm text-[#93A9BA]">{message}</p>
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
+      <div
+        className="w-full max-w-sm rounded-xl border border-line/70 bg-surface/80 p-8 text-center"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="mx-auto flex size-11 items-center justify-center rounded-full border border-accent/30 bg-accent-soft text-accent">
+          <ShieldCheck className="size-5" />
+        </div>
+        <p className="label-caps mt-4 text-subtle">AeroQuest account</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{message}</p>
+        <Loader2 className="mx-auto mt-5 size-4 animate-spin text-accent" />
       </div>
-    </main>
+    </div>
   );
 }

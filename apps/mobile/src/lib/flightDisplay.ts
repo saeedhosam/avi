@@ -68,7 +68,11 @@ export function formatDateTime(value: string | null | undefined): string {
 /** Empty provider strings are "not reported", never displayed as a blank fact. */
 export function displayText(value: string | null | undefined): string {
   const trimmed = value?.trim();
-  return trimmed && !/^[—–-]$/.test(trimmed) ? trimmed : "Not reported";
+  if (!trimmed || /^[—–-]$/.test(trimmed)) return "Not reported";
+  if (/^(n\/a|tbd|gate tbd|carousel tbd|unknown)$/i.test(trimmed)) {
+    return "Not reported";
+  }
+  return trimmed;
 }
 
 export function displayBoolean(value: boolean | null | undefined): string {

@@ -29,7 +29,7 @@ import {
   Title,
 } from "../../src/components/ui";
 import { GATEWAY_URL, HOME_AIRPORTS } from "../../src/lib/config";
-import { COLORS, HAUL_COLORS } from "../../src/lib/theme";
+import { COLORS, HAUL_COLORS, RADIUS } from "../../src/lib/theme";
 
 interface CountryShape {
   n: string;
@@ -214,15 +214,15 @@ export default function ExploreScreen() {
         <Svg width="100%" height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
           <Path
             d={`M 0 0 H ${MAP_WIDTH} V ${MAP_HEIGHT} H 0 Z`}
-            fill="#07111e"
+            fill={COLORS.cockpit}
           />
           <G opacity={0.5}>
             {COUNTRIES.map((country) => (
               <Path
                 key={country.n}
                 d={countryPath(country)}
-                fill="#13283a"
-                stroke="#1e3a4c"
+                fill={COLORS.surface3}
+                stroke={COLORS.line}
                 strokeWidth={0.35}
               />
             ))}
@@ -236,7 +236,7 @@ export default function ExploreScreen() {
                 y1={y}
                 x2={MAP_WIDTH}
                 y2={y}
-                stroke="#143042"
+                stroke={COLORS.line}
                 strokeWidth={0.4}
               />
             );
@@ -326,6 +326,8 @@ export default function ExploreScreen() {
           {HAULS.map((item) => (
             <Pressable
               key={item.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: haul === item.key }}
               onPress={() => setHaul(item.key)}
               style={[
                 styles.filter,
@@ -364,6 +366,8 @@ export default function ExploreScreen() {
           <Label>Filter by airline</Label>
           <Row>
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: !airline }}
               onPress={() => setAirline(null)}
               style={[styles.chip, !airline && styles.chipActive]}
             >
@@ -374,6 +378,10 @@ export default function ExploreScreen() {
             {airlines.map((carrier) => (
               <Pressable
                 key={carrier.code || carrier.name}
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: airline === (carrier.code || carrier.name),
+                }}
                 onPress={() =>
                   setAirline(carrier.code || carrier.name || null)
                 }
@@ -475,35 +483,39 @@ function Metric({ label, value, note }: { label: string; value: string; note: st
 }
 
 const styles = StyleSheet.create({
-  mapCard: { padding: 10, gap: 10 },
+  mapCard: { padding: 10, gap: 12 },
   filter: {
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   filterActive: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  filterText: { color: COLORS.muted, fontSize: 11, fontWeight: "700" },
+  filterText: { color: COLORS.muted, fontSize: 12, fontWeight: "600" },
   chip: {
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
   chipActive: { backgroundColor: COLORS.amber, borderColor: COLORS.amber },
-  chipText: { color: COLORS.text, fontSize: 10, fontWeight: "700" },
-  destTitle: { color: COLORS.white, fontSize: 22, fontWeight: "800", marginTop: 3 },
+  chipText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  destTitle: { color: COLORS.white, fontSize: 22, fontWeight: "700", marginTop: 3 },
   metric: { flex: 1, minWidth: 90 },
   metricLabel: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
-  metricValue: { color: COLORS.white, fontSize: 16, fontWeight: "800", marginTop: 2 },
-  metricNote: { color: COLORS.muted, fontSize: 10 },
+  metricValue: { color: COLORS.white, fontSize: 16, fontWeight: "700", marginTop: 2 },
+  metricNote: { color: COLORS.muted, fontSize: 12 },
   weather: { color: COLORS.radar, fontSize: 13, fontWeight: "600" },
   note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
 });

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { Panel } from "@/components/ui";
+import { PageHeader, Panel } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: { absolute: "Privacy Policy · AeroQuest" },
@@ -12,22 +12,30 @@ const UPDATE = "November 11, 2026";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-black uppercase tracking-[0.16em] text-accent">{title}</h2>
-      <div className="mt-2 space-y-2 text-[13px] leading-relaxed text-muted">{children}</div>
+      <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+        {title}
+      </h2>
+      <div className="mt-2 space-y-2.5 text-sm leading-relaxed text-muted">
+        {children}
+      </div>
     </section>
   );
 }
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <Panel className="p-6">
-        <p className="label-caps flex items-center gap-2 text-accent">
-          <ShieldCheck className="size-4" /> Legal
-        </p>
-        <h1 className="mt-2 text-xl font-black text-ink">AeroQuest Privacy Policy</h1>
-        <p className="mt-1 text-[11px] text-subtle">Last updated: {UPDATE}</p>
+    <div className="mx-auto max-w-3xl px-4 py-8 lg:px-8">
+      <PageHeader
+        eyebrow={
+          <span className="flex items-center gap-2">
+            <ShieldCheck className="size-4" /> Legal
+          </span>
+        }
+        title="Privacy Policy"
+        description={`Last updated ${UPDATE}. What AeroQuest collects, why, and how to remove it.`}
+      />
 
+      <Panel className="mt-6 p-5 sm:p-6">
         <Section title="1. Who we are">
           <p>
             AeroQuest (&quot;AeroQuest&quot;, &quot;we&quot;, &quot;us&quot;) is a live flight-tracking

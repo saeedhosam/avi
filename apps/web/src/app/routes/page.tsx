@@ -54,7 +54,7 @@ import { Button, FilterChip, Modal, TextInput } from "@/components/ui";
 const OsmRouteMap = dynamic(() => import("@/components/osm-map").then((m) => m.OsmRouteMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-surface-2">
+    <div className="flex h-full items-center justify-center rounded-xl border border-line/70 bg-surface">
       <p className="text-xs font-medium text-muted">Loading route network…</p>
     </div>
   ),
@@ -734,31 +734,39 @@ function RoutesContent() {
   const explorerHref = originIata ? `/explore/${originIata}` : "/explore/CAI";
 
   return (
-    <div className="mx-auto max-w-[1680px] px-2 py-2 sm:px-3 sm:py-3 lg:px-5">
+    <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
       {/*
         Deliberate consolidation: the shared explorer owns the globe, airline
         filters, and arrival weather. This page keeps the working airport board,
         live timetable, and pivot history that /explore does not replace yet.
       */}
-      <div className="mb-2 flex flex-col gap-2 rounded-xl border border-accent/35 bg-accent-soft px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-2">
-          <Globe2 className="mt-0.5 size-4 shrink-0 text-accent" />
-          <p className="text-[11px] leading-relaxed text-muted">
-            <span className="font-bold text-ink">Looking for the shared globe?</span>{" "}
-            The AeroQuest explorer has airline filters and arrival weather. This
-            planner stays available for the live airport board and timetable.
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="label-caps text-accent">Route planner</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+            Direct connections
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
+            Pick an origin on the map to see the provider&rsquo;s direct
+            destinations, then open a route for its live timetable.
           </p>
         </div>
-        <Link
-          href={explorerHref}
-          className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-accent/50 bg-surface px-3 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent hover:text-[color:var(--bg)]"
-        >
-          Open route explorer
-          <ArrowUpRight className="size-3.5" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="hidden items-center gap-1.5 text-xs text-subtle sm:flex">
+            <Globe2 className="size-3.5" />
+            Airline filters and arrival weather live in the explorer
+          </span>
+          <Link
+            href={explorerHref}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3.5 text-[13px] font-medium text-accent transition-colors hover:bg-accent hover:text-[color:var(--bg)]"
+          >
+            Open route explorer
+            <ArrowUpRight className="size-4" />
+          </Link>
+        </div>
       </div>
 
-      <div className="relative h-[calc(100vh-196px)] min-h-[520px] sm:min-h-160 overflow-hidden rounded-xl border border-line">
+      <div className="relative h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-xl border border-line/70 sm:min-h-160">
         <OsmRouteMap
           connections={filteredConnections}
           origin={summary.originAirport}
@@ -785,9 +793,9 @@ function RoutesContent() {
           className="h-full rounded-none border-0"
         />
 
-        {/* Timetable Panel (Responsive Bottom-Sheet on Mobile, Sidebar on Desktop) */}
+        {/* Timetable panel: bottom sheet on mobile, sidebar on desktop. */}
         {selectedConnection && !fullMap && (
-          <div className="pointer-events-auto absolute z-30 transition-all inset-x-0 bottom-0 top-auto max-h-[72vh] sm:inset-y-0 sm:left-0 sm:right-auto sm:top-0 sm:max-h-full sm:w-[385px] md:w-[415px] shadow-2xl">
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 top-auto z-30 max-h-[72vh] shadow-2xl transition-all sm:inset-y-0 sm:left-0 sm:right-auto sm:top-0 sm:max-h-full sm:w-[385px] md:w-[415px]">
             <RouteTimetable
               connection={selectedConnection}
               provenance={routeProvenance}
@@ -804,22 +812,22 @@ function RoutesContent() {
           </div>
         )}
 
-        {/* Floating Command HUD Bar */}
+        {/* Floating command HUD */}
         {!fullMap && (
           <div
             className={cn(
-              "pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-center lg:inset-x-4 lg:top-4 transition-all duration-300",
+              "pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-center transition-all duration-300 lg:inset-x-4 lg:top-4",
               selectedConnection ? "sm:pl-[400px] md:pl-[430px]" : "",
             )}
           >
-            <div className="pointer-events-auto w-full max-w-220 rounded-xl border border-line/80 bg-surface/95 p-2 sm:p-2.5 shadow-2xl backdrop-blur-xl">
-              <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="rounded-md bg-accent px-1.5 py-1 font-mono text-xs font-black text-bg">
+            <div className="pointer-events-auto w-full max-w-[860px] rounded-xl border border-line/80 bg-surface/95 p-3 shadow-2xl backdrop-blur-xl">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="rounded-md bg-accent px-2 py-1 font-mono text-xs font-semibold text-[color:var(--bg)]">
                     {summary.originAirport?.iata ??
                       (departureInput ? departureInput.slice(0, 3).toUpperCase() : "—")}
                   </span>
-                  <p className="truncate text-xs font-bold text-ink">
+                  <p className="truncate text-[13px] font-medium text-ink">
                     {selectedConnection
                       ? `${selectedConnection.origin.iata} → ${selectedConnection.destination.iata} · ${selectedConnection.destination.city}`
                       : summary.originAirport
@@ -829,47 +837,52 @@ function RoutesContent() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
+                    type="button"
                     onClick={() => setFullMap(true)}
-                    className="flex h-7 items-center gap-1 rounded-md border border-line bg-surface-2 px-2 text-xs font-semibold text-muted hover:text-ink transition-colors cursor-pointer"
-                    title="Toggle Full Map"
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2/60 px-2.5 text-xs font-medium text-muted transition-colors hover:text-ink"
+                    title="Toggle full map"
                   >
-                    <Maximize2 className="size-3" />
-                    <span className="hidden sm:inline">Full Map</span>
+                    <Maximize2 className="size-3.5" />
+                    <span className="hidden sm:inline">Full map</span>
                   </button>
                   {pivotHistory.length > 0 && (
                     <button
+                      type="button"
                       onClick={popHub}
-                      className="flex h-7 items-center gap-1 rounded-md border border-accent/40 bg-surface-2 px-2 text-xs font-bold text-accent transition-colors hover:bg-accent-soft cursor-pointer"
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/15"
                       title="Previous airport hub"
                     >
-                      <Undo2 className="size-3" />
+                      <Undo2 className="size-3.5" />
                       <span>{pivotHistory[pivotHistory.length - 1]}</span>
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => {
                       setHubQuery("");
                       setHubSheetOpen(true);
                     }}
-                    className="flex size-7 items-center justify-center rounded-md border border-line bg-surface-2 text-accent transition-colors hover:border-accent/40 cursor-pointer"
+                    className="flex size-9 items-center justify-center rounded-lg border border-line/70 bg-surface-2/60 text-accent transition-colors hover:border-accent/40"
                     title="Search worldwide airports"
+                    aria-label="Search worldwide airports"
                   >
-                    <Search className="size-3.5" />
+                    <Search className="size-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setFilterSheetOpen(true)}
                     className={cn(
-                      "flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition-all cursor-pointer",
+                      "flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
                       hasFilters
                         ? "border-accent/60 bg-accent-soft text-accent"
-                        : "border-line bg-surface-2 text-muted hover:text-ink hover:border-accent/40",
+                        : "border-line/70 bg-surface-2/60 text-muted hover:border-accent/40 hover:text-ink",
                     )}
                     title="Filter route network"
                   >
                     <SlidersHorizontal className="size-3.5" />
                     <span className="hidden sm:inline">Filters</span>
                     {hasFilters && (
-                      <span className="flex size-4 items-center justify-center rounded-full bg-accent text-[9px] font-black text-bg">
+                      <span className="flex size-4 items-center justify-center rounded-full bg-accent text-xs font-semibold text-[color:var(--bg)]">
                         {activeFilterCount}
                       </span>
                     )}
@@ -877,51 +890,61 @@ function RoutesContent() {
                 </div>
               </div>
 
-              {/* Origin & Destination Inputs with Swap */}
-              <div className="mt-2 flex items-center gap-1.5">
-                {/* Origin Input & Anchored Combobox */}
+              {/* Origin & destination inputs with swap */}
+              <div className="mt-2.5 flex items-center gap-2">
                 <div ref={originDropdownRef} className="relative flex-1">
-                  <div className="flex h-9 w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 transition-colors focus-within:border-accent/50">
-                    <PlaneTakeoff className="size-3.5 shrink-0 text-accent" />
+                  <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-line bg-surface-2/70 px-3 transition-colors focus-within:border-accent/50">
+                    <PlaneTakeoff className="size-4 shrink-0 text-accent" />
                     <input
                       value={departureInput}
                       onChange={(event) => updateDeparture(event.target.value)}
                       onKeyDown={handleDepartureKeyDown}
                       placeholder="Origin hub (e.g. CAI, London, JFK)"
-                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-ink outline-none placeholder:text-subtle"
+                      className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-ink outline-none placeholder:text-subtle"
                     />
                     {departureInput && (
-                      <button onClick={loadAllRoutes} aria-label="Clear origin" className="cursor-pointer">
-                        <X className="size-3 text-subtle hover:text-ink" />
+                      <button
+                        type="button"
+                        onClick={loadAllRoutes}
+                        aria-label="Clear origin"
+                        className="flex size-6 items-center justify-center rounded text-subtle hover:text-ink"
+                      >
+                        <X className="size-3.5" />
                       </button>
                     )}
                   </div>
 
-                  {/* Vertical Autocomplete Suggestions Dropdown */}
                   {suggestions.length > 0 && (
-                    <div className="absolute left-0 top-full mt-1.5 z-40 w-full rounded-xl border border-line/90 bg-surface/98 p-1 shadow-2xl backdrop-blur-xl">
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-subtle border-b border-line/40">
-                        Select Origin Airport
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-0.5 pt-1">
+                    <div className="absolute left-0 top-full z-40 mt-1.5 w-full rounded-lg border border-line/80 bg-surface p-1 shadow-2xl">
+                      <p className="label-caps border-b border-line/40 px-2 py-1.5 text-subtle">
+                        Origin airport
+                      </p>
+                      <div className="max-h-64 space-y-0.5 overflow-y-auto pt-1">
                         {suggestions.map((airport) => (
                           <button
                             key={airport.iata}
+                            type="button"
                             onClick={() => {
                               setDepartureInput(`${airport.iata} · ${airport.city}`);
                               setSuggestions([]);
                               void loadHub(airport.iata);
                             }}
-                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-surface-2 cursor-pointer group"
+                            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-surface-2"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-black text-accent">{airport.iata}</span>
-                              <span className="font-semibold text-ink truncate">{airport.city}</span>
-                              <span className="text-[11px] text-muted truncate hidden sm:inline">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="font-mono font-semibold text-accent">
+                                {airport.iata}
+                              </span>
+                              <span className="truncate font-medium text-ink">
+                                {airport.city}
+                              </span>
+                              <span className="hidden truncate text-xs text-muted sm:inline">
                                 {airport.name}
                               </span>
-                            </div>
-                            <span className="text-[10px] text-subtle shrink-0">{airport.country}</span>
+                            </span>
+                            <span className="shrink-0 text-xs text-subtle">
+                              {airport.country}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -930,59 +953,66 @@ function RoutesContent() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={swap}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/45 bg-surface-3 text-accent transition-transform hover:rotate-180 cursor-pointer shadow-sm"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-surface-3 text-accent shadow-sm transition-transform hover:rotate-180"
                   aria-label="Swap origin and destination"
                 >
-                  <ArrowLeftRight className="size-3.5" />
+                  <ArrowLeftRight className="size-4" />
                 </button>
 
-                {/* Destination Input & Anchored Combobox */}
                 <div ref={destDropdownRef} className="relative flex-1">
-                  <div className="flex h-9 w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 transition-colors focus-within:border-accent-2/50">
-                    <PlaneLanding className="size-3.5 shrink-0 text-accent-2" />
+                  <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-line bg-surface-2/70 px-3 transition-colors focus-within:border-accent-2/50">
+                    <PlaneLanding className="size-4 shrink-0 text-accent-2" />
                     <input
                       value={destinationInput}
                       onChange={(event) => updateDestination(event.target.value)}
                       onKeyDown={handleDestinationKeyDown}
                       placeholder="Filter destination (IATA / city)"
-                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-ink outline-none placeholder:text-subtle"
+                      className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-ink outline-none placeholder:text-subtle"
                     />
                     {destinationInput && (
                       <button
+                        type="button"
                         onClick={() => {
                           setDestinationInput("");
                           setSelectedDest(null);
                         }}
                         aria-label="Clear destination"
-                        className="cursor-pointer"
+                        className="flex size-6 items-center justify-center rounded text-subtle hover:text-ink"
                       >
-                        <X className="size-3 text-subtle hover:text-ink" />
+                        <X className="size-3.5" />
                       </button>
                     )}
                   </div>
 
-                  {/* Vertical Destination Suggestions Dropdown */}
                   {destinationSuggestions.length > 0 && (
-                    <div className="absolute left-0 top-full mt-1.5 z-40 w-full rounded-xl border border-line/90 bg-surface/98 p-1 shadow-2xl backdrop-blur-xl">
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-subtle border-b border-line/40">
-                        Direct Destinations
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-0.5 pt-1">
+                    <div className="absolute left-0 top-full z-40 mt-1.5 w-full rounded-lg border border-line/80 bg-surface p-1 shadow-2xl">
+                      <p className="label-caps border-b border-line/40 px-2 py-1.5 text-subtle">
+                        Direct destinations
+                      </p>
+                      <div className="max-h-64 space-y-0.5 overflow-y-auto pt-1">
                         {destinationSuggestions.map((airport) => (
                           <button
                             key={airport.iata}
+                            type="button"
                             onClick={() => selectDestination(airport.iata)}
-                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-surface-2 cursor-pointer group"
+                            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-surface-2"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-black text-accent-2">{airport.iata}</span>
-                              <span className="font-semibold text-ink truncate">{airport.city}</span>
-                              <span className="text-[11px] text-muted truncate hidden sm:inline">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="font-mono font-semibold text-accent-2">
+                                {airport.iata}
+                              </span>
+                              <span className="truncate font-medium text-ink">
+                                {airport.city}
+                              </span>
+                              <span className="hidden truncate text-xs text-muted sm:inline">
                                 {airport.name}
                               </span>
-                            </div>
-                            <span className="text-[10px] text-subtle shrink-0">{airport.country}</span>
+                            </span>
+                            <span className="shrink-0 text-xs text-subtle">
+                              {airport.country}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -991,21 +1021,24 @@ function RoutesContent() {
                 </div>
               </div>
 
-              {/* Zero-State Scaffolding: Curated Popular Global Hubs */}
+              {/* Zero-state quick hubs */}
               {!originIata && (
-                <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-0.5 border-t border-line/50 pt-2">
-                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-subtle">
-                    Popular hubs:
+                <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto border-t border-line/50 pt-2.5">
+                  <span className="label-caps shrink-0 text-subtle">
+                    Popular hubs
                   </span>
                   {QUICK_HUBS.slice(0, 8).map((code) => {
                     const node = findAirportNode(code);
                     return (
                       <button
                         key={code}
+                        type="button"
                         onClick={() => void loadHub(code)}
-                        className="flex shrink-0 items-center gap-1 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-semibold text-muted hover:border-accent/50 hover:text-accent transition-colors cursor-pointer"
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-line/70 bg-surface-2/50 px-2.5 text-xs text-muted transition-colors hover:border-accent/50 hover:text-accent"
                       >
-                        <span className="font-mono font-bold text-accent">{code}</span>
+                        <span className="font-mono font-semibold text-accent">
+                          {code}
+                        </span>
                         <span className="text-ink">{node?.city ?? code}</span>
                       </button>
                     );
@@ -1018,39 +1051,46 @@ function RoutesContent() {
 
         {fullMap && (
           <button
+            type="button"
             onClick={() => setFullMap(false)}
-            className="absolute left-3.5 top-3.5 z-20 flex items-center gap-1.5 rounded-lg border border-line bg-surface/95 px-3 py-1.5 text-xs font-bold text-ink shadow-lg backdrop-blur hover:bg-surface-2 transition-all cursor-pointer"
+            className="absolute left-3.5 top-3.5 z-20 flex h-10 items-center gap-1.5 rounded-lg border border-line/70 bg-surface/95 px-3 text-[13px] font-medium text-ink shadow-lg backdrop-blur transition-colors hover:bg-surface-2"
           >
-            <Minimize2 className="size-3.5 text-accent" />
+            <Minimize2 className="size-4 text-accent" />
             <span>Show controls</span>
           </button>
         )}
 
         {loading && (
-          <div className="absolute left-1/2 top-28 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/50 bg-surface/95 px-3 py-1.5 shadow-xl backdrop-blur">
-            <Loader2 className="size-3.5 animate-spin text-accent" />
-            <span className="text-xs font-semibold text-ink">Loading AeroDataBox route statistics for {originIata}…</span>
+          <div className="absolute left-1/2 top-32 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/40 bg-surface/95 px-3.5 py-2 shadow-xl backdrop-blur">
+            <Loader2 className="size-4 animate-spin text-accent" />
+            <span className="text-xs font-medium text-ink">
+              Loading AeroDataBox route statistics for {originIata}…
+            </span>
           </div>
         )}
 
         {error && (
-          <div className="absolute left-1/2 top-32 z-10 flex w-[min(540px,calc(100%-32px))] -translate-x-1/2 items-center justify-between rounded-xl border border-delayed/50 bg-surface/95 px-3.5 py-2.5 text-xs text-muted shadow-2xl backdrop-blur">
+          <div
+            role="alert"
+            className="absolute left-1/2 top-36 z-10 flex w-[min(540px,calc(100%-32px))] -translate-x-1/2 items-start justify-between gap-3 rounded-lg border border-delayed/40 bg-surface/95 px-3.5 py-3 text-[13px] leading-relaxed text-muted shadow-2xl backdrop-blur"
+          >
             <span>{error}</span>
             <button
+              type="button"
               onClick={() => setError(null)}
-              className="text-subtle hover:text-ink cursor-pointer ml-2"
+              className="flex size-7 shrink-0 items-center justify-center rounded text-subtle hover:text-ink"
               aria-label="Dismiss error"
             >
-              <X className="size-3.5" />
+              <X className="size-4" />
             </button>
           </div>
         )}
       </div>
 
-      {/* Docked Status & Connectivity Metrics Bar */}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line/70 bg-surface px-3.5 py-2">
-        <div className="flex flex-wrap items-center gap-3.5 text-xs text-muted">
-          <span className="flex items-center gap-1 font-semibold text-ink">
+      {/* Docked status and connectivity metrics */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-line/70 bg-surface/80 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+          <span className="flex items-center gap-1.5 font-medium text-ink">
             <MapPin className="size-3.5 text-accent" />
             {summary.totalDirectDestinations} direct destinations
           </span>
@@ -1063,26 +1103,32 @@ function RoutesContent() {
           </span>
           {routeProvenance && (
             <span title={routeProvenance.note}>
-              AeroDataBox · retrieved {formatProvenanceTime(routeProvenance.fetchedAt)} · last 7 days, not a forward schedule
+              AeroDataBox · retrieved{" "}
+              {formatProvenanceTime(routeProvenance.fetchedAt)} · last 7 days,
+              not a forward schedule
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-subtle">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-subtle">
           <button
+            type="button"
             onClick={() => {
               if (originIata) void loadHub(originIata, false);
             }}
-            className="flex items-center gap-1 font-semibold text-accent hover:underline cursor-pointer"
+            className="flex items-center gap-1.5 font-medium text-accent transition-colors hover:text-ink"
           >
-            <RotateCcw className="size-3" />
+            <RotateCcw className="size-3.5" />
             <span>Refresh data</span>
           </button>
-          <span>·</span>
-          <span>Select a destination to view AeroDataBox&apos;s current departures board</span>
+          <span aria-hidden="true">·</span>
+          <span>
+            Select a destination to view AeroDataBox&apos;s current departures
+            board
+          </span>
         </div>
       </div>
 
-      {/* Origin Airport Hub Search Modal */}
+      {/* Origin airport hub search */}
       <Modal
         open={hubSheetOpen}
         onClose={() => setHubSheetOpen(false)}
@@ -1093,7 +1139,7 @@ function RoutesContent() {
       >
         <div className="space-y-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-accent" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
             <TextInput
               autoFocus
               value={hubQuery}
@@ -1106,41 +1152,45 @@ function RoutesContent() {
             {hubResults.slice(0, 24).map((airport) => (
               <button
                 key={airport.iata}
+                type="button"
                 onClick={() => {
                   void loadHub(airport.iata);
                   setHubSheetOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors cursor-pointer",
+                  "flex min-h-14 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
                   airport.iata === originIata
-                    ? "border-accent/50 bg-accent-soft"
-                    : "border-line/70 bg-surface-2 hover:border-accent/40",
+                    ? "border-accent/45 bg-accent-soft"
+                    : "border-line/70 bg-surface-2/40 hover:border-line-strong",
                 )}
               >
-                <span className="rounded-md border border-accent/35 bg-accent/10 px-1.5 py-1 font-mono text-xs font-extrabold text-accent">
+                <span className="rounded-md border border-accent/35 bg-accent/10 px-2 py-1 font-mono text-xs font-semibold text-accent">
                   {airport.iata}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-bold text-ink">
+                  <span className="block truncate text-[13px] font-medium text-ink">
                     {airport.city}, {airport.country}
                   </span>
-                  <span className="block truncate text-[11px] text-subtle">{airport.name}</span>
+                  <span className="block truncate text-xs text-subtle">
+                    {airport.name}
+                  </span>
                 </span>
-                <span className="shrink-0 text-[10px] font-semibold text-accent-2">
+                <span className="shrink-0 text-xs font-medium text-accent-2">
                   {REGION_META[airport.region]?.short ?? airport.region}
                 </span>
               </button>
             ))}
             {hubResults.length === 0 && (
-              <p className="py-6 text-center text-xs text-muted">
-                No reference airport matched “{hubQuery}”. Use the search bar for worldwide airports.
+              <p className="py-8 text-center text-[13px] text-muted">
+                No reference airport matched “{hubQuery}”. Use the search bar for
+                worldwide airports.
               </p>
             )}
           </div>
         </div>
       </Modal>
 
-      {/* Unified Route Filters Modal */}
+      {/* Unified route filters */}
       <Modal
         open={filterSheetOpen}
         onClose={() => setFilterSheetOpen(false)}
@@ -1159,10 +1209,10 @@ function RoutesContent() {
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
             <p className="label-caps text-subtle">Distance / haul range</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {HAULS.map((item) => (
                 <FilterChip
                   key={item}
@@ -1177,9 +1227,13 @@ function RoutesContent() {
           </div>
           <div>
             <p className="label-caps text-subtle">Destination region</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {REGIONS.map((item) => (
-                <FilterChip key={item} active={region === item} onClick={() => setRegion(item)}>
+                <FilterChip
+                  key={item}
+                  active={region === item}
+                  onClick={() => setRegion(item)}
+                >
                   {REGION_META[item].label}
                 </FilterChip>
               ))}
@@ -1188,7 +1242,7 @@ function RoutesContent() {
           {summary.availableAirlines.length > 0 && (
             <div>
               <p className="label-caps text-subtle">Operating airline</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+              <div className="mt-2 flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
                 <FilterChip active={!airlineCode} onClick={() => setAirlineCode(null)}>
                   All airlines ({summary.availableAirlines.length})
                 </FilterChip>

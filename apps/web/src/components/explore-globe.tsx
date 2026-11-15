@@ -19,13 +19,14 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { routeCoordinates } from "@/lib/geo";
+import { PALETTE } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { UpgradeCta } from "@/components/upgrade-cta";
 
 const HAUL_COLORS: Record<string, string> = {
-  SHORT_HAUL: "#34d399",
-  MEDIUM_HAUL: "#fbbf24",
-  LONG_HAUL: "#f472b6",
+  SHORT_HAUL: PALETTE.haul.SHORT_HAUL,
+  MEDIUM_HAUL: PALETTE.haul.MEDIUM_HAUL,
+  LONG_HAUL: PALETTE.haul.LONG_HAUL,
 };
 
 const HAUL_LABELS: Record<HaulCategory, string> = {
@@ -162,6 +163,20 @@ export function ExploreGlobe({
     [connections, haul, airline],
   );
 
+  // Keep the inspected destination inside the active filter set. Changing a
+  // filter must not leave a hidden route open in the detail panel.
+  useEffect(() => {
+    if (!visible.length) {
+      setSelected(null);
+      return;
+    }
+    setSelected((current) =>
+      current && visible.some((route) => route.id === current.id)
+        ? current
+        : (visible[0] ?? null),
+    );
+  }, [visible]);
+
   // Globe projection + route layers.
   useEffect(() => {
     if (!map) return;
@@ -202,7 +217,7 @@ export function ExploreGlobe({
           HAUL_COLORS.MEDIUM_HAUL,
           "LONG_HAUL",
           HAUL_COLORS.LONG_HAUL,
-          "#22d3ee",
+          PALETTE.haul.ALL,
         ],
         "line-width": 1.4,
         "line-opacity": 0.82,
@@ -242,7 +257,7 @@ export function ExploreGlobe({
           HAUL_COLORS.MEDIUM_HAUL,
           "LONG_HAUL",
           HAUL_COLORS.LONG_HAUL,
-          "#22d3ee",
+          PALETTE.haul.ALL,
         ],
         "circle-stroke-color": "rgba(226,239,255,0.75)",
         "circle-stroke-width": 0.8,
@@ -256,14 +271,14 @@ export function ExploreGlobe({
       layout: {
         "text-field": ["get", "iata"],
         "text-font": ["Noto Sans Regular"],
-        "text-size": 9,
+        "text-size": 10,
         "text-offset": [0, 1.1],
         "text-anchor": "top",
         "text-allow-overlap": false,
       },
       paint: {
-        "text-color": "#e2e8f0",
-        "text-halo-color": "#050b14",
+        "text-color": PALETTE.text,
+        "text-halo-color": PALETTE.background,
         "text-halo-width": 1.4,
       },
     });
@@ -301,7 +316,7 @@ export function ExploreGlobe({
       type: "line",
       source: "avi-explore-selected",
       paint: {
-        "line-color": "#f8fafc",
+        "line-color": PALETTE.accent,
         "line-width": 3.4,
         "line-opacity": 0.95,
       },
@@ -369,18 +384,16 @@ export function ExploreGlobe({
   }, [selected]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="relative overflow-hidden rounded-3xl border border-line bg-surface">
-        <div ref={containerRef} className="h-[560px] w-full" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
-          <div className="rounded-2xl border border-line/80 bg-bg/85 px-3 py-2 backdrop-blur">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-              Globe projection · live gateway cache
-            </p>
-            <p className="mt-0.5 text-sm font-semibold text-ink">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="relative overflow-hidden rounded-xl border border-line/70 bg-surface">
+        <div ref={containerRef} className="h-[440px] w-full sm:h-[540px] xl:h-[620px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4">
+          <div className="rounded-lg border border-line/70 bg-bg/85 px-3 py-2 backdrop-blur">
+            <p className="label-caps text-accent">Globe · live cache</p>
+            <p className="mt-1 text-sm font-medium text-ink">
               {origin ? `${origin.city} (${origin.iata})` : city}
             </p>
-            <p className="text-[10px] text-subtle">
+            <p className="text-xs text-subtle">
               {loading && connections.length === 0
                 ? "Loading direct network…"
                 : `${visible.length} of ${connections.length} direct destinations`}
@@ -389,9 +402,9 @@ export function ExploreGlobe({
               type="button"
               onClick={() => setRefreshToken((value) => value + 1)}
               disabled={loading}
-              className="pointer-events-auto mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] text-accent transition-colors hover:text-ink disabled:opacity-50"
+              className="pointer-events-auto mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line/70 px-2 text-xs font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
             >
-              <RefreshCw className={cn("size-2.5", loading && "animate-spin")} />
+              <RefreshCw className={cn("size-3", loading && "animate-spin")} />
               Refresh
             </button>
           </div>
@@ -402,11 +415,12 @@ export function ExploreGlobe({
                   key={option}
                   type="button"
                   onClick={() => setHaul(option)}
+                  aria-pressed={haul === option}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",
+                    "min-h-9 rounded-md border px-2.5 text-xs font-medium backdrop-blur transition-colors",
                     haul === option
-                      ? "border-accent bg-accent text-[color:var(--bg)]"
-                      : "border-line bg-bg/80 text-muted hover:text-ink",
+                      ? "border-accent/40 bg-accent-soft text-accent"
+                      : "border-line/70 bg-bg/80 text-muted hover:text-ink",
                   )}
                 >
                   {option === "ALL" ? "All" : HAUL_LABELS[option]}
@@ -416,26 +430,25 @@ export function ExploreGlobe({
           </div>
         </div>
         {error ? (
-          <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-[#f87171]/40 bg-[#2a0f14]/95 p-4 text-sm text-[#fecaca] backdrop-blur">
+          <div className="absolute inset-x-3 bottom-3 rounded-lg border border-cancelled/30 bg-surface/95 p-3.5 text-sm leading-relaxed text-ink backdrop-blur sm:inset-x-4 sm:bottom-4">
             {error} The explorer never falls back to a static route dataset.
           </div>
         ) : null}
       </div>
 
-      <div className="space-y-3">
-        <section className="rounded-3xl border border-line bg-surface p-4">
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-            Filter by airline
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="space-y-4">
+        <section className="rounded-xl border border-line/70 bg-surface/80 p-4">
+          <p className="label-caps text-subtle">Filter by airline</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => setAirline(null)}
+              aria-pressed={!airline}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[10px] font-bold",
+                "min-h-9 rounded-md border px-2.5 text-xs font-medium",
                 !airline
-                  ? "border-accent bg-accent text-[color:var(--bg)]"
-                  : "border-line text-muted hover:text-ink",
+                  ? "border-accent/40 bg-accent-soft text-accent"
+                  : "border-line/70 text-muted hover:text-ink",
               )}
             >
               All
@@ -447,11 +460,12 @@ export function ExploreGlobe({
                   key={code}
                   type="button"
                   onClick={() => setAirline(code)}
+                  aria-pressed={airline === code}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-[10px] font-bold",
+                    "min-h-9 rounded-md border px-2.5 text-xs font-medium",
                     airline === code
-                      ? "border-accent bg-accent text-[color:var(--bg)]"
-                      : "border-line text-muted hover:text-ink",
+                      ? "border-accent/40 bg-accent-soft text-accent"
+                      : "border-line/70 text-muted hover:text-ink",
                   )}
                 >
                   {code} · {carrier.count}
@@ -462,48 +476,48 @@ export function ExploreGlobe({
         </section>
 
         {selected ? (
-          <section className="rounded-3xl border border-line bg-surface p-4">
+          <section className="rounded-xl border border-line/70 bg-surface/80 p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-mono text-[11px] font-bold tracking-[0.18em] text-accent">
+                <p className="font-mono text-xs font-semibold tracking-[0.14em] text-accent">
                   {selected.destination.iata}
                 </p>
-                <h2 className="mt-1 text-xl font-black text-ink">
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink">
                   {selected.destination.city}
                 </h2>
-                <p className="text-xs text-muted">{selected.destination.name}</p>
+                <p className="text-[13px] text-muted">{selected.destination.name}</p>
               </div>
-              <span className="rounded-full border border-line px-2 py-1 text-[10px] font-bold text-muted">
+              <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium tabular text-muted">
                 {Math.round(selected.distanceKm).toLocaleString()} km
               </span>
             </div>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
               <div>
-                <dt className="text-[9px] uppercase tracking-wider text-subtle">Duration</dt>
-                <dd className="mt-0.5 font-semibold text-ink">
+                <dt className="text-xs text-subtle">Duration</dt>
+                <dd className="mt-0.5 font-medium text-ink">
                   {selected.durationFormatted ? `~${selected.durationFormatted}` : "Not reported"}
                   {selected.durationEstimated ? (
-                    <span className="ml-1 text-[9px] font-normal text-subtle">
-                      distance estimate
+                    <span className="ml-1 text-xs font-normal text-subtle">
+                      estimate
                     </span>
                   ) : null}
                 </dd>
               </div>
               <div>
-                <dt className="text-[9px] uppercase tracking-wider text-subtle">Daily flights</dt>
-                <dd className="mt-0.5 font-semibold text-ink">
+                <dt className="text-xs text-subtle">Daily flights</dt>
+                <dd className="mt-0.5 font-medium text-ink">
                   {selected.dailyFlightsCount ?? "Not reported"}
                 </dd>
               </div>
               <div>
-                <dt className="text-[9px] uppercase tracking-wider text-subtle">Airlines</dt>
-                <dd className="mt-0.5 font-semibold text-ink">
+                <dt className="text-xs text-subtle">Airlines</dt>
+                <dd className="mt-0.5 font-medium text-ink">
                   {selected.operatingCarriers.length}
                 </dd>
               </div>
               <div>
-                <dt className="text-[9px] uppercase tracking-wider text-subtle">Weather</dt>
-                <dd className="mt-0.5 font-semibold text-ink">
+                <dt className="text-xs text-subtle">Weather</dt>
+                <dd className="mt-0.5 font-medium text-ink">
                   {weatherLoading
                     ? "Loading…"
                     : weather?.dataAvailable
@@ -513,7 +527,7 @@ export function ExploreGlobe({
               </div>
             </dl>
             {weather?.dataAvailable ? (
-              <p className="mt-2 text-[11px] text-muted">
+              <p className="mt-2.5 text-xs leading-relaxed text-muted">
                 {weather.windCondition} · {weather.visibility} ·{" "}
                 {weather.advisory.arrivalNotice}
               </p>
@@ -521,13 +535,13 @@ export function ExploreGlobe({
             <div className="mt-4 grid gap-2">
               <Link
                 href={`/cabin/B77W/14A`}
-                className="rounded-xl bg-accent px-3 py-2.5 text-center text-xs font-bold text-[color:var(--bg)]"
+                className="rounded-lg bg-accent px-3 py-2.5 text-center text-[13px] font-semibold text-[color:var(--bg)]"
               >
-                Track & Unlock 3D Cabin in App
+                Track &amp; unlock 3D cabin in app
               </Link>
               <a
                 href="aeroquest://cabin/B77W/14A"
-                className="rounded-xl border border-line px-3 py-2.5 text-center text-xs font-bold text-ink"
+                className="rounded-lg border border-line/70 px-3 py-2.5 text-center text-[13px] font-medium text-ink"
               >
                 Open AeroQuest mobile
               </a>
@@ -535,10 +549,8 @@ export function ExploreGlobe({
           </section>
         ) : null}
 
-        <section className="rounded-3xl border border-line bg-surface p-4 text-[11px] leading-relaxed text-muted">
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-            What this page shows
-          </p>
+        <section className="rounded-xl border border-line/70 bg-surface/80 p-4 text-xs leading-relaxed text-muted">
+          <p className="label-caps text-subtle">What this page shows</p>
           <p className="mt-2">
             Non-stop destinations from {airportName}. Distances are computed from
             verified airport coordinates; durations are distance-derived

@@ -27,13 +27,22 @@ import {
   normalizeFlightNumber,
 } from "@/lib/utils";
 import type { Flight } from "@/lib/types";
-import { Button, EmptyState, Panel, StatusBadge } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  IconButton,
+  Panel,
+  StatusBadge,
+} from "@/components/ui";
 
 const FlightMap = dynamic(() => import("@/components/flight-map").then((m) => m.FlightMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center rounded-xl border border-line bg-surface-2">
-      <p className="text-[11px] text-muted">Loading live map…</p>
+    <div className="flex h-full items-center justify-center rounded-xl border border-line/70 bg-surface">
+      <p className="flex items-center gap-2 text-sm text-muted">
+        <RefreshCw className="size-4 animate-spin text-accent" />
+        Loading live map…
+      </p>
     </div>
   ),
 });
@@ -109,12 +118,18 @@ export default function FlightMapPage() {
   const [showHud, setShowHud] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
   if (lookupLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2.5">
           <RefreshCw className="size-6 animate-spin text-accent" />
-          <p className="text-xs font-semibold text-muted">Loading live flight telemetry…</p>
+          <p className="text-sm text-muted">Loading live flight telemetry…</p>
         </div>
       </div>
     );
@@ -122,10 +137,10 @@ export default function FlightMapPage() {
 
   if (!flight) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mx-auto max-w-4xl px-4 py-12">
         <Panel>
           <EmptyState
-            icon={<MapIcon className="size-6" />}
+            icon={<MapIcon className="size-5" />}
             title={
               lookupError ? "Live flight lookup unavailable" : "Flight map unavailable"
             }
@@ -171,29 +186,31 @@ export default function FlightMapPage() {
   };
 
   return (
-    <div className="flex flex-col gap-3 px-3 py-3 lg:px-5">
+    <div className="flex flex-col gap-3 px-3 py-3 lg:px-5 lg:py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <button
+        <div className="flex min-w-0 items-center gap-2.5">
+          <IconButton
+            label="Back"
             onClick={() => router.back()}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted transition-colors hover:text-ink"
-            aria-label="Back"
+            className="border border-line/70 bg-surface-2/60"
           >
             <ArrowLeft className="size-4" />
-          </button>
+          </IconButton>
           <div className="min-w-0">
             <p className="label-caps text-accent">
               {hasFreshPosition ? "Live flight map" : "Flight route map"}
             </p>
-            <h2 className="flex items-center gap-2 text-base font-bold text-ink lg:text-lg">
-              {flight.flightNumber}
-              {flight.isWatchlisted && (
-                <Glasses
-                  fill="currentColor"
-                  className="size-3.5 shrink-0 fill-current text-accent"
-                />
-              )}
-              <span className="text-[11px] font-medium text-muted">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <h1 className="flex items-center gap-1.5 font-mono text-lg font-semibold text-ink">
+                {flight.flightNumber}
+                {flight.isWatchlisted && (
+                  <Glasses
+                    className="size-3.5 shrink-0 fill-current text-accent"
+                    aria-label="On your watchlist"
+                  />
+                )}
+              </h1>
+              <span className="font-mono text-[13px] text-muted">
                 {flight.origin.code} → {flight.destination.code}
               </span>
               <StatusBadge
@@ -202,24 +219,41 @@ export default function FlightMapPage() {
                 delayMinutes={flight.delayMinutes}
                 delayReported={flight.delayReported}
               />
-            </h2>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => setShowHud((value) => !value)}
-            className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface-2 px-2.5 text-[9px] font-bold text-muted transition-colors hover:text-accent"
+            aria-pressed={showHud}
+            className={cn(
+              "inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium transition-colors",
+              showHud
+                ? "border-accent/35 bg-accent-soft text-accent"
+                : "border-line/70 bg-surface-2/60 text-muted hover:text-ink",
+            )}
           >
-            <Telescope className="size-3" /> HUD
+            <Telescope className="size-4" /> HUD
           </button>
-          <button
+          <IconButton
+            label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             onClick={toggleFullscreen}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted transition-colors hover:text-accent"
-            aria-label="Toggle fullscreen"
+            className="border border-line/70 bg-surface-2/60"
           >
-            {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-          </button>
-          <Link href={`/flight/${encodeURIComponent(flight.id)}`}>
+            {fullscreen ? (
+              <Minimize2 className="size-4" />
+            ) : (
+              <Maximize2 className="size-4" />
+            )}
+          </IconButton>
+          <Link
+            href={
+              flight.flightDate
+                ? `/flight/${encodeURIComponent(flight.id)}?date=${encodeURIComponent(flight.flightDate)}`
+                : `/flight/${encodeURIComponent(flight.id)}`
+            }
+          >
             <Button size="sm" variant="outline">
               Dossier
             </Button>
@@ -227,28 +261,30 @@ export default function FlightMapPage() {
         </div>
       </div>
 
-      <div className="relative h-[calc(100vh-160px)] min-h-[520px]">
-        <FlightMap flight={flight} className="h-full" />
+      <div className="relative h-[calc(100vh-168px)] min-h-[520px] overflow-hidden rounded-xl border border-line/70">
+        <FlightMap flight={flight} className="h-full" showAttribution={false} />
 
         {/* Floating flight info */}
-        <div className="pointer-events-none absolute left-3 top-3 w-[260px] max-w-[calc(100%-80px)]">
-          <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 p-3 shadow-xl backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg border border-accent/35 bg-accent-soft text-accent">
+        <div className="pointer-events-none absolute left-3 top-3 w-[280px] max-w-[calc(100%-80px)]">
+          <div className="pointer-events-auto rounded-lg border border-line/80 bg-surface/95 p-3.5 shadow-xl backdrop-blur">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-lg border border-accent/35 bg-accent-soft text-accent">
                   <Plane className="size-4" />
                 </div>
-                <div>
-                  <p className="font-mono text-xs font-black text-ink">
+                <div className="min-w-0">
+                  <p className="font-mono text-[13px] font-semibold text-ink">
                     {flight.flightNumber}
                   </p>
-                  <p className="text-[9px] text-subtle">{flight.airline}</p>
+                  <p className="truncate text-xs text-subtle">{flight.airline}</p>
                 </div>
               </div>
               <span
                 className={cn(
-                  "flex items-center gap-1 text-[8px] font-bold",
-                  hasFreshPosition ? "text-landed" : "text-subtle",
+                  "flex shrink-0 items-center gap-1.5 rounded-md border px-1.5 py-1 text-xs font-medium",
+                  hasFreshPosition
+                    ? "border-landed/35 bg-landed/10 text-landed"
+                    : "border-line/70 bg-surface-2 text-subtle",
                 )}
               >
                 <span
@@ -259,133 +295,192 @@ export default function FlightMapPage() {
                       : "bg-subtle",
                   )}
                 />
-                {hasFreshPosition ? "LIVE" : "POSITION NOT REPORTED"}
+                {hasFreshPosition ? "Live" : "No position"}
               </span>
             </div>
-            <div className="mt-2.5 flex items-center justify-between rounded-lg border border-line/60 bg-surface-2 px-2 py-1.5">
-              <span className="text-center">
-                <span className="block font-mono text-base font-black text-ink">
+
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-line/60 bg-surface-2/60 px-3 py-2">
+              <span className="min-w-0 text-center">
+                <span className="block font-mono text-base font-semibold text-ink">
                   {flight.origin.code}
                 </span>
-                <span className="text-[8px] text-subtle">{flight.origin.city}</span>
+                <span className="block truncate text-xs text-subtle">
+                  {flight.origin.city}
+                </span>
               </span>
-              <span className="flex flex-1 flex-col items-center px-2">
-                <Plane className="size-3 rotate-90 text-accent" />
-                <span className="mt-0.5 text-[8px] font-semibold text-accent">
+              <span className="flex flex-1 flex-col items-center px-1">
+                <Plane className="size-3.5 rotate-90 text-accent" />
+                <span className="mt-1 text-xs font-medium text-accent">
                   {hasFreshPosition
                     ? `${Math.round(flight.telemetry.progressPercent * 100)}%`
-                    : "No position"}
+                    : "—"}
                 </span>
               </span>
-              <span className="text-center">
-                <span className="block font-mono text-base font-black text-ink">
+              <span className="min-w-0 text-center">
+                <span className="block font-mono text-base font-semibold text-ink">
                   {flight.destination.code}
                 </span>
-                <span className="text-[8px] text-subtle">{flight.destination.city}</span>
+                <span className="block truncate text-xs text-subtle">
+                  {flight.destination.city}
+                </span>
               </span>
             </div>
-            <div className="mt-2 space-y-1 text-[9px]">
-              <p className="flex items-center justify-between">
-                <span className="text-subtle">Position</span>
-                <span className="font-mono font-semibold text-ink">
-                  {hasFreshPosition
+
+            <dl className="mt-2.5 space-y-1.5 text-[13px]">
+              <HudRow
+                label="Position"
+                value={
+                  hasFreshPosition
                     ? `${flight.telemetry.currentLatitude.toFixed(2)}, ${flight.telemetry.currentLongitude.toFixed(2)}`
-                    : "Not reported"}
-                </span>
-              </p>
-              <p className="flex items-center justify-between">
-                <span className="text-subtle">Heading / speed</span>
-                <span className="font-semibold text-ink">
-                  {hasFreshPosition
+                    : "Not reported"
+                }
+                mono
+              />
+              <HudRow
+                label="Heading / speed"
+                value={
+                  hasFreshPosition
                     ? `${Math.round(flight.telemetry.headingDegrees)}° · ${flight.telemetry.groundSpeedKnots} kt`
-                    : "Not reported"}
-                </span>
-              </p>
-              <p className="flex items-center justify-between">
-                <span className="text-subtle">Aircraft</span>
-                <span className="truncate font-semibold text-ink">
-                  {flight.aircraft.model}
-                </span>
-              </p>
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] text-delayed">
-              <TriangleAlert className="size-2.5" />
-              {flight.statusReported
-                ? flight.statusNote || "No status note reported"
-                : "Status not reported by provider"}
+                    : "Not reported"
+                }
+              />
+              <HudRow label="Aircraft" value={flight.aircraft.model} />
+            </dl>
+
+            <div className="mt-2.5 flex items-start gap-1.5 rounded-md border border-delayed/30 bg-delayed/8 px-2.5 py-2 text-xs leading-relaxed text-muted">
+              <TriangleAlert className="mt-0.5 size-3 shrink-0 text-delayed" />
+              <span>
+                {flight.statusReported
+                  ? flight.statusNote || "No status note reported"
+                  : "Status not reported by provider"}
+              </span>
             </div>
             {!hasFreshPosition && (
-              <div className="mt-1.5 rounded-md border border-delayed/30 bg-delayed/10 px-2 py-1 text-[8px] leading-relaxed text-delayed">
-                A live aircraft position isn’t available for this flight. The route is
-                shown, but no aircraft marker is fabricated.
-              </div>
+              <p className="mt-2 rounded-md border border-line/70 bg-surface-2/60 px-2.5 py-2 text-xs leading-relaxed text-subtle">
+                A live aircraft position is not available for this flight. The
+                route is shown, but no aircraft marker is fabricated.
+              </p>
             )}
           </div>
         </div>
 
         {/* Floating route data */}
-        <div className="pointer-events-none absolute right-3 top-3 hidden w-[230px] sm:block">
-          <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 p-3 shadow-xl backdrop-blur">
+        <div className="pointer-events-none absolute right-3 top-3 hidden w-[250px] sm:block">
+          <div className="pointer-events-auto rounded-lg border border-line/80 bg-surface/95 p-3.5 shadow-xl backdrop-blur">
             <p className="label-caps text-subtle">Great circle route</p>
-            <div className="mt-1.5 space-y-1 text-[9px]">
-              <p className="flex justify-between gap-2">
-                <span className="text-subtle">Distance</span>
-                <span className="font-semibold text-ink">
-                  {distance.toLocaleString()} km ·{" "}
-                  {distanceNm.toLocaleString()} nm
-                </span>
-              </p>
-              <p className="flex justify-between gap-2">
-                <span className="text-subtle">Remaining</span>
-                <span className="font-semibold text-accent">
-                  {hasFreshPosition
+            <dl className="mt-2 space-y-1.5 text-[13px]">
+              <HudRow
+                label="Distance"
+                value={`${distance.toLocaleString()} km · ${distanceNm.toLocaleString()} nm`}
+              />
+              <HudRow
+                label="Remaining"
+                value={
+                  hasFreshPosition
                     ? `${flight.telemetry.distanceRemainingNm} nm`
-                    : "Not reported"}
-                </span>
-              </p>
-              <p className="flex justify-between gap-2">
-                <span className="text-subtle">ETA</span>
-                <span className="font-semibold text-ink">
-                  {hasFreshPosition &&
-                  flight.telemetry.etaMinutesRemaining > 0
+                    : "Not reported"
+                }
+                accent
+              />
+              <HudRow
+                label="ETA"
+                value={
+                  hasFreshPosition && flight.telemetry.etaMinutesRemaining > 0
                     ? `${flight.arrivalTimeEstimated} · ${flight.telemetry.etaMinutesRemaining}m`
-                    : flight.arrivalTimeEstimated || "Not reported"}
-                </span>
-              </p>
-              <p className="flex justify-between gap-2">
-                <span className="text-subtle">Waypoints</span>
-                <span className="font-semibold text-ink">
-                  {flight.telemetry.waypoints.length}
-                </span>
-              </p>
-            </div>
-            <div className="mt-2 flex items-center gap-1 border-t border-line/60 pt-2 text-[8px] text-subtle">
-              <Compass className="size-2.5 text-accent" /> Geodesic projection · Mercator basemap
-            </div>
+                    : flight.arrivalTimeEstimated || "Not reported"
+                }
+              />
+              <HudRow
+                label="Waypoints"
+                value={String(flight.telemetry.waypoints.length)}
+              />
+            </dl>
+            <p className="mt-2.5 flex items-center gap-1.5 border-t border-line/60 pt-2.5 text-xs text-subtle">
+              <Compass className="size-3 shrink-0 text-accent" />
+              Geodesic projection · Mercator basemap
+            </p>
           </div>
         </div>
 
         {/* Bottom HUD */}
         {showHud && (
           <div className="pointer-events-none absolute inset-x-3 bottom-3">
-            <div className="pointer-events-auto rounded-xl border border-line/80 bg-surface/92 px-3 py-2 shadow-xl backdrop-blur">
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                <HudItem label="Altitude" value={hasFreshPosition ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft` : "—"} accent />
-                <HudItem label="Ground speed" value={hasFreshPosition ? `${flight.telemetry.groundSpeedKnots} kt` : "—"} />
+            <div className="pointer-events-auto rounded-lg border border-line/80 bg-surface/95 px-3.5 py-2.5 shadow-xl backdrop-blur">
+              <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:grid-cols-6">
+                <HudItem
+                  label="Altitude"
+                  value={
+                    hasFreshPosition
+                      ? `${flight.telemetry.altitudeFeet.toLocaleString()} ft`
+                      : "—"
+                  }
+                  accent
+                />
+                <HudItem
+                  label="Ground speed"
+                  value={
+                    hasFreshPosition
+                      ? `${flight.telemetry.groundSpeedKnots} kt`
+                      : "—"
+                  }
+                />
                 <HudItem label="Mach" value="—" />
                 <HudItem label="Vertical speed" value="—" />
-                <HudItem label="Remaining" value={hasFreshPosition ? `${flight.telemetry.distanceRemainingNm} nm` : "—"} />
-                <HudItem label="ETA (calc.)" value={hasFreshPosition && flight.telemetry.etaMinutesRemaining > 0 ? `${flight.telemetry.etaMinutesRemaining} min` : "—"} accent />
+                <HudItem
+                  label="Remaining"
+                  value={
+                    hasFreshPosition
+                      ? `${flight.telemetry.distanceRemainingNm} nm`
+                      : "—"
+                  }
+                />
+                <HudItem
+                  label="ETA (calc.)"
+                  value={
+                    hasFreshPosition && flight.telemetry.etaMinutesRemaining > 0
+                      ? `${flight.telemetry.etaMinutesRemaining} min`
+                      : "—"
+                  }
+                  accent
+                />
               </div>
             </div>
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-20 left-3 flex items-center gap-1.5 rounded-md border border-line/70 bg-surface/85 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-subtle backdrop-blur">
-          <Layers className="size-2.5 text-accent" />{" "}
-          © OpenStreetMap contributors · tiles by OpenFreeMap · drag to pan · scroll to zoom
+        <div className="pointer-events-none absolute bottom-24 left-3 hidden items-center gap-1.5 rounded-md border border-line/70 bg-surface/90 px-2.5 py-1.5 text-xs text-subtle backdrop-blur sm:flex">
+          <Layers className="size-3 shrink-0 text-accent" />
+          © OpenStreetMap contributors · tiles by OpenFreeMap · drag to pan ·
+          scroll to zoom
         </div>
       </div>
+    </div>
+  );
+}
+
+function HudRow({
+  label,
+  value,
+  mono,
+  accent,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="shrink-0 text-subtle">{label}</dt>
+      <dd
+        className={cn(
+          "text-right font-medium",
+          mono && "font-mono text-xs",
+          accent ? "text-accent" : "text-ink",
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -401,12 +496,10 @@ function HudItem({
 }) {
   return (
     <div>
-      <p className="text-[8px] font-bold uppercase tracking-wider text-subtle">
-        {label}
-      </p>
+      <p className="label-caps text-subtle">{label}</p>
       <p
         className={cn(
-          "mt-0.5 text-[11px] font-bold tabular",
+          "mt-1 text-[13px] font-medium tabular",
           accent ? "text-accent" : "text-ink",
         )}
       >

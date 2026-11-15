@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Armchair,
+  Building2,
   Check,
   ChevronRight,
   Info,
@@ -23,20 +24,49 @@ import {
 } from "@/lib/airplane-data";
 import type { AircraftCabinSpec, CabinClass, SeatInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Button, MetricTile, Modal, Panel } from "@/components/ui";
+import {
+  Button,
+  Callout,
+  MetricTile,
+  Modal,
+  PageHeader,
+  Panel,
+  TextInput,
+} from "@/components/ui";
 
-const CABIN_COLORS: Record<CabinClass, { label: string; badgeBg: string; text: string }> = {
-  FIRST: { label: "First Class", badgeBg: "bg-amber-500/15 border-amber-500/40", text: "text-amber-400" },
-  BUSINESS: { label: "Business Class", badgeBg: "bg-purple-500/15 border-purple-500/40", text: "text-purple-400" },
-  PREMIUM_ECONOMY: { label: "Premium Economy", badgeBg: "bg-blue-500/15 border-blue-500/40", text: "text-blue-400" },
-  ECONOMY: { label: "Economy Class", badgeBg: "bg-cyan-500/15 border-cyan-500/40", text: "text-cyan-400" },
+const CABIN_META: Record<
+  CabinClass,
+  { label: string; dot: string; badge: string }
+> = {
+  FIRST: {
+    label: "First",
+    dot: "bg-delayed",
+    badge: "border-delayed/35 bg-delayed/10 text-delayed",
+  },
+  BUSINESS: {
+    label: "Business",
+    dot: "bg-accent-2",
+    badge: "border-accent-2/35 bg-accent-2/10 text-accent-2",
+  },
+  PREMIUM_ECONOMY: {
+    label: "Premium economy",
+    dot: "bg-landed",
+    badge: "border-landed/35 bg-landed/10 text-landed",
+  },
+  ECONOMY: {
+    label: "Economy",
+    dot: "bg-subtle",
+    badge: "border-line bg-surface-2 text-muted",
+  },
 };
 
 export default function AirplanesPage() {
   const [selectedAircraftId, setSelectedAircraftId] = useState(
     AIRCRAFT_PRESETS[0]?.id ?? "MS-A320NEO",
   );
-  const [activeCabinFilter, setActiveCabinFilter] = useState<CabinClass | "ALL">("ALL");
+  const [activeCabinFilter, setActiveCabinFilter] = useState<
+    CabinClass | "ALL"
+  >("ALL");
   const [selectedSeat, setSelectedSeat] = useState<SeatInfo | null>(null);
   const [mySeatId, setMySeatId] = useState<string | null>(null);
   const [aircraftPickerOpen, setAircraftPickerOpen] = useState(false);
@@ -55,7 +85,9 @@ export default function AirplanesPage() {
     const airline = params.get("airline");
     const model = params.get("model");
     if (plane) {
-      const match = AIRCRAFT_PRESETS.find((a) => a.id.toLowerCase() === plane.toLowerCase());
+      const match = AIRCRAFT_PRESETS.find(
+        (a) => a.id.toLowerCase() === plane.toLowerCase(),
+      );
       if (match) setSelectedAircraftId(match.id);
     } else if (airline || model) {
       const matched = findAircraft(airline ?? undefined, model ?? undefined);
@@ -86,14 +118,14 @@ export default function AirplanesPage() {
 
   if (!aircraft) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mx-auto max-w-2xl px-4 py-10">
         <Panel className="p-6 text-center">
-          <p className="text-sm font-bold text-ink">Seatmap unavailable</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            AeroQuest does not have an illustrative configuration for this aircraft.
-            No substitute aircraft is shown.
+          <p className="text-sm font-semibold text-ink">Seatmap unavailable</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            AeroQuest does not have an illustrative configuration for this
+            aircraft. No substitute aircraft is shown.
           </p>
-          <Link href="/airports" className="mt-3 inline-block">
+          <Link href="/airports" className="mt-4 inline-block">
             <Button size="sm" variant="outline">
               Back to airports
             </Button>
@@ -104,132 +136,149 @@ export default function AirplanesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1680px] px-4 py-4 lg:px-6">
-      <div className="mb-3 flex items-start gap-2 rounded-xl border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
-        <Info className="mt-0.5 size-3.5 shrink-0 text-delayed" />
-        <span>
-          This page is an illustrative aircraft and seat configuration reference.
-          It is not tied to your flight, and seat availability, Wi-Fi, and
-          passenger reviews are not live data.
-        </span>
-      </div>
-
-      {/* Top Header */}
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="label-caps text-accent">Aircraft Cabin Radar & Seat Configuration</p>
-          <h2 className="mt-1 flex items-center gap-2 text-xl font-black tracking-tight text-ink">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8 lg:py-8">
+      <PageHeader
+        eyebrow="Aircraft & seat reference"
+        title={
+          <span className="flex flex-wrap items-center gap-2.5">
             {aircraft.airlineName} {aircraft.aircraftModel}
             <span
-              className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-bold text-accent"
+              className="rounded-md bg-accent-soft px-2 py-1 font-mono text-xs font-semibold text-accent"
               title="Sample registration, not this flight's aircraft"
             >
-              SAMPLE · {aircraft.tailNumberSample}
+              Sample · {aircraft.tailNumberSample}
             </span>
-            <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 text-[8px] font-bold text-subtle">
-              {aircraft.totalSeats} SEATS
+            <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium text-muted">
+              {aircraft.totalSeats} seats
             </span>
-          </h2>
-          <p className="mt-1 max-w-xl text-[11px] text-muted">
-            Manufacturer: {aircraft.manufacturer} · Standard commercial airline passenger configuration
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAircraftPickerOpen(true)}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-accent/35 bg-surface-2 px-2.5 text-[10px] font-bold text-accent transition-colors hover:bg-accent-soft"
-          >
-            <Plane className="size-3.5" />
-            Switch aircraft ({aircraft.airlineCode} {aircraft.aircraftModel})
-            <ChevronRight className="size-3" />
-          </button>
-          <Link href="/airports">
-            <Button size="sm" variant="outline">
-              <Building2 className="size-3.5 text-accent" /> Airport indoor maps
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
-        {/* Left column: Cabin specifications & filters */}
-        <aside className="space-y-2.5">
-          {/* Quick Aircraft Switcher Card */}
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Illustrative aircraft configuration</p>
-            <button
+          </span>
+        }
+        description={`${aircraft.manufacturer} · standard commercial passenger configuration. This is an illustrative reference, not live seat availability.`}
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => setAircraftPickerOpen(true)}
-              className="mt-1.5 flex w-full items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-left transition-colors hover:border-accent/40"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-soft font-mono text-[11px] font-bold text-accent">
+              <Plane className="size-4" />
+              Switch aircraft
+            </Button>
+            <Link href="/airports">
+              <Button size="sm" variant="ghost">
+                <Building2 className="size-4" />
+                Airport maps
+              </Button>
+            </Link>
+          </>
+        }
+      />
+
+      <Callout tone="attention" className="mt-5">
+        Seat availability, Wi-Fi availability, and passenger reviews are not
+        live data. Pitch, width, and recline come from the aircraft type{" "}
+        {aircraft.aircraftModel}, not from your booking.
+      </Callout>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
+        {/* Left column: cabin selection & filters */}
+        <aside className="space-y-4">
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Aircraft</p>
+            <button
+              type="button"
+              onClick={() => setAircraftPickerOpen(true)}
+              className="mt-2.5 flex min-h-14 w-full items-center gap-3 rounded-lg border border-line/70 bg-surface-2/50 px-3 text-left transition-colors hover:border-line-strong"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent-soft font-mono text-xs font-semibold text-accent">
                 {aircraft.airlineCode}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-bold text-ink">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-ink">
                   {aircraft.airlineName}
-                </p>
-                <p className="truncate text-[9px] text-muted">
+                </span>
+                <span className="block truncate text-xs text-subtle">
                   {aircraft.aircraftModel} · {aircraft.totalSeats} pax
-                </p>
-              </div>
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-subtle" />
             </button>
 
-            {/* Quick seat jump */}
-            <form onSubmit={handleSeatSearch} className="mt-2.5">
-              <label className="label-caps block text-[8px] text-subtle">Find Specific Seat</label>
-              <div className="mt-1 flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder="e.g. 1A, 12F, 24C..."
+            <form onSubmit={handleSeatSearch} className="mt-4">
+              <label
+                htmlFor="seat-search"
+                className="label-caps block text-subtle"
+              >
+                Find a seat
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <TextInput
+                  id="seat-search"
                   value={seatSearch}
                   onChange={(e) => setSeatSearch(e.target.value)}
-                  className="h-7 w-full rounded-md border border-line bg-surface px-2 text-[10px] text-ink placeholder:text-subtle focus:border-accent focus:outline-none uppercase"
+                  placeholder="12F"
+                  maxLength={4}
+                  className="h-10 font-mono uppercase"
+                  autoComplete="off"
+                  spellCheck={false}
                 />
-                <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-[9px]">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                >
                   Find
                 </Button>
               </div>
             </form>
           </Panel>
 
-          {/* Cabin Class Filter */}
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Cabin Classes</p>
-            <div className="mt-1.5 space-y-1">
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Cabin classes</p>
+            <div className="mt-2.5 space-y-1">
               <button
+                type="button"
                 onClick={() => setActiveCabinFilter("ALL")}
+                aria-pressed={activeCabinFilter === "ALL"}
                 className={cn(
-                  "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[10px] transition-colors",
+                  "flex min-h-10 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors",
                   activeCabinFilter === "ALL"
-                    ? "bg-accent-soft font-bold text-accent"
+                    ? "bg-accent-soft font-medium text-accent"
                     : "text-muted hover:bg-surface-2 hover:text-ink",
                 )}
               >
-                <span>Full Aircraft Cabin</span>
-                <span className="font-mono text-[8px] text-subtle">{aircraft.totalSeats} seats</span>
+                <span>Full cabin</span>
+                <span className="font-mono text-xs text-subtle">
+                  {aircraft.totalSeats}
+                </span>
               </button>
               {aircraft.cabins.map((cabin) => {
                 const active = activeCabinFilter === cabin.classType;
-                const meta = CABIN_COLORS[cabin.classType];
+                const meta = CABIN_META[cabin.classType];
                 const count = aircraft.rows
                   .filter((r) => r.cabin === cabin.classType)
                   .reduce((acc, r) => acc + r.seats.length, 0);
                 return (
                   <button
                     key={cabin.name}
+                    type="button"
                     onClick={() => setActiveCabinFilter(cabin.classType)}
+                    aria-pressed={active}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[10px] transition-colors",
+                      "flex min-h-10 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors",
                       active
-                        ? "bg-accent-soft font-bold text-accent"
+                        ? "bg-accent-soft font-medium text-accent"
                         : "text-muted hover:bg-surface-2 hover:text-ink",
                     )}
                   >
-                    <span className="flex items-center gap-1.5">
-                      <span className={cn("size-2 rounded-full", meta.text.replace("text-", "bg-"))} />
-                      <span className="font-semibold">{cabin.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={cn("size-1.5 shrink-0 rounded-full", meta.dot)}
+                      />
+                      <span className="truncate">{meta.label}</span>
                     </span>
-                    <span className="font-mono text-[8px] text-subtle">
+                    <span className="shrink-0 font-mono text-xs text-subtle">
                       {cabin.layout} · {count}
                     </span>
                   </button>
@@ -238,104 +287,70 @@ export default function AirplanesPage() {
             </div>
           </Panel>
 
-          {/* Onboard Amenities */}
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Onboard Amenities & Tech</p>
-            <div className="mt-2 space-y-2.5 text-[10px]">
-              <div className="flex items-start gap-2 text-muted">
-                <Wifi className="mt-0.5 size-3.5 shrink-0 text-cyan-400" />
-                <div>
-                  <p className="font-semibold text-ink">Satellite Wi-Fi</p>
-                  <p className="text-[8px] text-subtle">{aircraft.amenities.wifi}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 text-muted">
-                <Zap className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
-                <div>
-                  <p className="font-semibold text-ink">Seat Power & USB</p>
-                  <p className="text-[8px] text-subtle">{aircraft.amenities.power}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 text-muted">
-                <Tv className="mt-0.5 size-3.5 shrink-0 text-purple-400" />
-                <div>
-                  <p className="font-semibold text-ink">In-Flight Entertainment</p>
-                  <p className="text-[8px] text-subtle">{aircraft.amenities.ife}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 text-muted">
-                <Wind className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
-                <div>
-                  <p className="font-semibold text-ink">Overhead Storage</p>
-                  <p className="text-[8px] text-subtle">{aircraft.amenities.overheadBins}</p>
-                </div>
-              </div>
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Onboard amenities</p>
+            <div className="mt-3 space-y-3">
+              <AmenityRow icon={Wifi} title="Satellite Wi-Fi" body={aircraft.amenities.wifi} />
+              <AmenityRow icon={Zap} title="Seat power & USB" body={aircraft.amenities.power} />
+              <AmenityRow icon={Tv} title="Entertainment" body={aircraft.amenities.ife} />
+              <AmenityRow icon={Wind} title="Overhead storage" body={aircraft.amenities.overheadBins} />
             </div>
           </Panel>
 
-          {/* Seat Map Legend */}
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Seat Legend</p>
-            <div className="mt-2 space-y-2 text-[9px] text-muted">
-              <div className="rounded-lg border border-delayed/30 bg-delayed/10 px-2 py-1.5 text-[9px] leading-relaxed text-muted">
-                Seat availability is <strong>not connected</strong>. This is an
-                illustrative cabin configuration, not live inventory.
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Seat legend</p>
+            <div className="mt-2.5 space-y-2.5 text-xs text-muted">
+              <div className="flex items-center gap-2">
+                <span className="size-3.5 rounded-sm border border-delayed/60 bg-delayed/25" />
+                Exit row · extra space
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-1.5">
-                  <div className="size-3.5 rounded-sm border border-amber-500/60 bg-amber-500/25" />
-                  <span>Exit / Extra Space</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="size-3.5 rounded-sm border-2 border-accent bg-accent/40 shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
-                  <span>Selected</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="size-3.5 rounded-sm border-2 border-accent bg-accent/40" />
+                Inspected seat
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="size-3.5 rounded-sm border-2 border-landed bg-landed/30" />
+                Your selected seat
               </div>
             </div>
           </Panel>
         </aside>
 
-        {/* Center: Fuselage & Interactive Seat Map */}
-        <main className="space-y-3">
-          <Panel className="relative overflow-hidden p-4 sm:p-6">
-            <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-accent">CABIN SEATMAP</span>
-                <span className="text-[10px] text-muted">
-                  Illustrative reference configuration — not live seat availability
-                </span>
+        {/* Centre: fuselage & seat map */}
+        <div className="min-w-0 space-y-4">
+          <Panel className="overflow-hidden p-4 sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-3">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-ink">Cabin seatmap</p>
+                <p className="text-xs text-subtle">
+                  Illustrative reference configuration · not live availability
+                </p>
               </div>
               {mySeatId && (
-                <div className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent-soft px-2 py-0.5 text-[9px] font-bold text-accent">
-                  <Check className="size-3" />
+                <span className="flex items-center gap-1.5 rounded-md bg-accent-soft px-2 py-1 text-xs font-medium text-accent">
+                  <Check className="size-3.5" />
                   Selected: {mySeatId}
-                </div>
+                </span>
               )}
             </div>
 
-            {/* Fuselage Container */}
             <div className="mx-auto max-w-xl">
-              {/* Cockpit / Nose */}
-              <div className="relative mx-auto mb-4 flex h-14 w-44 flex-col items-center justify-center rounded-t-[40px] border-2 border-b-0 border-line bg-surface-2 shadow-inner">
+              <div className="relative mx-auto mb-3 flex h-12 w-40 flex-col items-center justify-center rounded-t-[36px] border border-b-0 border-line/70 bg-surface-2/60">
                 <div className="flex gap-2">
-                  <div className="h-4 w-7 rounded-t-lg border border-accent/40 bg-accent/15" />
-                  <div className="h-4 w-7 rounded-t-lg border border-accent/40 bg-accent/15" />
+                  <div className="h-3.5 w-6 rounded-t-lg border border-accent/30 bg-accent-soft" />
+                  <div className="h-3.5 w-6 rounded-t-lg border border-accent/30 bg-accent-soft" />
                 </div>
-                <span className="mt-1 font-mono text-[8px] font-bold tracking-widest text-subtle">
-                  COCKPIT / NOSE
+                <span className="mt-1 font-mono text-xs tracking-[0.2em] text-subtle">
+                  COCKPIT
                 </span>
               </div>
 
-              {/* Fuselage Body */}
-              <div className="relative rounded-2xl border-x-2 border-line bg-surface/80 p-3 sm:p-5 shadow-2xl backdrop-blur-sm">
-                {/* Left & Right Wings (rendered as visual indicators) */}
-                <div className="pointer-events-none absolute -left-12 top-[35%] h-[280px] w-12 border-l border-line/40 bg-gradient-to-r from-accent/5 to-transparent opacity-50" />
-                <div className="pointer-events-none absolute -right-12 top-[35%] h-[280px] w-12 border-r border-line/40 bg-gradient-to-l from-accent/5 to-transparent opacity-50" />
-
-                {/* Rows listing */}
-                <div className="space-y-2">
+              <div className="relative overflow-hidden rounded-xl border border-line/70 bg-surface/60 p-3 sm:p-5">
+                <div className="space-y-1.5">
                   {visibleRows.map((row) => {
-                    const cabinSpec = aircraft.cabins.find((c) => c.classType === row.cabin);
+                    const cabinSpec = aircraft.cabins.find(
+                      (c) => c.classType === row.cabin,
+                    );
                     const aisles = cabinSpec?.aislesAfterLetters ?? ["C"];
                     const isWingRow =
                       row.rowNumber >= aircraft.wingsRowRange[0] &&
@@ -345,92 +360,82 @@ export default function AirplanesPage() {
                       <div
                         key={row.rowNumber}
                         className={cn(
-                          "relative rounded px-1 transition-colors",
-                          isWingRow && "bg-accent/[0.02]",
+                          "rounded-md px-1 py-0.5 transition-colors",
+                          isWingRow && "bg-surface-2/45",
                         )}
                       >
-                        {/* Emergency exit row indicator */}
                         {row.isExitRow && (
-                          <div className="my-1.5 flex items-center justify-between text-[8px] font-bold uppercase tracking-wider text-amber-400">
-                            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-1 py-0.5">
-                              <AlertTriangle className="size-2.5" /> EXIT DOOR
+                          <div className="my-2 flex items-center gap-2 text-xs font-medium text-delayed">
+                            <span className="flex items-center gap-1 rounded bg-delayed/10 px-1.5 py-0.5">
+                              <AlertTriangle className="size-3" /> Exit door
                             </span>
-                            <span className="h-px flex-1 bg-amber-500/30 mx-2" />
-                            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-1 py-0.5">
-                              EXIT DOOR <AlertTriangle className="size-2.5" />
-                            </span>
+                            <span className="h-px flex-1 bg-delayed/25" />
                           </div>
                         )}
 
-                        {/* Galley ahead notice */}
                         {row.hasGalleyAhead && (
-                          <div className="mb-2 rounded border border-line bg-surface-2 p-1 text-center font-mono text-[8px] text-subtle">
-                            FORWARD GALLEY & LAVATORIES
+                          <div className="mb-1.5 rounded border border-line/60 bg-surface-2/60 py-1 text-center font-mono text-xs text-subtle">
+                            FORWARD GALLEY · LAVATORIES
                           </div>
                         )}
 
-                        {/* Row Item with Seats */}
-                        <div className="flex items-center justify-center gap-1 sm:gap-2">
-                          {/* Row Number Left */}
-                          <span className="w-5 text-right font-mono text-[9px] font-bold text-subtle">
+                        <div className="flex items-center justify-center gap-1 sm:gap-1.5">
+                          <span className="w-5 text-right font-mono text-xs tabular text-subtle">
                             {row.rowNumber}
                           </span>
 
-                          {/* Seats layout */}
                           <div className="flex items-center gap-1">
                             {row.seats.map((seat) => {
                               const isSelected = selectedSeat?.id === seat.id;
                               const isMySeat = mySeatId === seat.id;
                               const isExit = seat.isExitRow;
-
-                              // Aisle spacer if this letter is after an aisle letter
                               const needsAisle = aisles.includes(seat.letter);
 
                               return (
                                 <div key={seat.id} className="flex items-center">
                                   <button
+                                    type="button"
                                     onClick={() => setSelectedSeat(seat)}
-                                    title={`Seat ${seat.id} (${seat.cabin}) - ${seat.pitchInches}" pitch`}
+                                    aria-pressed={isSelected}
+                                    aria-label={`Seat ${seat.id}, ${CABIN_META[seat.cabin].label}, ${seat.pitchInches} inch pitch`}
+                                    title={`Seat ${seat.id} · ${seat.pitchInches}" pitch`}
                                     className={cn(
-                                      "relative flex size-7 sm:size-8 items-center justify-center rounded transition-all duration-150 focus:outline-none",
+                                      "relative flex size-7 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 sm:size-8",
                                       isSelected
-                                        ? "scale-110 border-2 border-accent bg-accent/40 text-ink shadow-[0_0_12px_rgba(0,229,255,0.6)] font-bold z-10"
+                                        ? "border-2 border-accent bg-accent/30 font-semibold text-ink"
                                         : isMySeat
-                                          ? "border-2 border-emerald-400 bg-emerald-500/30 text-ink font-bold"
+                                          ? "border-2 border-landed bg-landed/25 font-semibold text-ink"
                                           : isExit
-                                            ? "border border-amber-500/50 bg-amber-500/20 text-amber-200 hover:border-amber-400"
-                                            : "border border-line bg-surface-3 text-ink hover:border-accent/60 hover:bg-surface-2",
+                                            ? "border border-delayed/50 bg-delayed/15 text-delayed hover:border-delayed"
+                                            : "border border-line/70 bg-surface-3 text-ink hover:border-accent/50 hover:bg-surface-2",
                                     )}
                                   >
-                                    <span className="font-mono text-[9px] font-bold">
+                                    <span className="font-mono text-xs">
                                       {seat.letter}
                                     </span>
                                     {isMySeat && (
-                                      <span className="absolute -top-1 -right-1 size-2 rounded-full bg-emerald-400" />
+                                      <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-landed" />
                                     )}
                                   </button>
 
-                                  {/* Aisle gap */}
                                   {needsAisle && (
-                                    <div className="w-3 sm:w-5 text-center font-mono text-[7px] text-subtle select-none">
+                                    <span className="w-3 select-none text-center font-mono text-[11px] text-subtle sm:w-4">
                                       ·
-                                    </div>
+                                    </span>
                                   )}
                                 </div>
                               );
                             })}
                           </div>
 
-                          {/* Row Number Right */}
-                          <span className="w-5 text-left font-mono text-[9px] font-bold text-subtle">
+                          <span className="w-5 text-left font-mono text-xs tabular text-subtle">
                             {row.rowNumber}
                           </span>
                         </div>
 
-                        {/* Lavatory behind notice */}
                         {row.hasLavatoryBehind && (
-                          <div className="mt-2 rounded border border-line bg-surface-2 p-1 text-center font-mono text-[8px] text-subtle">
-                            AFT LAVATORIES & REAR GALLEY
+                          <div className="mt-1.5 rounded border border-line/60 bg-surface-2/60 py-1 text-center font-mono text-xs text-subtle">
+                            AFT LAVATORIES · REAR GALLEY
                           </div>
                         )}
                       </div>
@@ -439,119 +444,101 @@ export default function AirplanesPage() {
                 </div>
               </div>
 
-              {/* Tail / APU Section */}
-              <div className="relative mx-auto mt-2 flex h-8 w-28 items-center justify-center rounded-b-[20px] border-2 border-t-0 border-line bg-surface-2 text-center">
-                <span className="font-mono text-[8px] text-subtle">AFT TAIL / APU</span>
+              <div className="mx-auto mt-2 flex h-8 w-24 items-center justify-center rounded-b-[18px] border border-t-0 border-line/70 bg-surface-2/60">
+                <span className="font-mono text-xs text-subtle">AFT</span>
               </div>
             </div>
           </Panel>
 
-          {/* Quick Stats Grid */}
-          <div className="grid gap-2 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MetricTile
-              label="Fleet Aircraft"
+              label="Aircraft"
               value={aircraft.aircraftModel}
               sub={aircraft.airlineName}
             />
             <MetricTile
-              label="Total Capacity"
-              value={`${aircraft.totalSeats} seats`}
+              label="Capacity"
+              value={`${aircraft.totalSeats}`}
               sub="Multi-cabin layout"
             />
             <MetricTile
-              label="Standard Pitch"
-              value={`${aircraft.cabins[aircraft.cabins.length - 1]?.pitchInches}" - ${aircraft.cabins[0]?.pitchInches}"`}
-              sub="Economy to Premium"
+              label="Pitch range"
+              value={`${aircraft.cabins[aircraft.cabins.length - 1]?.pitchInches}″ – ${aircraft.cabins[0]?.pitchInches}″`}
+              sub="Economy to premium"
             />
             <MetricTile
               label="Connectivity"
-              value="Reference only"
+              value="Reference"
               sub="Not verified for this flight"
             />
           </div>
-        </main>
+        </div>
 
-        {/* Right column: Selected seat inspector & illustrative notes */}
-        <aside className="space-y-2.5">
+        {/* Right column: seat inspector & spec */}
+        <aside className="space-y-4">
           {selectedSeat ? (
-            <Panel className="p-3">
+            <Panel className="p-4">
               <div className="flex items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <span
                     className={cn(
-                      "inline-block rounded border px-1.5 py-0.5 text-[8px] font-bold",
-                      CABIN_COLORS[selectedSeat.cabin].badgeBg,
-                      CABIN_COLORS[selectedSeat.cabin].text,
+                      "inline-block rounded-md border px-2 py-1 text-xs font-medium",
+                      CABIN_META[selectedSeat.cabin].badge,
                     )}
                   >
-                    {CABIN_COLORS[selectedSeat.cabin].label}
+                    {CABIN_META[selectedSeat.cabin].label}
                   </span>
-                  <h3 className="mt-1 flex items-center gap-2 text-lg font-black text-ink">
-                    Seat {selectedSeat.id}
+                  <h2 className="mt-2 flex items-center gap-2 font-mono text-xl font-semibold text-ink">
+                    {selectedSeat.id}
                     {mySeatId === selectedSeat.id && (
-                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold text-emerald-400">
-                        SELECTED
+                      <span className="rounded bg-landed/15 px-1.5 py-0.5 text-xs font-medium text-landed">
+                        Yours
                       </span>
                     )}
-                  </h3>
-                  <p className="text-[10px] text-muted">
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted">
                     {selectedSeat.isWindow
-                      ? "Window Seat"
+                      ? "Window seat"
                       : selectedSeat.isAisle
-                        ? "Aisle Seat"
-                        : "Middle Seat"}
-                    {selectedSeat.isExitRow ? " · Exit Row" : ""}
+                        ? "Aisle seat"
+                        : "Middle seat"}
+                    {selectedSeat.isExitRow ? " · Exit row" : ""}
                     {selectedSeat.isBulkhead ? " · Bulkhead" : ""}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedSeat(null)}
-                  className="rounded p-1 text-subtle hover:bg-surface-2 hover:text-ink"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+                  aria-label="Close seat details"
                 >
-                  <X className="size-3.5" />
+                  <X className="size-4" />
                 </button>
               </div>
 
-              {/* Dimensions */}
-              <div className="mt-3 grid grid-cols-3 gap-2 border-y border-line py-2.5 text-center">
-                <div className="rounded-md bg-surface-2 p-1.5">
-                  <span className="text-[8px] uppercase text-subtle">Pitch</span>
-                  <p className="font-mono text-xs font-bold text-ink">
-                    {selectedSeat.pitchInches}&quot;
-                  </p>
-                </div>
-                <div className="rounded-md bg-surface-2 p-1.5">
-                  <span className="text-[8px] uppercase text-subtle">Width</span>
-                  <p className="font-mono text-xs font-bold text-ink">
-                    {selectedSeat.widthInches}&quot;
-                  </p>
-                </div>
-                <div className="rounded-md bg-surface-2 p-1.5">
-                  <span className="text-[8px] uppercase text-subtle">Recline</span>
-                  <p className="font-mono text-xs font-bold text-ink">
-                    {selectedSeat.reclineInches}&quot;
-                  </p>
-                </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <SeatMetric label="Pitch" value={`${selectedSeat.pitchInches}″`} />
+                <SeatMetric label="Width" value={`${selectedSeat.widthInches}″`} />
+                <SeatMetric label="Recline" value={`${selectedSeat.reclineInches}″`} />
               </div>
 
-              {/* Illustrative seat note — not a passenger review */}
               {selectedSeat.review && (
-                <div className="mt-3 rounded-lg border border-line bg-surface-2 p-2.5">
-                  <div className="flex items-center gap-1 text-[9px] font-bold">
+                <div className="mt-3 rounded-lg border border-line/60 bg-surface-2/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
                     {selectedSeat.review.rating === "GOOD" ? (
-                      <Sparkles className="size-3 text-emerald-400" />
+                      <Sparkles className="size-3.5 text-landed" />
                     ) : selectedSeat.review.rating === "CAUTION" ? (
-                      <AlertTriangle className="size-3 text-amber-400" />
+                      <AlertTriangle className="size-3.5 text-delayed" />
                     ) : (
-                      <Info className="size-3 text-cyan-400" />
+                      <Info className="size-3.5 text-accent-2" />
                     )}
                     <span
                       className={
                         selectedSeat.review.rating === "GOOD"
-                          ? "text-emerald-400"
+                          ? "text-landed"
                           : selectedSeat.review.rating === "CAUTION"
-                            ? "text-amber-400"
-                            : "text-ink"
+                            ? "text-delayed"
+                            : "text-muted"
                       }
                     >
                       {selectedSeat.review.rating === "GOOD"
@@ -561,20 +548,19 @@ export default function AirplanesPage() {
                           : "Standard configuration"}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] text-muted leading-relaxed">
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
                     {selectedSeat.review.notes}
                   </p>
                 </div>
               )}
 
-              {/* Features checklist */}
-              <div className="mt-3 space-y-1.5 text-[10px]">
-                <p className="label-caps text-subtle">Seat Features</p>
-                <div className="flex flex-wrap gap-1">
+              <div className="mt-3">
+                <p className="label-caps text-subtle">Features</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {selectedSeat.features.map((feature) => (
                     <span
                       key={feature}
-                      className="rounded border border-line bg-surface px-1.5 py-0.5 text-[8px] font-medium text-ink"
+                      className="rounded-md bg-surface-2 px-2 py-1 text-xs text-muted"
                     >
                       {feature.replace(/_/g, " ")}
                     </span>
@@ -582,96 +568,102 @@ export default function AirplanesPage() {
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="mt-4 flex gap-2">
-                <Button
-                  size="sm"
-                  variant={mySeatId === selectedSeat.id ? "ghost" : "primary"}
-                  className="flex-1"
-                  onClick={() => {
-                    setMySeatId((curr) => (curr === selectedSeat.id ? null : selectedSeat.id));
-                  }}
-                >
-                  <Armchair className="size-3.5" />
-                  {mySeatId === selectedSeat.id ? "Deselect seat" : "Select seat"}
-                </Button>
-              </div>
+              <Button
+                className="mt-4 w-full"
+                size="sm"
+                variant={mySeatId === selectedSeat.id ? "ghost" : "primary"}
+                onClick={() => {
+                  setMySeatId((curr) =>
+                    curr === selectedSeat.id ? null : selectedSeat.id,
+                  );
+                }}
+              >
+                <Armchair className="size-4" />
+                {mySeatId === selectedSeat.id ? "Deselect seat" : "Select seat"}
+              </Button>
             </Panel>
           ) : (
-            <Panel className="p-4 text-center">
-              <Armchair className="mx-auto size-7 text-subtle" />
-              <h4 className="mt-2 text-xs font-bold text-ink">No Seat Selected</h4>
-              <p className="mt-1 text-[10px] text-muted">
-                Click any seat to inspect the illustrative pitch, width, and recline. Seat availability is not connected.
-              </p>
+            <Panel>
+              <div className="flex flex-col items-center px-5 py-10 text-center">
+                <span className="flex size-11 items-center justify-center rounded-xl border border-line/70 bg-surface-2/60 text-muted">
+                  <Armchair className="size-5" />
+                </span>
+                <p className="mt-3 text-sm font-medium text-ink">
+                  No seat selected
+                </p>
+                <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted">
+                  Choose any seat to inspect illustrative pitch, width, and
+                  recline. Availability is not connected.
+                </p>
+              </div>
             </Panel>
           )}
 
-          {/* Aircraft Information Card */}
-          <Panel className="p-3">
-            <p className="label-caps text-subtle">Aircraft Specification</p>
-            <div className="mt-2 space-y-1.5 text-[10px]">
-              <div className="flex items-center justify-between text-muted">
-                <span>Airline Operator:</span>
-                <span className="font-bold text-ink">{aircraft.airlineName} ({aircraft.airlineCode})</span>
-              </div>
-              <div className="flex items-center justify-between text-muted">
-                <span>Aircraft Type:</span>
-                <span className="font-mono text-ink">{aircraft.aircraftModel}</span>
-              </div>
-              <div className="flex items-center justify-between text-muted">
-                <span>Manufacturer:</span>
-                <span className="text-ink">{aircraft.manufacturer}</span>
-              </div>
-              <div className="flex items-center justify-between text-muted">
-                <span>Sample Registration:</span>
-                <span className="font-mono text-accent">{aircraft.tailNumberSample}</span>
-              </div>
-              <div className="flex items-center justify-between text-muted">
-                <span>Overwing Rows:</span>
-                <span className="font-mono text-ink">
-                  Rows {aircraft.wingsRowRange[0]}–{aircraft.wingsRowRange[1]}
-                </span>
-              </div>
-            </div>
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Specification</p>
+            <dl className="mt-2.5 space-y-2.5 text-[13px]">
+              <SpecRow
+                label="Operator"
+                value={`${aircraft.airlineName} (${aircraft.airlineCode})`}
+              />
+              <SpecRow label="Type" value={aircraft.aircraftModel} mono />
+              <SpecRow label="Manufacturer" value={aircraft.manufacturer} />
+              <SpecRow
+                label="Sample registration"
+                value={aircraft.tailNumberSample}
+                mono
+                accent
+              />
+              <SpecRow
+                label="Overwing rows"
+                value={`${aircraft.wingsRowRange[0]}–${aircraft.wingsRowRange[1]}`}
+                mono
+              />
+            </dl>
           </Panel>
         </aside>
       </div>
 
-      {/* Aircraft Picker Modal */}
       <Modal
         open={aircraftPickerOpen}
         onClose={() => setAircraftPickerOpen(false)}
-        title="Select Airline & Aircraft Model"
+        title="Select aircraft"
+        subtitle="Illustrative configurations from the AeroQuest reference catalog."
+        size="md"
       >
-        <div className="space-y-2 py-1">
+        <div className="space-y-2">
           {AIRCRAFT_PRESETS.map((spec) => (
             <button
               key={spec.id}
+              type="button"
               onClick={() => {
                 setSelectedAircraftId(spec.id);
                 setSelectedSeat(null);
                 setAircraftPickerOpen(false);
               }}
+              aria-pressed={spec.id === selectedAircraftId}
               className={cn(
-                "flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors",
+                "flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
                 spec.id === selectedAircraftId
-                  ? "border-accent bg-accent-soft"
-                  : "border-line bg-surface-2 hover:bg-surface-3",
+                  ? "border-accent/40 bg-accent-soft"
+                  : "border-line/70 bg-surface-2/40 hover:border-line-strong",
               )}
             >
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-black text-accent">
+                  <span className="font-mono text-xs font-semibold text-accent">
                     {spec.airlineCode}
                   </span>
-                  <span className="text-xs font-bold text-ink">{spec.airlineName}</span>
+                  <span className="truncate text-[13px] font-medium text-ink">
+                    {spec.airlineName}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-[10px] text-muted">
-                  {spec.aircraftModel} · {spec.totalSeats} seats · {spec.manufacturer}
+                <p className="mt-0.5 truncate text-xs text-subtle">
+                  {spec.aircraftModel} · {spec.totalSeats} seats ·{" "}
+                  {spec.manufacturer}
                 </p>
               </div>
-              <ChevronRight className="size-4 text-subtle" />
+              <ChevronRight className="size-4 shrink-0 text-subtle" />
             </button>
           ))}
         </div>
@@ -680,28 +672,60 @@ export default function AirplanesPage() {
   );
 }
 
-function Building2(props: React.SVGProps<SVGSVGElement>) {
+function AmenityRow({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
-      <path d="M9 22v-4h6v4" />
-      <path d="M8 6h.01" />
-      <path d="M16 6h.01" />
-      <path d="M12 6h.01" />
-      <path d="M12 10h.01" />
-      <path d="M12 14h.01" />
-      <path d="M16 10h.01" />
-      <path d="M16 14h.01" />
-      <path d="M8 10h.01" />
-      <path d="M8 14h.01" />
-    </svg>
+    <div className="flex items-start gap-2.5">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted" />
+      <div className="min-w-0">
+        <p className="text-[13px] font-medium text-ink">{title}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-subtle">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function SeatMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2/50 px-2 py-2 text-center">
+      <p className="text-xs text-subtle">{label}</p>
+      <p className="mt-0.5 font-mono text-[13px] font-medium text-ink">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SpecRow({
+  label,
+  value,
+  mono,
+  accent,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <dd
+        className={cn(
+          "text-right font-medium",
+          mono && "font-mono",
+          accent ? "text-accent" : "text-ink",
+        )}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }

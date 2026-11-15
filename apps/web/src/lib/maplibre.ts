@@ -41,6 +41,8 @@ export function createBaseMap(
     minZoom?: number;
     maxZoom?: number;
     attribution?: boolean;
+    /** Built-in +/- control. Custom map HUDs supply their own controls. */
+    navigation?: boolean;
   } = {},
 ): MapLibreMap {
   const map = new MapLibreMapClass({
@@ -77,7 +79,9 @@ export function createBaseMap(
     map.on("styledata", collapseAttribution);
   }
 
-  map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+  if (options.navigation) {
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+  }
 
   return map;
 }

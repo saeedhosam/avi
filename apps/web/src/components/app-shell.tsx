@@ -8,10 +8,12 @@ import {
   Bell,
   Building2,
   CheckCircle2,
+  ChevronRight,
   CircleAlert,
   Glasses,
   Globe2,
   Info,
+  LayoutGrid,
   Network,
   Plane,
   RefreshCw,
@@ -19,6 +21,7 @@ import {
   Settings2,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { DATA_SOURCE_META } from "@/lib/data-source";
@@ -26,40 +29,56 @@ import { AccountDialog } from "./account-dialog";
 import { NotificationsDialog } from "./notifications-dialog";
 import { Button, Modal } from "./ui";
 
-const NAV_ITEMS = [
-  { href: "/search", label: "Search", icon: Search, tag: "Flight lookup" },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  matches?: string[];
+};
+
+const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
-    href: "/routes",
-    label: "Routes",
-    icon: Network,
-    tag: "Global connections",
+    label: "Plan",
+    items: [
+      { href: "/search", label: "Search", icon: Search },
+      { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
+      { href: "/routes", label: "Routes", icon: Network },
+    ],
   },
   {
-    href: "/explore/CAI",
-    label: "Explore",
-    icon: Globe2,
-    tag: "Direct route globe",
+    label: "At the airport",
+    items: [
+      { href: "/airports", label: "Airports", icon: Building2 },
+      {
+        href: "/airplanes",
+        label: "Airplanes",
+        icon: Plane,
+        matches: ["/airplanes", "/cabin"],
+      },
+    ],
   },
   {
-    href: "/airports",
-    label: "Airports",
-    icon: Building2,
-    tag: "Indoor terminal maps",
-  },
-  {
-    href: "/airplanes",
-    label: "Airplanes",
-    icon: Plane,
-    tag: "Cabin seatmaps",
-  },
-  { href: "/watchlist", label: "Watchlist", icon: Glasses, tag: "Watched flights" },
-  {
-    href: "/pricing",
-    label: "Plans",
-    icon: BadgeDollarSign,
-    tag: "Pro · Trip Pass",
+    label: "Your account",
+    items: [
+      { href: "/watchlist", label: "Watchlist", icon: Glasses },
+      { href: "/pricing", label: "Plans", icon: BadgeDollarSign },
+    ],
   },
 ];
+
+const MOBILE_ITEMS: NavItem[] = [
+  { href: "/search", label: "Search", icon: Search },
+  { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
+  { href: "/airports", label: "Airports", icon: Building2 },
+  { href: "/watchlist", label: "Watchlist", icon: Glasses },
+];
+
+function isActive(pathname: string, item: NavItem) {
+  const targets = item.matches ?? [item.href];
+  return targets.some(
+    (target) => pathname === target || pathname.startsWith(`${target}/`),
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -77,96 +96,121 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const source = DATA_SOURCE_META[dataSourceMode];
+  const moreActive = ["/routes", "/airplanes", "/cabin", "/pricing"].some(
+    (href) => pathname === href || pathname.startsWith(`${href}/`),
+  );
 
   return (
     <div className="app-bg min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col border-r border-line/70 bg-surface/80 backdrop-blur-xl lg:flex">
-        <div className="flex h-[72px] items-center gap-2.5 border-b border-line/60 px-5">
-          <div className="flex size-9 items-center justify-center rounded-full border border-accent bg-accent-soft text-accent">
-            <Plane className="size-4.5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[17px] font-black leading-none tracking-tight text-ink">
-              AeroQuest
-            </p>
-            <p className="mt-1 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] text-accent">
-              Route · Terminal · Cabin
-            </p>
-          </div>
-        </div>
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          <p className="px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-subtle">
-            Operations
-          </p>
-          {NAV_ITEMS.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/search" && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all",
-                  active
-                    ? "border-accent/35 bg-accent-soft text-accent"
-                    : "border-transparent text-muted hover:border-line/70 hover:bg-surface-2/70 hover:text-ink",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-lg border transition-colors",
-                    active
-                      ? "border-accent/40 bg-accent/10 text-accent"
-                      : "border-line/60 bg-surface-2 text-muted group-hover:text-ink",
-                  )}
-                >
-                  <Icon className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center justify-between gap-1">
-                    <span className="text-[13px] font-semibold">
-                      {item.label}
-                    </span>
-                    {item.href === "/watchlist" && watchlist.length > 0 && (
-                      <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--bg)]">
-                        {watchlist.length}
-                      </span>
-                    )}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[9px] text-subtle">
-                    {item.tag}
-                  </span>
-                </span>
-              </Link>
-            );
-          })}
+      {/* Desktop rail */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line/60 bg-surface/70 backdrop-blur-xl lg:flex">
+        <Link
+          href="/search"
+          className="flex h-[68px] items-center gap-2.5 border-b border-line/50 px-5 transition-colors hover:bg-surface-2/40"
+        >
+          <span className="flex size-9 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent">
+            <Plane className="size-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[17px] font-semibold leading-none tracking-tight text-ink">
+              AeroQuest
+            </span>
+            <span className="mt-1 block whitespace-nowrap text-xs font-medium text-subtle">
+              Route · Terminal · Cabin
+            </span>
+          </span>
+        </Link>
+
+        <nav
+          className="flex-1 space-y-5 overflow-y-auto px-3 py-5"
+          aria-label="Primary"
+        >
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="label-caps px-3 pb-2 text-subtle">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(pathname, item);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "group flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors",
+                        active
+                          ? "bg-accent-soft text-accent"
+                          : "text-muted hover:bg-surface-2/60 hover:text-ink",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-[18px] shrink-0",
+                          active ? "text-accent" : "text-subtle group-hover:text-muted",
+                        )}
+                      />
+                      <span className="flex-1">{item.label}</span>
+                      {item.href === "/watchlist" && watchlist.length > 0 && (
+                        <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-xs font-semibold tabular text-muted">
+                          {watchlist.length}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="space-y-2 border-t border-line/60 p-3">
-          <div className="flex items-center gap-1.5">
+        <div className="space-y-1.5 border-t border-line/50 p-3">
+          <button
+            type="button"
+            onClick={() => setSourceOpen(true)}
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left transition-colors hover:bg-surface-2/60"
+          >
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: source.color }}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium text-ink">
+                {source.badge}
+              </span>
+              <span className="block truncate text-xs text-subtle">
+                Data &amp; API status
+              </span>
+            </span>
+            <Info className="size-3.5 text-subtle" />
+          </button>
+
+          <div className="flex items-center gap-1">
             <button
-              onClick={refreshData}
+              type="button"
+              onClick={() => void refreshData()}
               disabled={syncing}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line/70 bg-surface-2/60 px-2 py-2 text-[10px] font-bold text-muted transition-colors hover:border-accent/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted transition-colors hover:bg-surface-2/60 hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
             >
-              <RefreshCw
-                className={cn("size-3.5", syncing && "animate-spin")}
-              />
-              Refresh
+              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
+              {syncing ? "Syncing" : "Refresh"}
             </button>
             <button
+              type="button"
               onClick={() => setNotificationsOpen(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line/70 bg-surface-2/60 px-2 py-2 text-[10px] font-bold text-muted transition-colors hover:border-accent/40 hover:text-ink"
+              className="relative flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted transition-colors hover:bg-surface-2/60 hover:text-ink"
             >
               <Bell className="size-3.5" />
               Alerts
               {unreadAlertCount > 0 && (
-                <span className="rounded-full bg-[#F59E0B] px-1.5 text-[9px] font-bold leading-4 text-[#070E17]">
+                <span className="ml-0.5 rounded-full bg-delayed px-1.5 text-xs font-semibold tabular leading-4 text-[color:var(--bg)]">
                   {unreadAlertCount}
                 </span>
               )}
@@ -174,98 +218,92 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <button
-            onClick={() => setSourceOpen(true)}
-            className="flex w-full items-center gap-2 rounded-xl border border-line/70 bg-surface-2/60 px-2.5 py-2 text-left transition-colors hover:border-accent/40"
-          >
-            <span
-              className="size-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: source.color }}
-            />
-            <span className="min-w-0 flex-1">
-              <span
-                className="block truncate text-[9px] font-extrabold uppercase tracking-wider"
-                style={{ color: source.color }}
-              >
-                {source.badge}
-              </span>
-              <span className="block truncate text-[9px] text-subtle">
-                {source.summary}
-              </span>
-            </span>
-            <Info className="size-3 text-subtle" />
-          </button>
-
-          <button
+            type="button"
             onClick={() => setAccountOpen(true)}
-            className="flex w-full items-center gap-2.5 rounded-xl border border-line/70 bg-surface-2/60 p-2 text-left transition-colors hover:border-accent/40"
+            className="flex min-h-12 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-2/60"
           >
-            <span className="flex size-8 items-center justify-center rounded-full border border-accent/50 bg-accent-soft text-[11px] font-bold text-accent">
+            <span className="flex size-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-xs font-semibold text-accent">
               {account.avatarInitial}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[11px] font-bold text-ink">
+              <span className="block truncate text-[13px] font-medium text-ink">
                 {account.name}
               </span>
-              <span className="block truncate text-[9px] text-subtle">
+              <span className="block truncate text-xs text-subtle">
                 {account.isSignedIn ? account.email : "Sign in to sync"}
               </span>
             </span>
-            <Settings2 className="size-3.5 text-subtle" />
+            <Settings2 className="size-3.5 shrink-0 text-subtle" />
           </button>
 
+          <div className="flex items-center justify-between px-3 pt-1 text-xs text-subtle">
+            <Link href="/legal/terms" className="hover:text-muted">
+              Terms
+            </Link>
+            <Link href="/legal/privacy" className="hover:text-muted">
+              Privacy
+            </Link>
+          </div>
         </div>
       </aside>
 
-      <div className="lg:pl-[240px]">
-        <main className="min-h-screen pb-20 lg:pb-0">
+      <div className="lg:pl-[248px]">
+        <main id="main-content" className="min-h-screen pb-safe-nav pt-safe">
           {children}
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line/70 bg-surface/95 backdrop-blur-xl lg:hidden">
-        {NAV_ITEMS.map((item) => {
-          const active =
-            pathname === item.href ||
-            (item.href !== "/search" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-semibold",
-                active ? "text-accent" : "text-subtle",
+      {/* Mobile tab bar: five destinations, everything else under More. */}
+      <nav
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-surface/95 backdrop-blur-xl lg:hidden"
+        aria-label="Primary"
+      >
+        <div className="grid grid-cols-5">
+          {MOBILE_ITEMS.map((item) => {
+            const active = isActive(pathname, item);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-[58px] flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
+                  active ? "text-accent" : "text-subtle hover:text-ink",
+                )}
+              >
+                <span className="relative">
+                  <Icon className="size-5" />
+                  {item.href === "/watchlist" && watchlist.length > 0 && (
+                    <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-accent" />
+                  )}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-expanded={moreOpen}
+            className={cn(
+              "flex min-h-[58px] flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
+              moreActive || moreOpen
+                ? "text-accent"
+                : "text-subtle hover:text-ink",
+            )}
+          >
+            <span className="relative">
+              <LayoutGrid className="size-5" />
+              {unreadAlertCount > 0 && (
+                <span className="absolute -right-2 -top-1 min-w-3.5 rounded-full bg-delayed px-1 text-center text-xs font-semibold leading-3.5 text-[color:var(--bg)]">
+                  {unreadAlertCount}
+                </span>
               )}
-            >
-              <Icon className="size-4" />
-              {item.label.split(" ")[0]}
-              {item.href === "/watchlist" && watchlist.length > 0 && (
-                <span className="absolute right-[22%] top-1.5 size-1.5 rounded-full bg-accent" />
-              )}
-            </Link>
-          );
-        })}
-        <button
-          onClick={() => setNotificationsOpen(true)}
-          className="relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-semibold text-subtle transition-colors hover:text-accent"
-        >
-          <Bell className="size-4" />
-          Alerts
-          {unreadAlertCount > 0 && (
-            <span className="absolute right-[22%] top-1 flex min-w-4 items-center justify-center rounded-full bg-[#F59E0B] px-1 text-[9px] font-bold leading-4 text-[#070E17]">
-              {unreadAlertCount}
             </span>
-          )}
-        </button>
-        <button
-          onClick={() => setAccountOpen(true)}
-          className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-semibold text-subtle transition-colors hover:text-accent"
-        >
-          <span className="flex size-4 items-center justify-center rounded-full border border-accent/45 bg-surface-2 text-[8px] font-bold text-accent">
-            {account.avatarInitial}
-          </span>
-          Account
-        </button>
+            More
+          </button>
+        </div>
       </nav>
 
       <NotificationsDialog
@@ -274,74 +312,94 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       />
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
 
+      <MoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        pathname={pathname}
+        onAlerts={() => {
+          setMoreOpen(false);
+          setNotificationsOpen(true);
+        }}
+        onAccount={() => {
+          setMoreOpen(false);
+          setAccountOpen(true);
+        }}
+        onSource={() => {
+          setMoreOpen(false);
+          setSourceOpen(true);
+        }}
+        accountName={account.name}
+      />
+
       <Modal
         open={sourceOpen}
         onClose={() => setSourceOpen(false)}
-        title="Telemetry & API diagnostics"
+        title="Data & API status"
         subtitle={source.title}
         icon={<Info className="size-4" />}
         size="sm"
         footer={
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSourceOpen(false)}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setSourceOpen(false)}>
             Close
           </Button>
         }
       >
-        <div className="space-y-3">
-          <p className="text-xs leading-relaxed text-muted">
-            {source.subtitle}
-          </p>
-          <div className="space-y-2">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-muted">{source.subtitle}</p>
+          <div className="divide-y divide-line/60 rounded-lg border border-line/60">
             <DiagnosticRow
               title="Live flight data"
-              detail="Flight lookup, airport boards, daily route stats"
+              detail="Flight lookup, airport boards, route stats"
               active={dataSourceMode === "LIVE_AERODATABOX"}
               value={
                 dataSourceMode === "LIVE_AERODATABOX"
-                  ? "LIVE RESPONSE"
+                  ? "Live"
                   : aeroConfigured
-                    ? "READY · NO DATA"
-                    : "SAVED DATA"
+                    ? "Ready · no data"
+                    : "Saved data"
               }
             />
             <DiagnosticRow
               title="Destination weather"
-              detail="Open-Meteo model forecast, fetched on demand"
+              detail="Open-Meteo forecast, fetched on demand"
               active={false}
-              value="ON DEMAND"
+              value="On demand"
             />
             <DiagnosticRow
               title="Local cache & background sync"
-              detail="Saved flight records, watchlist, notes, alerts"
+              detail="Saved flights, watchlist, notes, alerts"
               active
-              value="ACTIVE"
+              value="Active"
             />
             <DiagnosticRow
               title="Account sync"
               detail="Sign-in · profile · watchlist · alerts"
               active={Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)}
-              value={Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) ? "CONFIGURED" : "OPTIONAL"}
+              value={
+                Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)
+                  ? "Configured"
+                  : "Optional"
+              }
             />
           </div>
           {!aeroConfigured && (
-            <p className="rounded-lg border border-delayed/30 bg-delayed/10 px-3 py-2 text-[10px] leading-relaxed text-muted">
+            <p className="rounded-lg border border-delayed/30 bg-delayed/8 px-3.5 py-3 text-sm leading-relaxed text-muted">
               Live flight lookups aren’t connected in this build, so saved
-              flights and weather are used until it is. Everything else —
-              watchlist, saves, notes, alerts — works normally.
+              flights and weather are used until they are. Watchlist, saves,
+              notes and alerts work normally.
             </p>
           )}
         </div>
       </Modal>
 
-      <div className="pointer-events-none fixed bottom-20 right-4 z-[90] flex w-[min(92vw,380px)] flex-col gap-2 lg:bottom-5">
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed bottom-24 right-4 z-[90] flex w-[min(92vw,380px)] flex-col gap-2 lg:bottom-5"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="pointer-events-auto animate-slide-left rounded-xl border border-line bg-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+            className="pointer-events-auto animate-slide-left rounded-lg border border-line bg-surface/95 p-3.5 shadow-2xl backdrop-blur-xl"
           >
             <div className="flex items-start gap-2.5">
               {toast.kind === "success" ? (
@@ -353,12 +411,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ) : (
                 <Info className="mt-0.5 size-4 shrink-0 text-accent-2" />
               )}
-              <p className="flex-1 text-[11px] leading-relaxed text-ink">
+              <p className="flex-1 text-[13px] leading-relaxed text-ink">
                 {toast.message}
               </p>
               <button
+                type="button"
                 onClick={() => dismissToast(toast.id)}
-                className="text-subtle transition-colors hover:text-ink"
+                className="-m-1 p-1 text-subtle transition-colors hover:text-ink"
                 aria-label="Dismiss notification"
               >
                 <X className="size-3.5" />
@@ -368,6 +427,133 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function MoreSheet({
+  open,
+  onClose,
+  pathname,
+  onAlerts,
+  onAccount,
+  onSource,
+  accountName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  pathname: string;
+  onAlerts: () => void;
+  onAccount: () => void;
+  onSource: () => void;
+  accountName: string;
+}) {
+  const rows: Array<
+    | { kind: "link"; href: string; label: string; icon: LucideIcon; detail: string }
+    | { kind: "action"; label: string; icon: LucideIcon; detail: string; onPress: () => void }
+  > = [
+    {
+      kind: "link",
+      href: "/routes",
+      label: "Routes",
+      icon: Network,
+      detail: "Global connection planner",
+    },
+    {
+      kind: "link",
+      href: "/airplanes",
+      label: "Airplanes",
+      icon: Plane,
+      detail: "Cabin and seat maps",
+    },
+    {
+      kind: "link",
+      href: "/pricing",
+      label: "Plans",
+      icon: BadgeDollarSign,
+      detail: "Free · Pro · Trip Pass",
+    },
+    {
+      kind: "action",
+      label: "Alerts",
+      icon: Bell,
+      detail: "Watchlist notifications",
+      onPress: onAlerts,
+    },
+    {
+      kind: "action",
+      label: accountName,
+      icon: Settings2,
+      detail: "Account and sync",
+      onPress: onAccount,
+    },
+    {
+      kind: "action",
+      label: "Data & API status",
+      icon: Info,
+      detail: "Sources and availability",
+      onPress: onSource,
+    },
+  ];
+
+  return (
+    <Modal open={open} onClose={onClose} title="More" size="sm">
+      <div className="divide-y divide-line/60">
+        {rows.map((row) => {
+          const Icon = row.icon;
+          const active =
+            row.kind === "link" &&
+            (pathname === row.href || pathname.startsWith(`${row.href}/`));
+          const inner = (
+            <>
+              <span
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface-2",
+                  active ? "text-accent" : "text-muted",
+                )}
+              >
+                <Icon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink">
+                  {row.label}
+                </span>
+                <span className="block truncate text-xs text-subtle">
+                  {row.detail}
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-subtle" />
+            </>
+          );
+          return row.kind === "link" ? (
+            <Link
+              key={row.href}
+              href={row.href}
+              onClick={onClose}
+              className="flex min-h-14 items-center gap-3 py-2.5"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <button
+              key={row.label}
+              type="button"
+              onClick={row.onPress}
+              className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left"
+            >
+              {inner}
+            </button>
+          );
+        })}
+        <div className="flex items-center justify-between py-3 text-xs text-subtle">
+          <Link href="/legal/terms" onClick={onClose} className="hover:text-muted">
+            Terms
+          </Link>
+          <Link href="/legal/privacy" onClick={onClose} className="hover:text-muted">
+            Privacy
+          </Link>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -383,17 +569,17 @@ function DiagnosticRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-surface-2 px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 px-3.5 py-3">
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold text-ink">{title}</p>
-        <p className="mt-0.5 truncate text-[9px] text-subtle">{detail}</p>
+        <p className="truncate text-[13px] font-medium text-ink">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-subtle">{detail}</p>
       </div>
       <span
         className={cn(
-          "shrink-0 rounded-md border px-1.5 py-1 text-[8px] font-extrabold tracking-wide",
+          "shrink-0 rounded-md border px-2 py-1 text-xs font-semibold",
           active
-            ? "border-landed/35 bg-landed/10 text-landed"
-            : "border-delayed/35 bg-delayed/10 text-delayed",
+            ? "border-landed/30 bg-landed/10 text-landed"
+            : "border-delayed/30 bg-delayed/10 text-delayed",
         )}
       >
         {value}

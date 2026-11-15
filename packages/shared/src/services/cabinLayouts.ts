@@ -634,6 +634,7 @@ function seatDistanceMeters(a: CabinSeat, b: CabinFeature): number {
 export function resolveSeat(
   layout: AircraftCabinLayout,
   seatNumber: string,
+  options?: { deck?: number },
 ): ResolvedSeat {
   const parsed = parseSeatNumber(seatNumber);
   const seat =
@@ -641,7 +642,9 @@ export function resolveSeat(
       ? null
       : (layout.seats.find(
           (candidate) =>
-            candidate.row === parsed.row && candidate.letter === parsed.letter,
+            candidate.row === parsed.row &&
+            candidate.letter === parsed.letter &&
+            (options?.deck === undefined || candidate.deck === options.deck),
         ) ?? null);
 
   if (!seat) {

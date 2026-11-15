@@ -4,121 +4,188 @@ import {
   Badge,
   Card,
   Label,
+  ListRow,
   Row,
   Screen,
+  SectionHeader,
   Subtitle,
   Title,
 } from "../src/components/ui";
 import { useAuth } from "../src/lib/auth";
 import { HOME_AIRPORTS } from "../src/lib/config";
-import { COLORS } from "../src/lib/theme";
+import { COLORS, RADIUS } from "../src/lib/theme";
 
-const FEATURES = [
+const TOOLS = [
   {
-    id: "flights",
-    eyebrow: "LIVE GATEWAY · OFFLINE CACHE",
-    title: "Flight Search & Tracking",
-    detail:
-      "Find a flight by number or airport board, track its live snapshot, and open gate, aircraft, terminal, and offline HUD context.",
-    action: "Find a flight",
-    href: "/flights",
-  },
-  {
-    id: "pricing",
-    eyebrow: "FREE · PRO · $4.99 TRIP PASS",
-    title: "Plans",
-    detail:
-      "Compare the free tools, AeroQuest Pro, and the Single-Trip Pass. Checkout is hosted by the configured billing provider; nothing is charged when it is unavailable.",
-    action: "Compare plans",
-    href: "/pricing",
-  },
-  {
-    id: "explore",
-    eyebrow: "FREE · WEB + MOBILE",
-    title: "Direct Route Explorer",
-    detail:
-      "Pick a home airport and see every non-stop destination on a 3D-ready globe, colour-coded by haul and filtered by airline.",
-    action: "Explore routes",
-    href: "/explore/CAI",
-  },
-  {
-    id: "terminal",
-    eyebrow: "FREE 2D · PRO SPRINT",
-    title: "Terminal Radar",
-    detail:
-      "A game-style indoor map with glowing POI pins, nearest restroom/power/water routing, and Tight-Connection Sprint Mode.",
-    action: "Open JFK T4",
+    code: "TRM",
+    title: "Terminal",
+    detail: "Indoor gates, amenities, and sprint routing.",
     href: "/terminal/JFK",
+    tag: "Free map",
   },
   {
-    id: "cabin",
-    eyebrow: "PRO · 3D CABIN",
-    title: "Seat Twin",
-    detail:
-      "Inspect a parametric cabin deck, highlight 14A, and review window alignment, pitch, power, lavatories, and exits.",
-    action: "Open 777 cabin",
+    code: "CAB",
+    title: "Cabin twin",
+    detail: "Deck-aware seat map and window alignment.",
     href: "/cabin/B77W/14A",
+    tag: "Pro",
   },
   {
-    id: "scan",
-    eyebrow: "FREE · ZERO API COST",
-    title: "Boarding Pass Scanner",
-    detail:
-      "Scan PDF417, Aztec, or QR BCBP data on-device, parse the PNR, route, and seat locally, then fetch live status from the gateway.",
-    action: "Scan a pass",
+    code: "SCN",
+    title: "Scan pass",
+    detail: "Read a boarding pass barcode on-device.",
     href: "/scan",
+    tag: "Free",
   },
   {
-    id: "bag",
-    eyebrow: "PRO · AR SIZER",
-    title: "Carry-On Fit Check",
-    detail:
-      "Measure a bag against the overhead-bin dimensions for the aircraft on your booking before you reach the gate.",
-    action: "Size my bag",
+    code: "BAG",
+    title: "Bag fit",
+    detail: "Check a carry-on against the cabin bins.",
     href: "/bag",
+    tag: "Pro",
   },
   {
-    id: "hud",
-    eyebrow: "PRO · OFFLINE",
-    title: "In-Flight HUD",
-    detail:
-      "Barometer-derived cabin altitude, great-circle progress, meal-service timeline, and landmark callouts with no signal.",
-    action: "Open HUD",
+    code: "HUD",
+    title: "Flight HUD",
+    detail: "Offline progress, altitude, and landmarks.",
     href: "/hud",
+    tag: "Pro",
+  },
+  {
+    code: "PLN",
+    title: "Plans",
+    detail: "Compare Free, Pro, and the Trip Pass.",
+    href: "/pricing",
+    tag: "Billing",
   },
 ] as const;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { configured, ready, user } = useAuth();
+  const accountLabel = user
+    ? (user.email ?? "Signed in")
+    : configured
+      ? "Sign in to sync"
+      : "Account unavailable";
 
   return (
     <Screen>
       <View style={styles.hero}>
-        <Badge>STARTER-SAFE GATEWAY</Badge>
-        <Title>AeroQuest</Title>
+        <Row style={styles.heroRow}>
+          <Badge tone="muted">AEROQUEST</Badge>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open account"
+            onPress={() => router.push("/auth")}
+            style={({ pressed }) => [
+              styles.accountChip,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <View style={styles.accountDot} />
+            <Text style={styles.accountChipText} numberOfLines={1}>
+              {user ? "Account" : "Sign in"}
+            </Text>
+          </Pressable>
+        </Row>
+        <Title>Where are you flying?</Title>
         <Subtitle>
-          One travel companion for route discovery, terminal sprints, 3D cabins,
-          boarding passes, and offline flight awareness.
+          Live flight tracking, direct-route discovery, terminal wayfinding, and
+          cabin tools in one companion.
         </Subtitle>
       </View>
 
       <Pressable
-        onPress={() => router.push("/auth")}
-        style={({ pressed }) => [pressed && { opacity: 0.82 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Find and track a flight"
+        onPress={() => router.push("/flights")}
+        style={({ pressed }) => [pressed && { opacity: 0.85 }]}
       >
-        <Card>
-          <Row style={{ justifyContent: "space-between" }}>
-            <View style={{ flex: 1 }}>
-              <Label>Account</Label>
-              <Text style={styles.accountTitle}>
-                {user
-                  ? user.email ?? "Signed in"
-                  : configured
-                    ? "Sign in to sync"
-                    : "Account unavailable"}
+        <View style={styles.primaryCard}>
+          <View style={styles.primaryGlow} />
+          <Label>Flight search</Label>
+          <Text style={styles.primaryTitle}>Find and track a flight</Text>
+          <Text style={styles.primaryDetail}>
+            Search by flight number or airport board. Open live gate, aircraft,
+            terminal, and offline HUD context.
+          </Text>
+          <View style={styles.primaryAction}>
+            <Text style={styles.primaryActionText}>Open flight search</Text>
+            <Text style={styles.primaryArrow}>→</Text>
+          </View>
+        </View>
+      </Pressable>
+
+      <Card>
+        <Label>Explore non-stop routes</Label>
+        <Text style={styles.cardBody}>
+          Pick a home airport, then filter every direct destination by airline
+          and haul.
+        </Text>
+        <View style={styles.hubRow}>
+          {HOME_AIRPORTS.map((airport) => (
+            <Pressable
+              key={airport.iata}
+              accessibilityRole="button"
+              accessibilityLabel={`Explore routes from ${airport.city}`}
+              onPress={() => router.push(`/explore/${airport.iata}`)}
+              style={({ pressed }) => [
+                styles.hub,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={styles.hubCode}>{airport.iata}</Text>
+              <Text style={styles.hubCity} numberOfLines={1}>
+                {airport.city}
               </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Card>
+
+      <SectionHeader
+        title="Trip tools"
+        detail="Purpose-built utilities for the airport and the air."
+      />
+      <View style={styles.toolGrid}>
+        {TOOLS.map((tool) => (
+          <Pressable
+            key={tool.code}
+            accessibilityRole="button"
+            accessibilityLabel={`${tool.title}. ${tool.detail}`}
+            onPress={() => router.push(tool.href)}
+            style={({ pressed }) => [
+              styles.tool,
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            <View style={styles.toolTop}>
+              <Text style={styles.toolCode}>{tool.code}</Text>
+              <Text style={styles.toolTag}>{tool.tag}</Text>
             </View>
+            <Text style={styles.toolTitle}>{tool.title}</Text>
+            <Text style={styles.toolDetail} numberOfLines={3}>
+              {tool.detail}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <SectionHeader title="Account" />
+      <Card style={styles.accountCard}>
+        <ListRow
+          code={user?.email?.[0]?.toUpperCase() ?? "AU"}
+          title={accountLabel}
+          detail={
+            user
+              ? "Tracked flights and terminal visits sync through Supabase."
+              : configured
+                ? "Sign in to sync your watchlist and push alerts."
+                : "Account sync is not configured in this build."
+          }
+          onPress={() => router.push("/auth")}
+          trailing={
             <Badge
               tone={
                 user ? "green" : configured && ready ? "muted" : "amber"
@@ -130,107 +197,130 @@ export default function HomeScreen() {
                   ? ready
                     ? "SIGNED OUT"
                     : "RESTORING"
-                  : "NOT CONFIGURED"}
+                  : "LOCAL"}
             </Badge>
-          </Row>
-          <Text style={styles.note}>
-            {user
-              ? "Tracked flights, device push tokens, and passport visits sync through Supabase. Local snapshots still work offline."
-              : configured
-                ? "Sign in with a real Supabase account to sync tracked flights and terminal passport visits. No demo account is created."
-                : "Supabase environment variables are missing. Local flights and the terminal map still work; account sync does not."}
-          </Text>
-          <Text style={styles.action}>
-            {user ? "Manage account →" : "Open account →"}
-          </Text>
-        </Card>
-      </Pressable>
-
-      <Card>
-        <Label>Choose your home airport</Label>
-        <Row>
-          {HOME_AIRPORTS.map((airport) => (
-            <Pressable
-              key={airport.iata}
-              onPress={() => router.push(`/explore/${airport.iata}`)}
-              style={({ pressed }) => [styles.hub, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.hubCode}>{airport.iata}</Text>
-              <Text style={styles.hubCity}>{airport.city}</Text>
-            </Pressable>
-          ))}
-        </Row>
-        <Text style={styles.note}>
-          Route statistics are cached for 7 days on the Hetzner gateway. Clients
-          never call AeroDataBox directly.
-        </Text>
+          }
+          muted
+        />
       </Card>
 
-      {FEATURES.map((feature) => (
-        <Pressable
-          key={feature.id}
-          onPress={() => router.push(feature.href)}
-          style={({ pressed }) => [pressed && { opacity: 0.82 }]}
-        >
-          <Card>
-            <Text style={styles.eyebrow}>{feature.eyebrow}</Text>
-            <Text style={styles.featureTitle}>{feature.title}</Text>
-            <Text style={styles.featureDetail}>{feature.detail}</Text>
-            <Text style={styles.action}>{feature.action} →</Text>
-          </Card>
-        </Pressable>
-      ))}
-
-      <Card>
-        <Label>Data integrity</Label>
-        <Subtitle>
-          Missing gates, baggage belts, weather, or seat details are shown as
-          unavailable. AeroQuest never fills gaps with guessed values.
-        </Subtitle>
-      </Card>
+      <Text style={styles.footnote}>
+        Missing gates, baggage belts, weather, or seat details are shown as
+        unavailable. AeroQuest never fills gaps with guessed values.
+      </Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { gap: 8, paddingTop: 8, paddingBottom: 4 },
+  hero: { gap: 8, paddingTop: 4 },
+  heroRow: { justifyContent: "space-between" },
+  accountChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    minHeight: 36,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surface,
+  },
+  accountDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.radar,
+  },
+  accountChipText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  primaryCard: {
+    overflow: "hidden",
+    borderRadius: RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: `${COLORS.radar}59`,
+    backgroundColor: COLORS.surface,
+    padding: 18,
+    gap: 6,
+  },
+  primaryGlow: {
+    position: "absolute",
+    top: -60,
+    right: -30,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: `${COLORS.radar}12`,
+  },
+  primaryTitle: {
+    color: COLORS.white,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  primaryDetail: { color: COLORS.muted, fontSize: 14, lineHeight: 20 },
+  primaryAction: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  primaryActionText: { color: COLORS.radar, fontSize: 14, fontWeight: "700" },
+  primaryArrow: { color: COLORS.radar, fontSize: 16 },
+  cardBody: { color: COLORS.muted, fontSize: 14, lineHeight: 20 },
+  hubRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
   hub: {
     flexGrow: 1,
-    minWidth: 72,
-    borderWidth: 1,
+    minWidth: 88,
+    minHeight: 56,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
     backgroundColor: COLORS.surface2,
-    borderRadius: 14,
-    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
   hubCode: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 17,
+    letterSpacing: 1,
+  },
+  hubCity: { color: COLORS.subtle, fontSize: 12, marginTop: 2 },
+  toolGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  tool: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minHeight: 128,
+    borderRadius: RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surface,
+    padding: 14,
+    gap: 4,
+  },
+  toolTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  toolCode: {
     color: COLORS.radar,
-    fontWeight: "900",
-    fontSize: 18,
-    letterSpacing: 1.5,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
-  hubCity: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
-  accountTitle: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 2,
+  toolTag: { color: COLORS.subtle, fontSize: 12 },
+  toolTitle: { color: COLORS.white, fontSize: 16, fontWeight: "700" },
+  toolDetail: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
+  accountCard: { paddingVertical: 4 },
+  footnote: {
+    color: COLORS.subtle,
+    fontSize: 12,
+    lineHeight: 18,
+    paddingBottom: 8,
   },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  eyebrow: {
-    color: COLORS.amber,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-  },
-  featureTitle: {
-    color: COLORS.white,
-    fontSize: 20,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  featureDetail: { color: COLORS.muted, fontSize: 13, lineHeight: 19 },
-  action: { color: COLORS.radar, fontWeight: "800", marginTop: 4 },
 });

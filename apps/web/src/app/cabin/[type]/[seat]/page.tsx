@@ -11,87 +11,128 @@ import {
 } from "@avi/shared";
 import { cn } from "@/lib/utils";
 import { UpgradeCta } from "@/components/upgrade-cta";
+import { Button, PageHeader, Panel } from "@/components/ui";
 
 const CabinViewer3D = dynamic(
   () => import("@avi/ui/cabin/CabinViewer3D").then((module) => module.CabinViewer3D),
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[520px] items-center justify-center rounded-3xl border border-line bg-surface text-sm text-muted">
+      <div className="flex h-full min-h-[420px] items-center justify-center bg-surface text-sm text-muted">
         Loading the 3D cabin twin…
       </div>
     ),
   },
 );
 
+const QUICK_SEATS = ["1A", "2K", "9A", "14A", "26D", "30K", "42A"];
+
 export default function CabinPage() {
   const params = useParams<{ type?: string; seat?: string }>();
   const type = (params.type ?? "B77W").toUpperCase();
   const initialSeat = (params.seat ?? "14A").toUpperCase();
   const [seatNumber, setSeatNumber] = useState(initialSeat);
+  // Repeating seat labels exist on multiple decks of a widebody. Track the
+  // deck so the 3D highlight and the report agree on one physical seat.
+  const [deck, setDeck] = useState<number | null>(null);
   const layout = useMemo(() => resolveCabinLayout(type), [type]);
-  const resolved = useMemo(() => resolveSeat(layout, seatNumber), [layout, seatNumber]);
+  const resolved = useMemo(
+    () => resolveSeat(layout, seatNumber, deck == null ? undefined : { deck }),
+    [layout, seatNumber, deck],
+  );
+  const activeDeck = deck ?? resolved.seat?.deck ?? null;
+  const deckName =
+    layout.decks.find((item) => item.index === activeDeck)?.name ?? null;
 
-  const onSeatSelect = (seat: CabinSeat) => setSeatNumber(seat.id);
+  const onSeatSelect = (seat: CabinSeat) => {
+    setSeatNumber(seat.id);
+    setDeck(seat.deck);
+  };
+  const jumpTo = (candidate: string) => {
+    setSeatNumber(candidate);
+    setDeck(null);
+  };
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] px-4 py-6 lg:px-8">
-      <header className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
-            AeroQuest Pro · 3D Cabin & Seat Twin
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-ink lg:text-5xl">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8 lg:py-8">
+      <PageHeader
+        eyebrow="AeroQuest Pro · 3D cabin"
+        title={
+          <span className="flex flex-wrap items-center gap-3">
             {layout.aircraftType} seat {seatNumber || "—"}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted">
-            A free interactive preview of the parametric cabin reconstruction:
-            tap a seat to highlight it, then inspect window alignment, pitch,
-            power, lavatories, galleys, and emergency exits. Live seat tracking
-            and saved trip cabins are AeroQuest Pro or Single-Trip Pass features.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/explore/CAI"
-            className="rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink hover:border-accent/50"
-          >
-            Back to route explorer
-          </Link>
-          <a
-            href={`aeroquest://cabin/${layout.aircraftType}/${seatNumber}`}
-            className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-[color:var(--bg)]"
-          >
-            Open in app
-          </a>
-        </div>
-      </header>
+            <Badge>{deckName ?? "Deck"}</Badge>
+          </span>
+        }
+        description="A free interactive preview of the parametric cabin reconstruction. Tap a seat to inspect window alignment, pitch, power, nearby lavatories, galleys and exits. Details are reconstructed from the aircraft type, not a certified cabin plan."
+        actions={
+          <>
+            <Link href="/explore/CAI">
+              <Button size="sm" variant="ghost">
+                Route explorer
+              </Button>
+            </Link>
+            <a href={`aeroquest://cabin/${layout.aircraftType}/${seatNumber}`}>
+              <Button size="sm" variant="outline">
+                Open in app
+              </Button>
+            </a>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="h-[520px] overflow-hidden rounded-3xl border border-line bg-surface">
+      <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-6">
+        <Panel className="h-[480px] overflow-hidden lg:h-[560px]">
           <CabinViewer3D
             layout={layout}
             selectedSeat={seatNumber}
+            selectedDeck={activeDeck}
             onSeatSelect={onSeatSelect}
             autoRotate
             className="h-full w-full"
           />
-        </div>
+        </Panel>
 
-        <div className="space-y-3">
-          <section className="rounded-3xl border border-line bg-surface p-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-              Seat report
-            </p>
+        <div className="space-y-4">
+          <Panel className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="label-caps text-subtle">Seat report</p>
+                <p className="mt-1 font-mono text-3xl font-semibold tracking-tight text-ink">
+                  {resolved.seat?.id ?? seatNumber}
+                </p>
+                <p className="mt-0.5 text-xs text-subtle">
+                  {deckName ?? "Deck not resolved"}
+                </p>
+              </div>
+              {resolved.seat && (
+                <Badge>{resolved.seat.seatClass.replace("_", " ")}</Badge>
+              )}
+            </div>
+
+            {layout.decks.length > 1 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {layout.decks.map((item) => (
+                  <button
+                    key={item.index}
+                    type="button"
+                    onClick={() => setDeck(item.index)}
+                    aria-pressed={activeDeck === item.index}
+                    className={cn(
+                      "min-h-9 rounded-md border px-3 text-xs font-medium transition-colors",
+                      activeDeck === item.index
+                        ? "border-accent/40 bg-accent-soft text-accent"
+                        : "border-line/70 text-muted hover:text-ink",
+                    )}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {resolved.seat ? (
               <>
-                <div className="mt-1 flex items-baseline justify-between gap-3">
-                  <p className="text-4xl font-black text-ink">{resolved.seat.id}</p>
-                  <span className="rounded-full border border-line px-2 py-1 text-[10px] font-bold text-muted">
-                    {resolved.seat.seatClass.replace("_", " ")}
-                  </span>
-                </div>
-                <dl className="mt-3 space-y-2 text-xs">
+                <dl className="mt-4 space-y-2.5 border-t border-line/60 pt-3 text-[13px]">
                   <Detail label="Window" value={resolved.windowNote} />
                   <Detail label="Legroom" value={resolved.legroomNote} />
                   <Detail label="Power" value={resolved.powerNote} />
@@ -112,58 +153,64 @@ export default function CabinPage() {
                     }
                   />
                 </dl>
-                <p className="mt-3 text-[11px] text-muted">
+                <p className="mt-3 border-t border-line/60 pt-3 text-xs leading-relaxed text-muted">
                   Nearby:{" "}
                   {resolved.nearbyFeatures.length
-                    ? resolved.nearbyFeatures.map((feature) => feature.label).join(" · ")
+                    ? resolved.nearbyFeatures
+                        .map((feature) => feature.label)
+                        .join(" · ")
                     : "No mapped features"}
                 </p>
               </>
             ) : (
-              <p className="mt-2 text-sm text-[#fbbf24]">
-                Seat {seatNumber} is not in this layout. No window, pitch, or
-                power claim is generated.
+              <p className="mt-3 rounded-lg border border-delayed/30 bg-delayed/8 px-3 py-2.5 text-sm leading-relaxed text-muted">
+                Seat {seatNumber} is not present on {deckName ?? "this deck"}. No
+                window, pitch, or power claim is generated.
               </p>
             )}
-          </section>
+          </Panel>
 
-          <section className="rounded-3xl border border-line bg-surface p-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-              Jump to a seat
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {["1A", "2K", "9A", "14A", "26D", "30K", "42A"].map((candidate) => (
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Jump to a seat</p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {QUICK_SEATS.map((candidate) => (
                 <button
                   key={candidate}
                   type="button"
-                  onClick={() => setSeatNumber(candidate)}
+                  onClick={() => jumpTo(candidate)}
+                  aria-pressed={seatNumber === candidate}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-[10px] font-bold",
+                    "min-h-9 rounded-md border px-3 font-mono text-xs font-medium transition-colors",
                     seatNumber === candidate
-                      ? "border-accent bg-accent text-[color:var(--bg)]"
-                      : "border-line text-muted hover:text-ink",
+                      ? "border-accent/40 bg-accent-soft text-accent"
+                      : "border-line/70 text-muted hover:text-ink",
                   )}
                 >
                   {candidate}
                 </button>
               ))}
             </div>
-          </section>
-
-          <section className="rounded-3xl border border-line bg-surface p-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent">
-              Overhead bin
+            <p className="mt-2.5 text-xs leading-relaxed text-subtle">
+              Repeating labels such as 14A exist on more than one deck. Choose
+              the deck above before comparing.
             </p>
+          </Panel>
+
+          <Panel className="p-4">
+            <p className="label-caps text-subtle">Overhead bin</p>
             {layout.overheadBins.map((bin) => (
-              <p key={bin.aircraftType} className="mt-2 text-sm font-semibold text-ink">
+              <p
+                key={bin.aircraftType}
+                className="mt-2 text-sm font-medium text-ink"
+              >
                 {bin.widthCm} × {bin.heightCm} × {bin.depthCm} cm ·{" "}
                 {bin.carryOnCapacity} standard bags
               </p>
             ))}
-            <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            <p className="mt-2 text-xs leading-relaxed text-subtle">
               {layout.disclaimer}
             </p>
-          </section>
+          </Panel>
 
           <UpgradeCta
             title="This cabin preview is free."
@@ -171,7 +218,15 @@ export default function CabinPage() {
           />
         </div>
       </div>
-    </main>
+    </div>
+  );
+}
+
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-md border border-line/70 bg-surface-2/50 px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted">
+      {children}
+    </span>
   );
 }
 

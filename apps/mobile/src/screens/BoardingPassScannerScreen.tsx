@@ -33,7 +33,7 @@ import {
   Title,
 } from "../../src/components/ui";
 import { GATEWAY_URL } from "../../src/lib/config";
-import { COLORS } from "../../src/lib/theme";
+import { COLORS, RADIUS } from "../../src/lib/theme";
 
 function formatFromBarcode(type: string | undefined): BoardingPassFormat {
   const value = (type ?? "").toLowerCase();
@@ -242,30 +242,32 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  cameraCard: { padding: 10, gap: 8 },
-  camera: { height: 240, borderRadius: 14, overflow: "hidden" },
-  cameraHint: { color: COLORS.muted, fontSize: 11, textAlign: "center" },
-  cardTitle: { color: COLORS.white, fontSize: 18, fontWeight: "800" },
+  cameraCard: { padding: 10, gap: 10 },
+  camera: { height: 240, borderRadius: RADIUS.md, overflow: "hidden" },
+  cameraHint: { color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: "center" },
+  cardTitle: { color: COLORS.white, fontSize: 18, fontWeight: "700" },
   input: {
-    minHeight: 88,
-    borderWidth: 1,
+    minHeight: 96,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    borderRadius: 12,
-    padding: 10,
+    backgroundColor: COLORS.surface2,
+    borderRadius: RADIUS.md,
+    padding: 12,
     color: COLORS.text,
     textAlignVertical: "top",
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 20,
   },
   field: { flex: 1, minWidth: 90 },
   fieldLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  fieldValue: { color: COLORS.white, fontSize: 14, fontWeight: "700", marginTop: 2 },
-  warning: { color: COLORS.amber, fontSize: 12, lineHeight: 18 },
-  path: { color: COLORS.muted, fontSize: 10 },
-  flightNumber: { color: COLORS.white, fontSize: 22, fontWeight: "900" },
+  fieldValue: { color: COLORS.white, fontSize: 15, fontWeight: "600", marginTop: 2 },
+  warning: { color: COLORS.amber, fontSize: 13, lineHeight: 19 },
+  path: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  flightNumber: { color: COLORS.white, fontSize: 22, fontWeight: "700" },
   note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
 });

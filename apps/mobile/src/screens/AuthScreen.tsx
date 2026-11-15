@@ -25,7 +25,7 @@ import {
   type NotificationPermissionStatus,
   type PushEnvironment,
 } from "../lib/push";
-import { COLORS } from "../lib/theme";
+import { COLORS, RADIUS, TOUCH } from "../lib/theme";
 
 type AuthMode = "signIn" | "signUp";
 
@@ -226,7 +226,7 @@ export default function AuthScreen() {
         </Card>
       ) : (
         <Card>
-          <Row>
+          <View style={styles.modeRow}>
             <ModeButton
               label="Sign in"
               active={mode === "signIn"}
@@ -245,7 +245,7 @@ export default function AuthScreen() {
                 setNotice(null);
               }}
             />
-          </Row>
+          </View>
           <Divider />
           <Label>Email</Label>
           <TextInput
@@ -439,43 +439,54 @@ function StatusRow({
 }
 
 const styles = StyleSheet.create({
-  unconfigured: { borderColor: COLORS.amber, backgroundColor: "#1a1408" },
-  cardTitle: { color: COLORS.white, fontSize: 18, fontWeight: "800" },
+  unconfigured: { borderColor: `${COLORS.amber}66`, backgroundColor: COLORS.amberSurface },
+  cardTitle: { color: COLORS.white, fontSize: 18, fontWeight: "700" },
   email: {
     color: COLORS.white,
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "600",
     marginTop: 2,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
     backgroundColor: COLORS.surface2,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: TOUCH,
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 15,
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surface2,
   },
   mode: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: RADIUS.sm,
+    minHeight: 40,
+    paddingHorizontal: 12,
   },
-  modeActive: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  modeText: { color: COLORS.muted, fontSize: 12, fontWeight: "800" },
-  modeTextActive: { color: COLORS.cockpit },
-  error: { color: COLORS.red, fontSize: 12, lineHeight: 18 },
-  notice: { color: COLORS.green, fontSize: 12, lineHeight: 18 },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
+  modeActive: { backgroundColor: COLORS.surface3 },
+  modeText: { color: COLORS.muted, fontSize: 13, fontWeight: "600" },
+  modeTextActive: { color: COLORS.radar },
+  error: { color: COLORS.red, fontSize: 13, lineHeight: 19 },
+  notice: { color: COLORS.green, fontSize: 13, lineHeight: 19 },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
   statusRow: {
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.line,
-    paddingVertical: 5,
+    paddingVertical: 8,
   },
-  statusLabel: { color: COLORS.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8 },
-  statusValue: { fontSize: 12, fontWeight: "700" },
+  statusLabel: { color: COLORS.muted, fontSize: 12 },
+  statusValue: { fontSize: 13, fontWeight: "600" },
 });

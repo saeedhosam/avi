@@ -24,58 +24,59 @@ export function FlightTimelineView({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-line bg-surface p-4",
+        "rounded-xl border border-line/70 bg-surface/80 p-4",
         className,
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold text-ink">Flight event timeline</p>
-          <p className="mt-0.5 text-[11px] text-muted">
-            Real-time gate and airborne progression
+          <p className="text-[15px] font-semibold text-ink">Event timeline</p>
+          <p className="mt-0.5 text-xs text-subtle">
+            Gate and airborne progression
           </p>
         </div>
         <Clock3 className="size-4 text-subtle" />
       </div>
-      <div className="mt-4 space-y-0">
+
+      <ol className="mt-4">
         {events.map((event, index) => (
-          <div key={`${event.title}-${index}`} className="flex gap-3">
-            <div className="flex w-6 shrink-0 flex-col items-center">
-              <div
+          <li key={`${event.title}-${index}`} className="flex gap-3">
+            <div className="flex w-5 shrink-0 flex-col items-center">
+              <span
                 className={cn(
                   "flex size-5 items-center justify-center rounded-full border",
                   event.isCurrent
-                    ? "border-ink bg-accent text-[color:var(--bg)]"
+                    ? "border-accent bg-accent text-[color:var(--bg)]"
                     : event.isCompleted
-                      ? "border-landed/60 bg-landed text-[color:var(--bg)]"
+                      ? "border-landed/50 bg-landed/90 text-[color:var(--bg)]"
                       : "border-line bg-surface-3",
                 )}
               >
                 {event.isCompleted && !event.isCurrent ? (
-                  <Check className="size-2.5" />
+                  <Check className="size-3" />
                 ) : event.isCurrent ? (
                   <Circle className="size-1.5 fill-current" />
                 ) : null}
-              </div>
+              </span>
               {index < events.length - 1 && (
-                <div
+                <span
                   className={cn(
                     "w-px flex-1",
                     event.isCompleted ? "bg-landed/40" : "bg-line",
                   )}
-                  style={{ minHeight: 30 }}
+                  style={{ minHeight: 28 }}
                 />
               )}
             </div>
-            <div className="min-w-0 flex-1 pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-1">
+            <div className="min-w-0 flex-1 pb-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <p
                   className={cn(
-                    "text-xs font-semibold",
+                    "text-[13px]",
                     event.isCurrent
-                      ? "font-bold text-accent"
+                      ? "font-semibold text-accent"
                       : event.isCompleted
-                        ? "text-ink"
+                        ? "font-medium text-ink"
                         : "text-muted",
                   )}
                 >
@@ -83,7 +84,7 @@ export function FlightTimelineView({
                 </p>
                 <p
                   className={cn(
-                    "text-[10px] font-medium",
+                    "font-mono text-xs tabular",
                     event.isCurrent ? "text-accent" : "text-subtle",
                   )}
                 >
@@ -91,14 +92,14 @@ export function FlightTimelineView({
                 </p>
               </div>
               {event.description && (
-                <p className="mt-0.5 text-[10px] leading-relaxed text-subtle">
+                <p className="mt-1 text-xs leading-relaxed text-subtle">
                   {event.description}
                 </p>
               )}
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }
@@ -115,53 +116,59 @@ export function AircraftInfoCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-line bg-surface p-4",
+        "rounded-xl border border-line/70 bg-surface/80 p-4",
         className,
       )}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-ink">Aircraft specifications</p>
-        <span className="font-mono text-[10px] font-semibold text-accent">
-          Reg: {aircraft.registration}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[15px] font-semibold text-ink">Aircraft</p>
+        <span className="font-mono text-xs text-subtle">
+          {aircraft.registration}
         </span>
       </div>
-      <div className="mt-3 flex items-center gap-2.5">
-        <div className="flex size-10 items-center justify-center rounded-xl border border-accent/35 bg-surface-3 text-accent">
+
+      <div className="mt-3 flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-surface-2 text-muted">
           <Plane className="size-5" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-ink">{aircraft.model}</p>
-          <p className="text-[11px] text-muted">
-            Airframe age: {aircraft.age ?? "Not reported"}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-ink">
+            {aircraft.model}
+          </p>
+          <p className="text-xs text-subtle">
+            Airframe age {aircraft.age ?? "not reported"}
           </p>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line/60 pt-3">
+
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line/50 pt-3">
         <AmenityPill
           icon={<Wifi className="size-3.5" />}
-          label="Satellite Wi-Fi"
+          label="Wi-Fi"
           available={aircraft.wifiAvailable}
         />
         <AmenityPill
           icon={<Bolt className="size-3.5" />}
-          label="USB & power"
+          label="Power"
           available={aircraft.powerOutlets}
         />
       </div>
-      <div className="mt-2 flex items-center justify-between rounded-lg bg-surface-2 px-2.5 py-2">
-        <div className="flex items-start gap-2">
-          <Armchair className="mt-0.5 size-3.5 shrink-0 text-accent-2" />
-          <p className="text-[10px] font-medium leading-relaxed text-muted">
-            {aircraft.seatLayout ?? "Seat layout not reported by the provider."}
+
+      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-surface-2/50 px-3 py-2.5">
+        <div className="flex min-w-0 items-start gap-2">
+          <Armchair className="mt-0.5 size-3.5 shrink-0 text-subtle" />
+          <p className="text-xs leading-relaxed text-muted">
+            {aircraft.seatLayout ?? "Seat layout not reported."}
           </p>
         </div>
         <Link
           href={`/airplanes?model=${encodeURIComponent(aircraft.model)}${
             airlineCode ? `&airline=${encodeURIComponent(airlineCode)}` : ""
           }`}
-          className="ml-2 flex shrink-0 items-center gap-1 rounded border border-accent/30 bg-accent-soft px-2 py-0.5 text-[9px] font-bold text-accent transition-colors hover:bg-accent/25"
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent transition-colors hover:text-ink"
         >
-          View seatmap <ChevronRight className="size-3" />
+          Seatmap
+          <ChevronRight className="size-3.5" />
         </Link>
       </div>
     </div>
@@ -178,15 +185,15 @@ function AmenityPill({
   available: boolean | null;
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2 px-2 py-1.5">
+    <div className="flex items-center gap-2 rounded-lg bg-surface-2/50 px-2.5 py-2">
       <span className={available ? "text-landed" : "text-subtle"}>{icon}</span>
       <span
         className={cn(
-          "text-[10px] font-medium",
+          "text-xs",
           available ? "text-ink" : "text-subtle",
         )}
       >
-        {available == null ? `${label}: not reported` : label}
+        {available == null ? `${label} not reported` : label}
       </span>
     </div>
   );
@@ -214,13 +221,11 @@ export function RouteProgress({
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className="text-left">
-        <p className="font-mono text-lg font-black text-ink">{origin}</p>
-      </div>
+      <p className="font-mono text-lg font-semibold text-ink">{origin}</p>
       <div className="relative h-5 flex-1">
-        <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
+        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-line" />
         <div
-          className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-accent to-accent-2"
+          className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-accent"
           style={{ width: `${clamped * 100}%` }}
         />
         <div
@@ -228,13 +233,11 @@ export function RouteProgress({
           style={{ left: `calc(${clamped * 100}% - 8px)` }}
         >
           <span className="flex size-4 items-center justify-center rounded-full bg-accent text-[color:var(--bg)]">
-            <Plane className="size-2 rotate-90" />
+            <Plane className="size-2.5 rotate-90" />
           </span>
         </div>
       </div>
-      <div className="text-right">
-        <p className="font-mono text-lg font-black text-ink">{destination}</p>
-      </div>
+      <p className="font-mono text-lg font-semibold text-ink">{destination}</p>
     </div>
   );
 }

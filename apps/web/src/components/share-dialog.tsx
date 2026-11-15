@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, Copy, Share2, Smartphone } from "lucide-react";
 import type { Flight } from "@/lib/types";
 import { STATUS_META } from "@/lib/utils";
-import { Button, Modal } from "./ui";
+import { Button, Field, Modal, Panel, TextInput } from "./ui";
 
 function known(value: string | null | undefined): value is string {
   return Boolean(value) && value !== "—" && value !== "N/A" && value !== "TBD";
@@ -120,12 +120,14 @@ export function ShareFlightDialog({
     await copy();
   };
 
+  const statusMeta = STATUS_META[flight.status];
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Share flight summary"
-      subtitle="Send real-time departure, gate, delay, and arrival updates to friends and family."
+      subtitle="Departure, gate, delay and arrival details, ready to send."
       icon={<Share2 className="size-4" />}
       size="md"
       footer={
@@ -139,7 +141,7 @@ export function ShareFlightDialog({
             ) : (
               <Copy className="size-3.5" />
             )}
-            {copied ? "Copied!" : "Copy"}
+            {copied ? "Copied" : "Copy"}
           </Button>
           <Button size="sm" onClick={share}>
             <Smartphone className="size-3.5" /> Share via apps
@@ -147,34 +149,34 @@ export function ShareFlightDialog({
         </>
       }
     >
-      <div className="space-y-3">
-        <label className="block">
-          <span className="label-caps text-subtle">Add a note (optional)</span>
-          <input
+      <div className="space-y-4">
+        <Field label="Add a note (optional)">
+          <TextInput
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="e.g. Picking me up at Terminal 3?"
-            className="mt-1 h-10 w-full rounded-xl border border-line bg-surface-2 px-3 text-xs text-ink outline-none placeholder:text-subtle focus:border-accent"
+            autoComplete="off"
           />
-        </label>
-        <div className="rounded-xl border border-line bg-surface-2">
-          <div className="flex items-center justify-between border-b border-line/60 px-3 py-2">
+        </Field>
+
+        <Panel className="overflow-hidden">
+          <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3.5 py-2.5">
             <span className="label-caps text-subtle">Summary preview</span>
             <span
-              className="rounded-full border px-2 py-0.5 text-[9px] font-bold"
+              className="rounded-md border px-2 py-0.5 text-xs font-medium"
               style={{
-                color: STATUS_META[flight.status].color,
-                borderColor: `${STATUS_META[flight.status].color}55`,
-                backgroundColor: STATUS_META[flight.status].soft,
+                color: statusMeta.color,
+                borderColor: `${statusMeta.color}55`,
+                backgroundColor: statusMeta.soft,
               }}
             >
-              {STATUS_META[flight.status].label}
+              {statusMeta.label}
             </span>
           </div>
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap px-3 py-2.5 font-mono text-[10.5px] leading-relaxed text-ink">
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap px-3.5 py-3 font-mono text-xs leading-relaxed text-ink">
             {summary}
           </pre>
-        </div>
+        </Panel>
       </div>
     </Modal>
   );

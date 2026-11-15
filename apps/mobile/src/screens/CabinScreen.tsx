@@ -1,7 +1,7 @@
 import { Canvas } from "@react-three/fiber/native";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   resolveCabinLayout,
   resolveSeat,
@@ -15,73 +15,132 @@ import {
   Label,
   Row,
   Screen,
+  SectionHeader,
   Subtitle,
   Title,
 } from "../../src/components/ui";
-import { COLORS } from "../../src/lib/theme";
+import { COLORS, RADIUS } from "../../src/lib/theme";
+
+const QUICK_SEATS = ["1A", "14A", "30K", "42A"] as const;
 
 export default function CabinScreen() {
   const params = useLocalSearchParams() as { type?: string; seat?: string };
   const aircraftType = (params.type ?? "B77W").toUpperCase();
-  const [seatNumber, setSeatNumber] = useState((params.seat ?? "14A").toUpperCase());
+  const [seatNumber, setSeatNumber] = useState(
+    (params.seat ?? "14A").toUpperCase(),
+  );
+  // Seat labels repeat across decks on widebodies; track the deck explicitly
+  // so the 3D highlight and the report describe the same physical seat.
+  const [deck, setDeck] = useState<number | null>(null);
   const layout = useMemo(() => resolveCabinLayout(aircraftType), [aircraftType]);
   const resolved = useMemo(
-    () => resolveSeat(layout, seatNumber),
-    [layout, seatNumber],
+    () =>
+      resolveSeat(layout, seatNumber, deck == null ? undefined : { deck }),
+    [layout, seatNumber, deck],
   );
+  const activeDeck = deck ?? resolved.seat?.deck ?? null;
+  const deckName =
+    layout.decks.find((item) => item.index === activeDeck)?.name ?? null;
 
-  const onSeatSelect = (seat: CabinSeat) => {
+  const selectSeat = (seat: CabinSeat) => {
     setSeatNumber(seat.id);
+    setDeck(seat.deck);
+  };
+
+  const jumpTo = (candidate: string) => {
+    setSeatNumber(candidate);
+    setDeck(null);
   };
 
   return (
     <Screen>
-      <Row style={{ justifyContent: "space-between" }}>
-        <View>
-          <Badge>PRO · 3D CABIN</Badge>
-          <Title>{layout.aircraftType} Seat Twin</Title>
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Badge>Pro · 3D cabin</Badge>
+          <Title>{layout.aircraftType}</Title>
+          <Subtitle>
+            Parametric deck reconstruction. Seat details are reconstructed from
+            the aircraft type and are not a certified cabin plan.
+          </Subtitle>
         </View>
         <Badge tone="amber">{seatNumber}</Badge>
-      </Row>
-      <Subtitle>
-        Parametric deck reconstruction. Tap any seat to inspect window
-        alignment, pitch, power, and nearby lavatories/exits. This preview is
-        free; live seat tracking and saved trip cabins require Pro or a
-        Single-Trip Pass.
-      </Subtitle>
+      </View>
 
       <Card style={styles.sceneCard}>
         <View style={styles.canvas}>
           <Canvas camera={{ position: [0, 15, 20], fov: 45 }}>
-            <color attach="background" args={["#050b14"]} />
+            <color attach="background" args={[COLORS.cockpit]} />
             <ambientLight intensity={0.8} />
-            <directionalLight position={[8, 18, 10]} intensity={1.4} color="#bae6fd" />
-            <directionalLight position={[-10, 8, -12]} intensity={0.5} color="#fbbf24" />
+            <directionalLight
+              position={[8, 18, 10]}
+              intensity={1.4}
+              color="#bae6fd"
+            />
+            <directionalLight
+              position={[-10, 8, -12]}
+              intensity={0.5}
+              color="#fbbf24"
+            />
             <CabinScene
               layout={layout}
               selectedSeat={seatNumber}
-              onSeatSelect={onSeatSelect}
+              selectedDeck={activeDeck}
+              onSeatSelect={selectSeat}
               autoRotate
             />
           </Canvas>
         </View>
-        <Row>
+        <View style={styles.sceneMeta}>
           <Text style={styles.hint}>
             {layout.decks.length} deck{layout.decks.length === 1 ? "" : "s"} ·{" "}
-            {layout.seats.length} seats · {layout.overheadBins[0]?.carryOnCapacity ?? 0} bag capacity
+            {layout.seats.length} seats ·{" "}
+            {layout.overheadBins[0]?.carryOnCapacity ?? 0} bag capacity
           </Text>
-        </Row>
+          <Text style={styles.hint}>Tap a seat to inspect it.</Text>
+        </View>
       </Card>
 
       <Card>
-        <Label>Seat report</Label>
+        <SectionHeader
+          title={resolved.seat ? `Seat ${resolved.seat.id}` : `Seat ${seatNumber}`}
+          detail={deckName ?? "Deck not resolved"}
+          action={
+            resolved.seat ? (
+              <Badge tone="muted">
+                {resolved.seat.seatClass.replace("_", " ")}
+              </Badge>
+            ) : undefined
+          }
+        />
+        {layout.decks.length > 1 ? (
+          <Row style={styles.deckRow}>
+            {layout.decks.map((item) => (
+              <Pressable
+                key={item.index}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeDeck === item.index }}
+                onPress={() => setDeck(item.index)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  activeDeck === item.index && styles.chipActive,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    activeDeck === item.index && styles.chipTextActive,
+                  ]}
+                >
+                  {item.name}
+                </Text>
+              </Pressable>
+            ))}
+          </Row>
+        ) : null}
+        <Divider />
         {resolved.seat ? (
-          <>
-            <Row style={{ justifyContent: "space-between" }}>
-              <Text style={styles.seatNumber}>{resolved.seat.id}</Text>
-              <Badge>{resolved.seat.seatClass.replace("_", " ")}</Badge>
-            </Row>
-            <Divider />
+          <View style={styles.detailList}>
             <Detail label="Window" value={resolved.windowNote} />
             <Detail label="Legroom" value={resolved.legroomNote} />
             <Detail label="Power" value={resolved.powerNote} />
@@ -105,16 +164,51 @@ export default function CabinScreen() {
             <Text style={styles.nearby}>
               Nearby:{" "}
               {resolved.nearbyFeatures.length
-                ? resolved.nearbyFeatures.map((feature) => feature.label).join(" · ")
+                ? resolved.nearbyFeatures
+                    .map((feature) => feature.label)
+                    .join(" · ")
                 : "No mapped features"}
             </Text>
-          </>
+          </View>
         ) : (
           <Text style={styles.missing}>
-            Seat {seatNumber} is not present in this parametric layout. No
-            window, power, or legroom claim is generated.
+            Seat {seatNumber} is not present on{" "}
+            {deckName ?? "this deck"}. No window, power, or legroom claim is
+            generated.
           </Text>
         )}
+      </Card>
+
+      <Card>
+        <Label>Jump to a seat</Label>
+        <Row style={styles.deckRow}>
+          {QUICK_SEATS.map((candidate) => (
+            <Pressable
+              key={candidate}
+              accessibilityRole="button"
+              accessibilityLabel={`Inspect seat ${candidate}`}
+              onPress={() => jumpTo(candidate)}
+              style={({ pressed }) => [
+                styles.chip,
+                seatNumber === candidate && styles.chipActive,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  seatNumber === candidate && styles.chipTextActive,
+                ]}
+              >
+                {candidate}
+              </Text>
+            </Pressable>
+          ))}
+        </Row>
+        <Text style={styles.note}>
+          Repeating labels such as 14A exist on more than one deck. Choose the
+          deck above before comparing.
+        </Text>
       </Card>
 
       <Card>
@@ -126,21 +220,6 @@ export default function CabinScreen() {
           </Text>
         ))}
         <Text style={styles.note}>{layout.disclaimer}</Text>
-      </Card>
-
-      <Card>
-        <Label>Recently selected</Label>
-        <Row>
-          {["1A", "14A", "30K", "42A"].map((candidate) => (
-            <Text
-              key={candidate}
-              onPress={() => setSeatNumber(candidate)}
-              style={[styles.quick, seatNumber === candidate && styles.quickActive]}
-            >
-              {candidate}
-            </Text>
-          ))}
-        </Row>
       </Card>
     </Screen>
   );
@@ -156,29 +235,47 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 4,
+  },
+  headerText: { flex: 1, gap: 8 },
   sceneCard: { padding: 8, gap: 8 },
-  canvas: { height: 360, borderRadius: 16, overflow: "hidden" },
-  hint: { color: COLORS.muted, fontSize: 11, paddingHorizontal: 6 },
-  seatNumber: { color: COLORS.white, fontSize: 34, fontWeight: "900" },
+  canvas: { height: 360, borderRadius: RADIUS.md, overflow: "hidden" },
+  sceneMeta: { gap: 2, paddingHorizontal: 6, paddingBottom: 4 },
+  hint: { color: COLORS.subtle, fontSize: 12, lineHeight: 17 },
+  detailList: { gap: 8 },
   detail: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  detailLabel: { color: COLORS.muted, fontSize: 12, minWidth: 70 },
-  detailValue: { color: COLORS.text, fontSize: 12, flex: 1, textAlign: "right" },
-  nearby: { color: COLORS.radar, fontSize: 12, lineHeight: 18 },
-  missing: { color: COLORS.amber, fontSize: 13, lineHeight: 19 },
-  bin: { color: COLORS.white, fontSize: 14, fontWeight: "700" },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  quick: {
+  detailLabel: { color: COLORS.muted, fontSize: 13, minWidth: 76 },
+  detailValue: {
     color: COLORS.text,
-    borderWidth: 1,
+    fontSize: 13,
+    flex: 1,
+    textAlign: "right",
+    lineHeight: 18,
+  },
+  nearby: { color: COLORS.radar, fontSize: 13, lineHeight: 19 },
+  missing: { color: COLORS.amber, fontSize: 14, lineHeight: 20 },
+  bin: { color: COLORS.white, fontSize: 14, fontWeight: "600" },
+  note: { color: COLORS.subtle, fontSize: 12, lineHeight: 18 },
+  deckRow: { gap: 8 },
+  chip: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    fontWeight: "700",
+    backgroundColor: COLORS.surface2,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  quickActive: {
-    backgroundColor: COLORS.radar,
-    borderColor: COLORS.radar,
-    color: COLORS.cockpit,
+  chipActive: {
+    borderColor: `${COLORS.radar}66`,
+    backgroundColor: `${COLORS.radar}18`,
   },
+  chipText: { color: COLORS.muted, fontSize: 13, fontWeight: "600" },
+  chipTextActive: { color: COLORS.radar },
 });

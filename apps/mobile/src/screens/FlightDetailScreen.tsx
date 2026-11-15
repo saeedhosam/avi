@@ -66,16 +66,26 @@ function parseRouteId(id: string): {
   return id.trim() ? { flightNumber: id.trim() } : {};
 }
 
-function pickFlight(flights: Flight[], flightNumber: string): Flight | null {
+function pickFlight(
+  flights: Flight[],
+  flightNumber: string,
+  date?: string,
+): Flight | null {
   const compact = flightNumber.replace(/\s+/g, "").toUpperCase();
-  return (
-    flights.find(
-      (candidate) =>
-        candidate.flightNumber.replace(/\s+/g, "").toUpperCase() === compact,
-    ) ??
-    flights[0] ??
-    null
+  const matches = flights.filter(
+    (candidate) =>
+      candidate.flightNumber.replace(/\s+/g, "").toUpperCase() === compact,
   );
+  if (!matches.length) return null;
+  if (date) {
+    const dated = matches.find((candidate) => candidate.flightDate === date);
+    if (dated) return dated;
+    // A single exact-number record without a date is the requested lookup;
+    // never substitute a record stamped with a different operating date.
+    if (matches.length === 1 && !matches[0]?.flightDate) return matches[0];
+    return null;
+  }
+  return matches[0] ?? null;
 }
 
 export default function FlightDetailScreen() {
@@ -154,7 +164,7 @@ export default function FlightDetailScreen() {
       try {
         const response = await fetchGatewayFlight(number, date);
         if (!active) return;
-        const fresh = pickFlight(response.flights, number);
+        const fresh = pickFlight(response.flights, number, date);
         if (!fresh) {
           setError(
             entry
@@ -307,18 +317,31 @@ export default function FlightDetailScreen() {
     const terminalParams: Record<string, string> = {
       iata: flight.origin.code,
     };
-    const departureTerminal = flight.terminalDeparture.trim();
-    if (departureTerminal && departureTerminal !== "—") {
-      terminalParams.terminal = /^\d+$/.test(departureTerminal)
-        ? `T${departureTerminal}`
-        : departureTerminal.toUpperCase();
+    // After departure the useful map is the arrival terminal; before departure
+    // it is the departure terminal. Never apply one airport's terminal id to
+    // the other airport.
+    const useArrival =
+      flight.status === "LANDED" || flight.status === "DEPARTED";
+    const terminalId = useArrival
+      ? flight.terminalArrival
+      : flight.terminalDeparture;
+    if (useArrival) terminalParams.iata = flight.destination.code;
+    const normalizedTerminal = terminalId.trim();
+    if (normalizedTerminal && normalizedTerminal !== "—") {
+      terminalParams.terminal = /^\d+$/.test(normalizedTerminal)
+        ? `T${normalizedTerminal}`
+        : normalizedTerminal.toUpperCase();
     }
     if (entry) terminalParams.flightId = entry.id;
     if (params.arrivalGate?.trim()) {
       terminalParams.arrivalGate = params.arrivalGate.trim();
+    } else if (useArrival && flight.gateArrival.trim()) {
+      terminalParams.arrivalGate = flight.gateArrival.trim();
     }
     if (params.departureGate?.trim()) {
       terminalParams.departureGate = params.departureGate.trim();
+    } else if (!useArrival && flight.gateDeparture.trim()) {
+      terminalParams.departureGate = flight.gateDeparture.trim();
     }
     if (params.arrivalTime?.trim()) {
       terminalParams.arrivalTime = params.arrivalTime.trim();
@@ -496,8 +519,9 @@ export default function FlightDetailScreen() {
           <Stat label="Baggage" value={displayText(flight.baggageCarousel)} />
         </Row>
         <Text style={styles.note}>
-          Missing gates and belts are shown as not reported. The terminal map is
-          opened only for {flight.origin.code}; no gate pin is invented.
+          Missing gates and belts are shown as not reported. The terminal map
+          opens the departure terminal before departure and the arrival terminal
+          once the flight is en route or landed; no gate pin is invented.
         </Text>
       </Card>
 
@@ -517,7 +541,13 @@ export default function FlightDetailScreen() {
 
       <Row>
         <PrimaryButton
-          label={busyAction === "terminal" ? "Opening…" : "Terminal map"}
+          label={
+            busyAction === "terminal"
+              ? "Opening…"
+              : flight.status === "LANDED" || flight.status === "DEPARTED"
+                ? "Arrival terminal map"
+                : "Departure terminal map"
+          }
           onPress={() => void openTerminal()}
           loading={busyAction === "terminal"}
           disabled={busyAction != null}
@@ -623,19 +653,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  warningCard: { borderColor: COLORS.amber, backgroundColor: "#1a1408" },
+  warningCard: { borderColor: `${COLORS.amber}66`, backgroundColor: COLORS.amberSurface },
   warning: { color: COLORS.amber, fontSize: 12, lineHeight: 18 },
   notice: { color: COLORS.green, fontSize: 12, lineHeight: 18 },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  statusValue: { color: COLORS.white, fontSize: 20, fontWeight: "900" },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  statusValue: { color: COLORS.white, fontSize: 20, fontWeight: "700" },
   stat: { flex: 1, minWidth: 88 },
   statLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  statValue: { color: COLORS.white, fontSize: 14, fontWeight: "700", marginTop: 2 },
+  statValue: { color: COLORS.white, fontSize: 15, fontWeight: "600", marginTop: 2 },
   timelineRow: {
     flexDirection: "row",
     gap: 10,
@@ -651,6 +681,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   timelineDotDone: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  timelineTitle: { color: COLORS.white, fontSize: 12, fontWeight: "700" },
-  provenance: { color: COLORS.radar, fontSize: 11, fontWeight: "700" },
+  timelineTitle: { color: COLORS.white, fontSize: 13, fontWeight: "600" },
+  provenance: { color: COLORS.radar, fontSize: 12, fontWeight: "600" },
 });

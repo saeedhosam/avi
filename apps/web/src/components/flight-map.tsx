@@ -247,8 +247,8 @@ export function FlightMap({
     <div className={cn("relative h-full w-full overflow-hidden", className)}>
       <div ref={containerRef} className="h-full w-full" />
       {showAttribution && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-line/70 bg-surface/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted shadow-sm backdrop-blur">
-          OSM · Positron
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-line/70 bg-surface/90 px-2.5 py-1.5 text-xs font-medium text-muted shadow-sm backdrop-blur">
+          OSM · OpenFreeMap
         </div>
       )}
     </div>

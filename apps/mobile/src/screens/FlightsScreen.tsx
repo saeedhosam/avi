@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -37,7 +37,7 @@ import {
   statusTone,
 } from "../lib/flightDisplay";
 import { getAccessToken } from "../lib/supabase";
-import { COLORS } from "../lib/theme";
+import { COLORS, RADIUS, TOUCH } from "../lib/theme";
 import {
   addTrackedFlight,
   listTrackedFlights,
@@ -87,10 +87,17 @@ export default function FlightsScreen() {
   const [provenance, setProvenance] = useState<GatewayProvenance | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emptyResult, setEmptyResult] = useState<{
+    title: string;
+    detail: string;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tracked, setTracked] = useState<TrackedFlightEntry[]>([]);
   const [trackedLoading, setTrackedLoading] = useState(true);
   const [refreshingIds, setRefreshingIds] = useState<string[]>([]);
+  // Monotonic token: only the newest lookup may write results, so a slow
+  // earlier request cannot overwrite a newer search.
+  const searchSeq = useRef(0);
 
   const loadTracked = useCallback(async () => {
     const entries = await listTrackedFlights();
@@ -117,8 +124,11 @@ export default function FlightsScreen() {
   }, []);
 
   const changeMode = (next: SearchMode) => {
+    searchSeq.current += 1;
     setMode(next);
+    setSearching(false);
     setError(null);
+    setEmptyResult(null);
     setNotice(null);
     setResults([]);
     setBoardFlights([]);
@@ -172,8 +182,10 @@ export default function FlightsScreen() {
       setError("Enter the operating date as YYYY-MM-DD.");
       return;
     }
+    const seq = ++searchSeq.current;
     setSearching(true);
     setError(null);
+    setEmptyResult(null);
     setNotice(null);
     setResults([]);
     setBoardFlights([]);
@@ -182,17 +194,25 @@ export default function FlightsScreen() {
     try {
       const client = await gatewayClient();
       const response = await client.getFlight(number, date);
-      setResults(response.flights);
+      if (seq !== searchSeq.current) return;
+      // Only show records for the exact flight number requested. Never fall
+      // back to a different flight or another operating date.
+      const matches = response.flights.filter(
+        (candidate) =>
+          candidate.flightNumber.replace(/\s+/g, "").toUpperCase() === number,
+      );
+      setResults(matches);
       setProvenance(response.provenance);
-      if (!response.flights.length) {
-        setError(
-          `The gateway returned no flight for ${number} on ${date}. No substitute flight is shown.`,
-        );
+      if (!matches.length) {
+        setEmptyResult({
+          title: "No flight for that date",
+          detail: `The gateway returned no record for ${number} on ${date}. This is not evidence the flight does not operate; no substitute flight is shown.`,
+        });
       }
     } catch (cause) {
-      setError(describeGatewayError(cause));
+      if (seq === searchSeq.current) setError(describeGatewayError(cause));
     } finally {
-      setSearching(false);
+      if (seq === searchSeq.current) setSearching(false);
     }
   };
 
@@ -202,8 +222,10 @@ export default function FlightsScreen() {
       setError("Enter a three-letter airport code, for example CAI.");
       return;
     }
+    const seq = ++searchSeq.current;
     setSearching(true);
     setError(null);
+    setEmptyResult(null);
     setNotice(null);
     setResults([]);
     setBoardFlights([]);
@@ -212,16 +234,20 @@ export default function FlightsScreen() {
     try {
       const client = await gatewayClient();
       const response = await client.getAirportBoard(code);
+      if (seq !== searchSeq.current) return;
       setBoardFlights(response.flights);
       setBoardWeather(response.weather);
       setProvenance(response.provenance);
       if (!response.flights.length) {
-        setError(`The gateway returned an empty board for ${code}.`);
+        setEmptyResult({
+          title: "No flights on this board",
+          detail: `The gateway returned an empty live board for ${code}. This can mean no flights are within the provider's current window; no static board is substituted.`,
+        });
       }
     } catch (cause) {
-      setError(describeGatewayError(cause));
+      if (seq === searchSeq.current) setError(describeGatewayError(cause));
     } finally {
-      setSearching(false);
+      if (seq === searchSeq.current) setSearching(false);
     }
   };
 
@@ -275,7 +301,7 @@ export default function FlightsScreen() {
       </Subtitle>
 
       <Card>
-        <Row>
+        <View style={styles.modeRow}>
           <ModeButton
             label="Flight number"
             active={mode === "flight"}
@@ -286,7 +312,7 @@ export default function FlightsScreen() {
             active={mode === "board"}
             onPress={() => changeMode("board")}
           />
-        </Row>
+        </View>
         <Divider />
         {mode === "flight" ? (
           <>
@@ -347,6 +373,9 @@ export default function FlightsScreen() {
       </Card>
 
       {error ? <EmptyState title="Flight data unavailable" detail={error} /> : null}
+      {emptyResult ? (
+        <EmptyState title={emptyResult.title} detail={emptyResult.detail} />
+      ) : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {searching ? (
         <Card>
@@ -607,64 +636,75 @@ function Field({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   input: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
     backgroundColor: COLORS.surface2,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: TOUCH,
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 15,
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surface2,
   },
   mode: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: RADIUS.sm,
+    minHeight: 40,
+    paddingHorizontal: 12,
   },
-  modeActive: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  modeText: { color: COLORS.muted, fontSize: 12, fontWeight: "800" },
-  modeTextActive: { color: COLORS.cockpit },
+  modeActive: { backgroundColor: COLORS.surface3 },
+  modeText: { color: COLORS.muted, fontSize: 13, fontWeight: "600" },
+  modeTextActive: { color: COLORS.radar },
   searchButton: {
     backgroundColor: COLORS.radar,
-    borderRadius: 14,
-    paddingVertical: 13,
+    borderRadius: RADIUS.md,
+    paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 46,
+    minHeight: TOUCH,
   },
-  searchButtonText: { color: COLORS.cockpit, fontWeight: "800", fontSize: 14 },
-  notice: { color: COLORS.green, fontSize: 12, lineHeight: 18 },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
-  weather: { color: COLORS.radar, fontSize: 13, fontWeight: "600" },
-  provenance: { color: COLORS.radar, fontSize: 11, fontWeight: "700" },
+  searchButtonText: { color: COLORS.cockpit, fontWeight: "700", fontSize: 15 },
+  notice: { color: COLORS.green, fontSize: 13, lineHeight: 19 },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  weather: { color: COLORS.radar, fontSize: 14, fontWeight: "600" },
+  provenance: { color: COLORS.radar, fontSize: 12, fontWeight: "600" },
   airline: {
     color: COLORS.amber,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   flightNumber: {
     color: COLORS.white,
     fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 0.5,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   route: { color: COLORS.text, fontSize: 13, fontWeight: "600" },
   field: { flex: 1, minWidth: 88 },
   fieldLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   fieldValue: {
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
     marginTop: 2,
   },
   trackedRow: {
@@ -676,8 +716,8 @@ const styles = StyleSheet.create({
   trackedNumber: {
     color: COLORS.white,
     fontSize: 19,
-    fontWeight: "900",
-    letterSpacing: 0.4,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-  trackedRoute: { color: COLORS.radar, fontSize: 12, fontWeight: "700" },
+  trackedRoute: { color: COLORS.radar, fontSize: 13, fontWeight: "600" },
 });

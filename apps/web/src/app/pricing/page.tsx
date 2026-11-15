@@ -23,10 +23,8 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <div className="app-bg min-h-screen">
-      <main className="mx-auto w-full max-w-[1200px] px-4 py-8 lg:px-8">
-        <PricingContent />
-      </main>
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 lg:px-8 lg:py-8">
+      <PricingContent />
     </div>
   );
 }

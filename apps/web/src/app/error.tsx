@@ -39,7 +39,7 @@ export default function RouteError({
           }
         />
         {error.digest && (
-          <p className="mt-1 text-center font-mono text-[9px] text-subtle">
+          <p className="mt-1 text-center font-mono text-xs text-subtle">
             Error ref: {error.digest}
           </p>
         )}

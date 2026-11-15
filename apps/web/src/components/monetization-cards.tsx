@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PlaneLanding, Sparkles, Wifi } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const LOUNGE_URL =
   process.env.NEXT_PUBLIC_LOUNGE_AFFILIATE_URL?.trim() ||
@@ -29,40 +30,41 @@ export function DelayLoungeCard({
   if (!Number.isFinite(delayMinutes) || delayMinutes < 120) return null;
   return (
     <div
-      className={
-        compact
-          ? "rounded-2xl border border-[#f59e0b]/40 bg-[#f59e0b]/10 p-3"
-          : "rounded-2xl border border-[#f59e0b]/40 bg-[#f59e0b]/10 p-4"
-      }
+      className={cn(
+        "rounded-lg border border-delayed/30 bg-delayed/8",
+        compact ? "px-3 py-2.5" : "p-4",
+      )}
     >
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#f59e0b]/50 bg-[#f59e0b]/15 text-[#fbbf24]">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-delayed/35 bg-delayed/10 text-delayed">
           <Sparkles className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#fbbf24]">
+          <p className="label-caps text-delayed">
             Flight delayed {Math.round(delayMinutes / 60)}h+
           </p>
-          <p className="mt-1 text-sm font-bold text-ink">
+          <p className="mt-1 text-[13px] font-medium text-ink">
             Unlock nearby lounge access
           </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted">
-            A long delay is a good time to reset. Compare lounges at this
-            terminal and check access with your card or a day pass.
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {!compact && (
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              A long delay is a good time to reset. Compare lounges at this
+              terminal and check access with your card or a day pass.
+            </p>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <a
               href={LOUNGE_URL}
               target="_blank"
               rel="noreferrer sponsored"
-              className="rounded-lg bg-[#fbbf24] px-2.5 py-1.5 text-[10px] font-extrabold text-[#1a1204]"
+              className="inline-flex h-8 items-center rounded-lg bg-delayed px-2.5 text-xs font-semibold text-[color:var(--bg)] transition-opacity hover:opacity-90"
             >
               Find a lounge
             </a>
             {flightNumber ? (
               <Link
                 href={`/map/${encodeURIComponent(flightNumber)}`}
-                className="rounded-lg border border-[#f59e0b]/40 px-2.5 py-1.5 text-[10px] font-bold text-[#fbbf24]"
+                className="inline-flex h-8 items-center rounded-lg border border-delayed/35 px-2.5 text-xs font-medium text-delayed transition-colors hover:bg-delayed/10"
               >
                 View live flight
               </Link>
@@ -90,32 +92,32 @@ export function ArrivalEsimCard({
     originCountry.trim().toUpperCase() !== destinationCountry.trim().toUpperCase();
   if (status !== "LANDED" || !international) return null;
   return (
-    <div className="rounded-2xl border border-[#22d3ee]/40 bg-[#22d3ee]/10 p-4">
+    <div className="rounded-lg border border-accent/25 bg-accent-soft p-4">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#22d3ee]/50 bg-[#22d3ee]/15 text-[#22d3ee]">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent">
           <PlaneLanding className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#22d3ee]">
+          <p className="label-caps text-accent">
             Landing in {destinationCountry}
           </p>
-          <p className="mt-1 text-sm font-bold text-ink">
+          <p className="mt-1 text-[13px] font-medium text-ink">
             Get instant eSIM data for {destinationCity}
           </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          <p className="mt-1 text-xs leading-relaxed text-muted">
             Skip the airport SIM queue. Install a data plan before you leave the
             aircraft and stay connected on arrival.
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <a
               href={ESIM_URL}
               target="_blank"
               rel="noreferrer sponsored"
-              className="inline-flex items-center gap-1 rounded-lg bg-[#22d3ee] px-2.5 py-1.5 text-[10px] font-extrabold text-[#06111d]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-2.5 text-xs font-semibold text-[color:var(--bg)] transition-opacity hover:opacity-90"
             >
-              <Wifi className="size-3" /> Get instant eSIM
+              <Wifi className="size-3.5" /> Get instant eSIM
             </a>
-            <span className="text-[9px] text-subtle">
+            <span className="text-xs text-subtle">
               Affiliate link · no extra cost to you
             </span>
           </div>

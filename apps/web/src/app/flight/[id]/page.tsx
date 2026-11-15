@@ -296,21 +296,21 @@ export default function FlightDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6 lg:py-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="mx-auto max-w-[1440px] px-4 py-5 lg:px-8 lg:py-7">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <button
             onClick={() => router.back()}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted transition-colors hover:text-ink"
+            className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border border-line/70 bg-surface-2/60 text-muted transition-colors hover:border-line-strong hover:text-ink"
             aria-label="Back"
           >
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0">
             <p className="label-caps text-accent">Flight dossier</p>
-            <h2 className="flex flex-wrap items-center gap-2 text-lg font-black tracking-tight text-ink lg:text-xl">
+            <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-ink">
               {flight.flightNumber}
-              <span className="text-xs font-medium text-muted">{flight.airline}</span>
+              <span className="text-sm font-normal text-muted">{flight.airline}</span>
               <StatusBadge
                 status={flight.status}
                 statusReported={flight.statusReported}
@@ -318,12 +318,12 @@ export default function FlightDetailPage() {
                 delayReported={flight.delayReported}
               />
               {isLivePosition && (
-                <span className="flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-accent">
-                  <Radio className="size-2.5 animate-pulse" /> LIVE
+                <span className="flex items-center gap-1 rounded-md bg-accent-soft px-2 py-1 text-xs font-medium text-accent">
+                  <Radio className="size-3 animate-pulse" /> Live
                 </span>
               )}
-            </h2>
-            <p className="mt-1 text-[9px] text-subtle">
+            </h1>
+            <p className="mt-1 text-xs text-subtle">
               {flight.fetchedAt &&
               Number.isFinite(Date.parse(flight.fetchedAt))
                 ? `Provider data retrieved ${timeAgo(Date.parse(flight.fetchedAt))}${
@@ -336,12 +336,12 @@ export default function FlightDetailPage() {
 
         <div className="flex flex-wrap items-center gap-1.5">
           <ActionButton
-            icon={<Share2 className="size-3.5" />}
+            icon={<Share2 className="size-4" />}
             label="Share"
             onClick={() => setShareOpen(true)}
           />
           <ActionButton
-            icon={<Edit3 className="size-3.5" />}
+            icon={<Edit3 className="size-4" />}
             label="Note"
             onClick={openNotes}
             active={Boolean(flight.customNotes)}
@@ -351,7 +351,7 @@ export default function FlightDetailPage() {
               <Glasses
                 fill={flight.isWatchlisted ? "currentColor" : "none"}
                 className={cn(
-                  "size-3.5 transition-colors",
+                  "size-4 transition-colors",
                   flight.isWatchlisted ? "fill-current text-accent" : "text-muted",
                 )}
               />
@@ -363,32 +363,34 @@ export default function FlightDetailPage() {
           <ActionButton
             icon={
               <Radio
-                className={cn(
-                  "size-3.5",
-                  refreshingCurrent && "animate-pulse",
-                )}
+                className={cn("size-4", refreshingCurrent && "animate-pulse")}
               />
             }
-            label={refreshingCurrent ? "Refreshing" : "Refresh flight"}
+            label={refreshingCurrent ? "Refreshing" : "Refresh"}
             onClick={() => void refreshCurrentFlight()}
           />
-          <Link href={`/map/${encodeURIComponent(flight.id)}`}>
+          <Link
+            href={
+              flight.flightDate
+                ? `/map/${encodeURIComponent(flight.id)}?date=${encodeURIComponent(flight.flightDate)}`
+                : `/map/${encodeURIComponent(flight.id)}`
+            }
+          >
             <Button size="sm" variant="outline">
-              <MapIcon className="size-3.5" /> Live map
+              <MapIcon className="size-4" /> Live map
             </Button>
           </Link>
-
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-3">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-6">
+        <div className="min-w-0 space-y-4">
           {/* Hero */}
           <Panel className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 px-4 py-3">
               <div className="flex items-center gap-2">
                 <span
-                  className="flex size-8 items-center justify-center rounded-lg border text-[10px] font-bold"
+                  className="flex size-8 items-center justify-center rounded-lg border font-mono text-xs font-semibold"
                   style={{
                     color: meta.color,
                     backgroundColor: meta.soft,
@@ -398,39 +400,39 @@ export default function FlightDetailPage() {
                   {flight.airlineCode}
                 </span>
                 <div>
-                  <p className="text-[11px] font-bold text-ink">
+                  <p className="text-xs font-medium text-ink">
                     {flight.origin.city} → {flight.destination.city}
                     {flight.flightDate ? ` · ${flightDateLabel(flight.flightDate)}` : ""}
                   </p>
-                  <p className="text-[9px] text-subtle">
+                  <p className="text-xs text-subtle">
                     {flight.aircraft.model} · {flight.aircraft.registration}
                   </p>
                 </div>
               </div>
               {flight.delayReason && (
-                <span className="rounded-full border border-delayed/40 bg-delayed/10 px-2 py-1 text-[9px] font-semibold text-delayed">
+                <span className="rounded-full border border-delayed/40 bg-delayed/10 px-2 py-1 text-xs font-semibold text-delayed">
                   {flight.delayReason}
                 </span>
               )}
             </div>
             <div className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[26px] font-black leading-none text-ink lg:text-3xl">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <p className="font-mono text-2xl font-semibold leading-none tracking-tight text-ink lg:text-[28px]">
                     {flight.origin.code}
                     <span className="mx-2 text-lg text-subtle">→</span>
                     {flight.destination.code}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted">
+                  <p className="mt-1 text-xs text-muted">
                     {flight.origin.name} → {flight.destination.name}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 sm:text-right">
                   <p className="label-caps text-subtle">Estimated arrival</p>
-                  <p className="text-lg font-bold text-ink tabular">
+                  <p className="text-lg font-semibold text-ink tabular">
                     {flight.arrivalTimeEstimated}
                   </p>
-                  <p className="text-[9px] text-subtle">
+                  <p className="text-xs text-subtle">
                     Scheduled {flight.arrivalTimeScheduled}
                   </p>
                 </div>
@@ -482,7 +484,7 @@ export default function FlightDetailPage() {
               </div>
 
               {flight.statusNote && (
-                <p className="mt-3 rounded-lg border border-accent/25 bg-accent-soft px-3 py-2 text-[11px] font-medium text-accent">
+                <p className="mt-3 rounded-lg border border-accent/25 bg-accent-soft px-3 py-2 text-xs font-medium text-accent">
                   {flight.statusNote}
                 </p>
               )}
@@ -601,12 +603,12 @@ export default function FlightDetailPage() {
                   />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-ink">
+                  <p className="text-[13px] font-medium text-ink">
                     {flight.isWatchlisted
                       ? "Saved to your watchlist"
                       : "Add this flight to your watchlist"}
                   </p>
-                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted">
                     {flight.isWatchlisted
                       ? "Offline-cached with alerts for gate, delay, boarding, and baggage."
                       : "Persist to the local cache for offline monitoring and alerts."}
@@ -671,7 +673,7 @@ export default function FlightDetailPage() {
               <p className="label-caps text-subtle">Provider telemetry</p>
               <span
                 className={cn(
-                  "flex items-center gap-1 text-[9px] font-bold",
+                  "flex items-center gap-1 text-xs font-semibold",
                   isLivePosition ? "text-landed" : "text-subtle",
                 )}
               >
@@ -697,7 +699,7 @@ export default function FlightDetailPage() {
             {flight.customNotes && (
               <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-line/60 bg-surface-2 px-2.5 py-2">
                 <StickyNote className="mt-0.5 size-3.5 shrink-0 text-accent" />
-                <p className="text-[10px] leading-relaxed text-muted">
+                <p className="text-xs leading-relaxed text-muted">
                   {flight.customNotes}
                 </p>
               </div>
@@ -711,7 +713,7 @@ export default function FlightDetailPage() {
 
           <Panel className="p-3.5">
             <p className="label-caps text-subtle">Flight data</p>
-            <div className="mt-2 space-y-1.5 text-[10px]">
+            <div className="mt-2 space-y-1.5 text-xs">
               <DataRow label="Airline" value={flight.airline} />
               <DataRow label="Airline code" value={flight.airlineCode} mono />
               <DataRow label="Flight number" value={flight.flightNumber} mono />
@@ -729,10 +731,10 @@ export default function FlightDetailPage() {
           </Panel>
 
           <div className="rounded-xl border border-dashed border-line bg-surface-2/50 px-3 py-2.5">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold text-muted">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted">
               <MapPin className="size-3 text-accent" /> Cached & cloud synced
             </p>
-            <p className="mt-1 text-[9px] leading-relaxed text-subtle">
+            <p className="mt-1 text-xs leading-relaxed text-subtle">
               Flight state is saved on this device and synced to
               your account when you’re signed in.
             </p>
@@ -775,10 +777,10 @@ function ActionButton({
     <button
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-semibold transition-colors",
+        "inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors",
         active
-          ? "border-accent/50 bg-accent-soft text-accent"
-          : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
+          ? "border-accent/40 bg-accent-soft text-accent"
+          : "border-line/70 bg-surface-2/50 text-muted hover:border-line-strong hover:text-ink",
       )}
     >
       {icon}
@@ -801,31 +803,39 @@ function InlineMetric({
   return (
     <div className="rounded-lg border border-line/70 bg-surface-2 px-2.5 py-2">
       <p className="label-caps text-subtle">{label}</p>
-      <p className={cn("mt-0.5 text-xs font-bold tabular", accent ? "text-accent" : "text-ink")}>
+      <p className={cn("mt-0.5 text-sm font-semibold tabular", accent ? "text-accent" : "text-ink")}>
         {value}
       </p>
-      {sub && <p className="mt-0.5 truncate text-[8px] text-subtle">{sub}</p>}
+      {sub && <p className="mt-0.5 truncate text-xs text-subtle">{sub}</p>}
     </div>
   );
 }
 
+function assigned(value: string | null | undefined): value is string {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized !== "" &&
+    normalized !== "—" &&
+    normalized !== "–" &&
+    normalized !== "-" &&
+    normalized !== "n/a" &&
+    normalized !== "tbd" &&
+    normalized !== "gate tbd" &&
+    normalized !== "carousel tbd" &&
+    normalized !== "unknown" &&
+    normalized !== "not reported"
+  );
+}
+
 function gateLabel(terminal: string, gate: string): string {
-  const terminalPart =
-    terminal && terminal !== "—" ? `Terminal ${terminal}` : null;
-  const gatePart = gate && gate !== "Gate TBD" ? gate : null;
+  const terminalPart = assigned(terminal) ? `Terminal ${terminal}` : null;
+  const gatePart = assigned(gate) ? gate : null;
   return [terminalPart, gatePart].filter(Boolean).join(" · ") || "Not reported";
 }
 
 function reportedOrUnavailable(value: string | null | undefined): string {
-  if (
-    !value ||
-    value === "—" ||
-    value === "N/A" ||
-    value === "Carousel TBD"
-  ) {
-    return "Not reported";
-  }
-  return value;
+  return assigned(value) ? value : "Not reported";
 }
 
 function GateTile({
@@ -842,16 +852,16 @@ function GateTile({
   onMap: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-3.5">
+    <div className="rounded-xl border border-line/70 bg-surface p-3.5">
       <div className="flex items-center justify-between">
         <p className="label-caps text-subtle">{label}</p>
         <span className="text-accent">{icon}</span>
       </div>
-      <p className="mt-1.5 truncate text-sm font-bold text-ink">{primary}</p>
-      <p className="mt-0.5 truncate text-[10px] text-accent-2">{secondary}</p>
+      <p className="mt-1.5 truncate text-sm font-semibold text-ink">{primary}</p>
+      <p className="mt-0.5 truncate text-xs text-accent-2">{secondary}</p>
       <button
         onClick={onMap}
-        className="mt-2 flex items-center gap-1 text-[10px] font-bold text-accent hover:underline"
+        className="-mx-1 mt-2 flex min-h-9 items-center gap-1 rounded-md px-1 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
       >
         Open terminal map <ChevronRight className="size-3" />
       </button>
@@ -871,7 +881,7 @@ function MiniAction({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2 px-2 py-2 text-[10px] font-semibold text-muted transition-colors hover:border-accent/40 hover:text-accent"
+      className="flex min-h-10 items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2 px-2 py-2 text-xs font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
     >
       {icon}
       {label}
@@ -890,10 +900,10 @@ function Snapshot({
 }) {
   return (
     <div className="rounded-lg border border-line/70 bg-surface-2 px-2 py-1.5">
-      <p className="text-[8px] font-bold uppercase tracking-wider text-subtle">
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
         {label}
       </p>
-      <p className={cn("mt-0.5 text-[11px] font-bold tabular", accent ? "text-accent" : "text-ink")}>
+      <p className={cn("mt-0.5 text-[13px] font-semibold tabular", accent ? "text-accent" : "text-ink")}>
         {value}
       </p>
     </div>
@@ -958,9 +968,10 @@ function NotesModal({
         onChange={(event) => onDraft(event.target.value)}
         placeholder="e.g. Mom's flight, pick up at baggage claim, seat 12A…"
         rows={5}
-        className="w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-ink outline-none placeholder:text-subtle focus:border-accent"
+        maxLength={500}
+        className="min-h-28 w-full resize-none rounded-lg border border-line bg-surface-2/70 px-3 py-2.5 text-sm leading-relaxed text-ink outline-none transition-colors placeholder:text-subtle/80 hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent/20"
       />
-      <p className="mt-1.5 text-[10px] text-subtle">
+      <p className="mt-1.5 text-xs text-subtle">
         Notes stay private to you — only you and your devices can
         see them. Up to 500 characters each.
       </p>

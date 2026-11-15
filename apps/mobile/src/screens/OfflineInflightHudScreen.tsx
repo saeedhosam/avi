@@ -438,6 +438,15 @@ function routeFromParams(params: HudParams): RouteResolution {
   };
 }
 
+/** Cabin pressure trend in plain language; 0 fpm means the cabin is level. */
+function verticalTrend(rate: number | null | undefined): string {
+  if (rate == null) return "trend pending";
+  if (rate === 0) return "cabin level";
+  return rate > 0
+    ? `climbing ${Math.abs(rate)} fpm`
+    : `descending ${Math.abs(rate)} fpm`;
+}
+
 export default function OfflineInflightHudScreen() {
   const router = useRouter();
   const params = useLocalSearchParams() as HudParams;
@@ -653,28 +662,24 @@ export default function OfflineInflightHudScreen() {
       ) : null}
 
       <Card style={styles.hud}>
-        <Row style={{ justifyContent: "space-between" }}>
-          <View>
-            <Text style={styles.hudLabel}>Cabin altitude</Text>
-            <Text style={styles.hudValue}>
-              {state.cabin.source === "NONE"
+        <View style={styles.hudStats}>
+          <HudStat
+            label="Cabin altitude"
+            value={
+              state.cabin.source === "NONE"
                 ? "Unavailable"
-                : `${state.cabin.cabinAltitudeFeet.toLocaleString()} ft`}
-            </Text>
-          </View>
-          <View>
-            <Text style={styles.hudLabel}>Progress</Text>
-            <Text style={styles.hudValue}>
-              {Math.round(state.position.progress * 100)}%
-            </Text>
-          </View>
-          <View>
-            <Text style={styles.hudLabel}>Remaining</Text>
-            <Text style={styles.hudValue}>
-              {Math.round(state.position.distanceRemainingKm).toLocaleString()} km
-            </Text>
-          </View>
-        </Row>
+                : `${state.cabin.cabinAltitudeFeet.toLocaleString()} ft`
+            }
+          />
+          <HudStat
+            label="Progress"
+            value={`${Math.round(state.position.progress * 100)}%`}
+          />
+          <HudStat
+            label="Remaining"
+            value={`${Math.round(state.position.distanceRemainingKm).toLocaleString()} km`}
+          />
+        </View>
         <View style={styles.progressTrack}>
           <View
             style={[
@@ -694,11 +699,9 @@ export default function OfflineInflightHudScreen() {
         <Text style={styles.pressure}>
           {state.cabin.source === "NONE"
             ? "No barometer reading. Cabin altitude is not estimated."
-            : `Pressure ${state.cabin.pressureHpa.toFixed(1)} hPa · ${
-                state.cabin.verticalRateFpm != null
-                  ? `${state.cabin.verticalRateFpm} fpm`
-                  : "trend pending"
-              }`}
+            : `Pressure ${state.cabin.pressureHpa.toFixed(1)} hPa · ${verticalTrend(
+                state.cabin.verticalRateFpm,
+              )}`}
         </Text>
         {cabin ? (
           <Text style={styles.note}>
@@ -730,19 +733,17 @@ export default function OfflineInflightHudScreen() {
       <Card>
         <Label>Under the flight path</Label>
         {state.callouts.length ? (
-          state.callouts.map((callout) => (
-            <Divider key={callout.name} />
-          ))
-        ) : null}
-        {state.callouts.length ? (
-          state.callouts.map((callout) => (
-            <Text key={`${callout.name}-label`} style={styles.callout}>
-              {callout.name} · {callout.distanceKm} km off track ·{" "}
-              {new Date(callout.at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
+          state.callouts.map((callout, index) => (
+            <View key={callout.name}>
+              {index > 0 ? <Divider /> : null}
+              <Text style={styles.callout}>
+                {callout.name} · {callout.distanceKm} km off track ·{" "}
+                {new Date(callout.at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </View>
           ))
         ) : (
           <Text style={styles.note}>No bundled landmarks near this route.</Text>
@@ -768,15 +769,33 @@ export default function OfflineInflightHudScreen() {
   );
 }
 
+function HudStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.hudStat}>
+      <Text style={styles.hudLabel}>{label}</Text>
+      <Text
+        style={styles.hudValue}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  hud: { borderColor: COLORS.radar, backgroundColor: "#071a24" },
+  hud: { borderColor: `${COLORS.radar}55`, backgroundColor: COLORS.radarSurface },
+  hudStats: { flexDirection: "row", gap: 10 },
+  hudStat: { flex: 1, minWidth: 0 },
   hudLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  hudValue: { color: COLORS.white, fontSize: 20, fontWeight: "900" },
+  hudValue: { color: COLORS.white, fontSize: 20, fontWeight: "700" },
   progressTrack: {
     height: 8,
     backgroundColor: COLORS.surface2,
@@ -785,8 +804,8 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 8, backgroundColor: COLORS.radar, borderRadius: 999 },
   pressure: { color: COLORS.radar, fontSize: 12, fontWeight: "600" },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 16 },
-  snapshot: { color: COLORS.radar, fontSize: 11, fontWeight: "700" },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
+  snapshot: { color: COLORS.radar, fontSize: 12, fontWeight: "600" },
   sampleNote: { color: COLORS.amber, fontSize: 12, lineHeight: 18 },
   timelineRow: {
     flexDirection: "row",
@@ -803,6 +822,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   dotDone: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  timelineLabel: { color: COLORS.white, fontSize: 12, fontWeight: "700" },
+  timelineLabel: { color: COLORS.white, fontSize: 13, fontWeight: "600" },
   callout: { color: COLORS.radar, fontSize: 12, paddingVertical: 4 },
 });

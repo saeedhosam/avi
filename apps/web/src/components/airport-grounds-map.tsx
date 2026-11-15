@@ -58,9 +58,9 @@ export function AirportGroundsMap({
     el.innerHTML = `
       <div class="absolute -inset-3 rounded-full bg-accent/20 animate-ping"></div>
       <div class="relative flex size-8 items-center justify-center rounded-full border-2 border-accent bg-bg shadow-xl shadow-accent/30">
-        <span class="font-mono text-[9px] font-black text-accent tracking-wider">${airport.iata}</span>
+        <span class="font-mono text-xs font-semibold text-accent tracking-wider">${airport.iata}</span>
       </div>
-      <div class="pointer-events-none absolute bottom-full mb-2 hidden -translate-x-1/2 left-1/2 whitespace-nowrap rounded-md border border-line bg-surface/95 px-2 py-1 text-[10px] font-bold text-ink shadow-lg group-hover:block backdrop-blur">
+      <div class="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-surface/95 px-2.5 py-1.5 text-xs font-medium text-ink shadow-lg backdrop-blur group-hover:block">
         ${airport.name} · ${airport.city}
       </div>
     `;
@@ -113,20 +113,20 @@ export function AirportGroundsMap({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-line bg-surface",
+        "relative overflow-hidden rounded-xl border border-line/70 bg-surface",
         className,
       )}
     >
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Floating HUD Badges */}
+      {/* Floating HUD badges */}
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1.5">
-        <div className="flex items-center gap-1.5 rounded-lg border border-line/80 bg-surface/90 px-2.5 py-1 text-[10px] font-bold text-ink shadow-lg backdrop-blur">
-          <span className="size-2 rounded-full bg-landed animate-pulse" />
-          <span>Airfield & Grounds View</span>
-          <span className="font-mono text-accent">Z{currentZoom}</span>
+        <div className="flex items-center gap-2 rounded-lg border border-line/70 bg-surface/95 px-2.5 py-1.5 text-xs font-medium text-ink shadow-lg backdrop-blur">
+          <span className="size-1.5 animate-pulse rounded-full bg-landed" />
+          Airfield &amp; grounds
+          <span className="font-mono text-subtle">Z{currentZoom}</span>
         </div>
-        <div className="hidden rounded-lg border border-line/80 bg-surface/90 px-2.5 py-1 font-mono text-[9px] text-muted shadow-lg backdrop-blur sm:block">
+        <div className="hidden rounded-lg border border-line/70 bg-surface/95 px-2.5 py-1.5 font-mono text-xs text-muted shadow-lg backdrop-blur sm:block">
           {Math.abs(airport.latitude).toFixed(4)}°
           {airport.latitude >= 0 ? "N" : "S"},{" "}
           {Math.abs(airport.longitude).toFixed(4)}°
@@ -134,62 +134,63 @@ export function AirportGroundsMap({
         </div>
       </div>
 
-      {/* Map Action Controls */}
-      <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5 rounded-xl border border-line/80 bg-surface/90 p-1 shadow-xl backdrop-blur">
+      {/* Map action controls */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-1 rounded-lg border border-line/70 bg-surface/95 p-1 shadow-xl backdrop-blur">
         <button
           type="button"
           onClick={handleRecenter}
-          className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-accent"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           title="Recenter on terminal"
           aria-label="Recenter on terminal"
         >
-          <LocateFixed className="size-3.5" />
+          <LocateFixed className="size-4" />
         </button>
         <button
           type="button"
           onClick={toggle3D}
           className={cn(
-            "flex size-7 items-center justify-center rounded-lg transition-colors",
+            "flex size-9 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             pitch3D
               ? "bg-accent-soft text-accent"
               : "text-muted hover:bg-surface-2 hover:text-ink",
           )}
-          title={pitch3D ? "Switch to 2D Top View" : "Switch to 3D Aerial Perspective"}
-          aria-label="Toggle 3D View"
+          title={pitch3D ? "Switch to 2D top view" : "Switch to 3D aerial view"}
+          aria-label="Toggle 3D view"
+          aria-pressed={pitch3D}
         >
-          <Box className="size-3.5" />
+          <Box className="size-4" />
         </button>
         <div className="my-0.5 h-px bg-line/60" />
         <button
           type="button"
           onClick={() => handleZoom(0.8)}
-          className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           title="Zoom in"
           aria-label="Zoom in"
         >
-          <ZoomIn className="size-3.5" />
+          <ZoomIn className="size-4" />
         </button>
         <button
           type="button"
           onClick={() => handleZoom(-0.8)}
-          className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           title="Zoom out"
           aria-label="Zoom out"
         >
-          <ZoomOut className="size-3.5" />
+          <ZoomOut className="size-4" />
         </button>
       </div>
 
-      {/* Bottom Switch to Indoor CAD Prompt if layout is available */}
+      {/* Switch to indoor schematic when one exists */}
       {hasIndoorSchematic && onSelectTerminal && (
         <div className="absolute bottom-3 left-3 z-10">
           <button
             type="button"
             onClick={onSelectTerminal}
-            className="flex items-center gap-1.5 rounded-lg border border-accent/50 bg-surface/95 px-3 py-1.5 text-[11px] font-bold text-accent shadow-xl backdrop-blur transition-all hover:bg-accent-soft hover:border-accent"
+            className="flex h-10 items-center gap-1.5 rounded-lg border border-accent/40 bg-surface/95 px-3 text-[13px] font-medium text-accent shadow-xl backdrop-blur transition-colors hover:bg-accent-soft"
           >
-            <Layers className="size-3.5" />
-            Switch to Multi-Level Indoor Concourse Map
+            <Layers className="size-4" />
+            Open indoor concourse map
           </button>
         </div>
       )}

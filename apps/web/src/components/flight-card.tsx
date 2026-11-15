@@ -2,17 +2,24 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Glasses,
-  Luggage,
-  MapPin,
-  Plane,
-} from "lucide-react";
+import { ArrowRight, Glasses, Luggage, MapPin, Plane } from "lucide-react";
 import { flightKey, useApp } from "@/lib/store";
 import type { Flight } from "@/lib/types";
 import { STATUS_META, cn, flightDateLabel, timeAgo } from "@/lib/utils";
 import { StatusBadge } from "./ui";
+
+function known(value: string | null | undefined): value is string {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized !== "" &&
+    normalized !== "—" &&
+    normalized !== "n/a" &&
+    normalized !== "tbd" &&
+    normalized !== "gate tbd" &&
+    normalized !== "carousel tbd"
+  );
+}
 
 export function FlightCard({
   flight,
@@ -42,180 +49,184 @@ export function FlightCard({
         : null;
 
   return (
-    <Link
-      href={href}
-      onClick={() => {
-        addRecent(flight);
-      }}
-      aria-label={`Open ${flight.flightNumber} flight details`}
+    <div
       className={cn(
-        "group relative block overflow-hidden rounded-2xl border border-line/90 bg-surface/95 p-4 transition-all hover:border-accent/35 hover:shadow-[0_18px_40px_-30px_rgba(0,229,255,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+        "group relative overflow-hidden rounded-xl border border-line/70 bg-surface/80 p-4 transition-colors hover:border-line-strong hover:bg-surface sm:p-5",
         className,
       )}
     >
+      <Link
+        href={href}
+        onClick={() => {
+          addRecent(flight);
+        }}
+        aria-label={`Open ${flight.flightNumber} details`}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/70"
+      />
 
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-surface-3 text-[11px] font-bold text-accent">
-            {flight.airlineCode}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-[15px] font-bold leading-none text-ink">
-                {flight.flightNumber}
-              </p>
-              {flight.flightDate && (
-                <span className="rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted">
-                  {flightDateLabel(flight.flightDate)}
+      <div className="pointer-events-none relative z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface-2 text-xs font-semibold tracking-wide text-muted">
+              {flight.airlineCode}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                <span className="font-mono text-[15px] font-semibold tracking-wide text-ink">
+                  {flight.flightNumber}
                 </span>
-              )}
-              <StatusBadge
-                status={flight.status}
-                statusReported={flight.statusReported}
-                delayMinutes={flight.delayMinutes}
-                delayReported={flight.delayReported}
-              />
+                {flight.flightDate && (
+                  <span className="font-mono text-xs text-subtle">
+                    {flightDateLabel(flight.flightDate)}
+                  </span>
+                )}
+                <StatusBadge
+                  status={flight.status}
+                  statusReported={flight.statusReported}
+                  delayMinutes={flight.delayMinutes}
+                  delayReported={flight.delayReported}
+                />
+              </div>
+              <p className="mt-1 truncate text-[13px] text-muted">
+                {flight.airline}
+                {flight.fetchedAt && Number.isFinite(Date.parse(flight.fetchedAt))
+                  ? ` · retrieved ${timeAgo(Date.parse(flight.fetchedAt))}`
+                  : ""}
+              </p>
             </div>
-            <p className="mt-1 truncate text-[11px] text-muted">{flight.airline}</p>
-            <p className="mt-0.5 text-[8px] text-subtle">
-              {flight.fetchedAt &&
-              Number.isFinite(Date.parse(flight.fetchedAt))
-                ? `Retrieved ${timeAgo(Date.parse(flight.fetchedAt))}${
-                    flight.source ? ` · ${flight.source}` : ""
-                  }`
-                : "Retrieval time not recorded"}
-            </p>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-1">
           {showWatchlist && (
             <button
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                toggleWatchlist(flight);
-              }}
+              type="button"
+              onClick={() => toggleWatchlist(flight)}
               aria-pressed={isWatchlisted}
               aria-label={
-                isWatchlisted
-                  ? "Remove from watchlist"
-                  : "Add to watchlist"
+                isWatchlisted ? "Remove from watchlist" : "Add to watchlist"
               }
               className={cn(
-                "inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-all",
+                "pointer-events-auto inline-flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
                 isWatchlisted
-                  ? "border-accent/60 bg-accent-soft text-accent shadow-sm"
-                  : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
+                  ? "border-accent/40 bg-accent-soft text-accent"
+                  : "border-line/60 bg-surface-2/60 text-muted hover:border-line-strong hover:text-ink",
               )}
             >
               <Glasses
                 fill={isWatchlisted ? "currentColor" : "none"}
-                className={cn(
-                  "size-3.5 transition-colors",
-                  isWatchlisted ? "fill-current text-accent" : "text-muted",
-                )}
+                className="size-4"
               />
-              {isWatchlisted ? "Watchlisted" : "Watchlist"}
             </button>
           )}
         </div>
-      </div>
 
-      <div className="relative z-10 mt-5 grid grid-cols-[1fr_1.35fr_1fr] items-center gap-2">
-        <div>
-          <p className="text-[26px] font-black leading-none tracking-tight text-ink">
-            {flight.origin.code}
-          </p>
-          <p className="mt-1 truncate text-[11px] font-medium text-muted">
-            {flight.origin.city && flight.origin.city !== flight.origin.code
-              ? flight.origin.city
-              : flight.origin.name}
-          </p>
-          <p className="mt-1.5 text-xs font-semibold text-accent tabular">
-            {flight.departureTimeEstimated}
-          </p>
-        </div>
+        <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-subtle">From</p>
+            <p className="mt-0.5 font-mono text-[28px] font-semibold leading-none tracking-tight text-ink sm:text-[32px]">
+              {flight.origin.code}
+            </p>
+            <p className="mt-1.5 truncate text-[13px] text-muted">
+              {flight.origin.city && flight.origin.city !== flight.origin.code
+                ? flight.origin.city
+                : flight.origin.name}
+            </p>
+            <p className="mt-1 font-mono text-sm font-medium tabular text-ink">
+              {flight.departureTimeEstimated}
+            </p>
+          </div>
 
-        <div className="flex flex-col items-center">
-          <p className="truncate text-[9px] text-subtle">
-            {flight.aircraft.model}
-          </p>
-          <div className="relative mt-2 h-6 w-full">
-            <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
-            <div
-              className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-accent to-accent-2"
-              style={{ width: `${(progress ?? 0) * 100}%` }}
-            />
-            {progress != null && (
+          <div className="flex w-24 flex-col items-center pt-5 sm:w-36">
+            <p className="max-w-full truncate text-xs text-subtle">
+              {flight.aircraft.model}
+            </p>
+            <div className="relative mt-2 h-5 w-full">
+              <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-line-strong/60" />
               <div
-                className="absolute top-1/2 -translate-y-1/2"
-                style={{ left: `calc(${progress * 100}% - 9px)` }}
-              >
-                <span className="flex size-[18px] items-center justify-center rounded-full bg-accent text-[color:var(--bg)] shadow-[0_0_12px_rgba(0,229,255,0.55)]">
-                  <Plane className="size-2.5 rotate-90" />
-                </span>
-              </div>
+                className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-accent"
+                style={{ width: `${(progress ?? 0) * 100}%` }}
+              />
+              {progress != null && (
+                <div
+                  className="absolute top-1/2 -translate-y-1/2"
+                  style={{ left: `calc(${progress * 100}% - 8px)` }}
+                >
+                  <span className="flex size-4 items-center justify-center rounded-full bg-accent text-[color:var(--bg)]">
+                    <Plane className="size-2.5 rotate-90" />
+                  </span>
+                </div>
+              )}
+            </div>
+            {flight.statusReported && flight.status === "DEPARTED" ? (
+              <p className="mt-0.5 text-center text-xs font-medium leading-tight text-accent-2">
+                {flight.telemetry.hasLiveLocation &&
+                flight.telemetry.etaMinutesRemaining > 0
+                  ? `${flight.telemetry.etaMinutesRemaining}m to arrival`
+                  : "Position not reported"}
+              </p>
+            ) : flight.delayReported && flight.delayMinutes > 0 ? (
+              <p className="mt-0.5 text-center text-xs font-medium leading-tight text-delayed">
+                +{flight.delayMinutes}m delay
+              </p>
+            ) : (
+              <p className="mt-0.5 text-center text-xs leading-tight text-subtle">
+                {flight.statusReported
+                  ? STATUS_META[flight.status].label
+                  : "Status not reported"}
+              </p>
             )}
           </div>
-          {flight.statusReported && flight.status === "DEPARTED" ? (
-            <p className="mt-0.5 text-[10px] font-semibold text-accent-2">
-              {flight.telemetry.hasLiveLocation &&
-              flight.telemetry.etaMinutesRemaining > 0
-                ? `${flight.telemetry.etaMinutesRemaining}m to arrival (calculated)`
-                : "Live position not reported"}
+
+          <div className="min-w-0 text-right">
+            <p className="text-xs font-medium text-subtle">To</p>
+            <p className="mt-0.5 font-mono text-[28px] font-semibold leading-none tracking-tight text-ink sm:text-[32px]">
+              {flight.destination.code}
             </p>
-          ) : flight.delayReported && flight.delayMinutes > 0 ? (
-            <p className="mt-0.5 text-[10px] font-semibold text-delayed">
-              +{flight.delayMinutes}m delay
+            <p className="mt-1.5 truncate text-[13px] text-muted">
+              {flight.destination.city &&
+              flight.destination.city !== flight.destination.code
+                ? flight.destination.city
+                : flight.destination.name}
             </p>
-          ) : (
-            <p className="mt-0.5 text-[10px] text-subtle">
-              {flight.statusReported
-                ? STATUS_META[flight.status].label
-                : "Status not reported"}
+            <p className="mt-1 font-mono text-sm font-medium tabular text-ink">
+              {flight.arrivalTimeEstimated}
             </p>
-          )}
+          </div>
         </div>
 
-        <div className="text-right">
-          <p className="text-[26px] font-black leading-none tracking-tight text-ink">
-            {flight.destination.code}
-          </p>
-          <p className="mt-1 truncate text-[11px] font-medium text-muted">
-            {flight.destination.city &&
-            flight.destination.city !== flight.destination.code
-              ? flight.destination.city
-              : flight.destination.name}
-          </p>
-          <p className="mt-1.5 text-xs font-semibold text-ink tabular">
-            {flight.arrivalTimeEstimated}
-          </p>
-        </div>
-      </div>
-
-      <div className="relative z-10 mt-3 border-t border-line/60 pt-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-3 text-[11px]">
-            <span className="flex items-center gap-1 text-ink">
-              <MapPin className="size-3 text-muted" />T{flight.terminalDeparture} ·{" "}
-              {flight.gateDeparture}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line/50 pt-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="size-3.5 text-subtle" />
+              {[
+                known(flight.terminalDeparture)
+                  ? `Terminal ${flight.terminalDeparture}`
+                  : null,
+                known(flight.gateDeparture)
+                  ? `Gate ${flight.gateDeparture}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Gate not reported"}
             </span>
-            <span className="flex items-center gap-1 text-muted">
-              <Luggage className="size-3 text-muted" />
-              {flight.baggageCarousel}
+            <span className="flex items-center gap-1.5">
+              <Luggage className="size-3.5 text-subtle" />
+              {known(flight.baggageCarousel)
+                ? `Belt ${flight.baggageCarousel}`
+                : "Belt not reported"}
             </span>
           </div>
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-accent">
-            Details <ArrowRight className="size-3" />
+          <span className="flex items-center gap-1 text-xs font-medium text-accent">
+            Details
+            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
           </span>
         </div>
+
         {flight.customNotes && (
-          <p className="mt-2 truncate rounded-md bg-surface-3/50 px-2 py-1 text-[10px] text-accent-2">
+          <p className="mt-2.5 truncate text-xs text-subtle">
             Note: {flight.customNotes}
           </p>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

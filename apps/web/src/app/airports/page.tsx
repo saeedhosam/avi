@@ -23,7 +23,6 @@ import {
   Share2,
   Compass,
   ArrowRight,
-  Info,
   Sparkles,
   PlaneTakeoff,
 } from "lucide-react";
@@ -38,10 +37,13 @@ import { AMENITY_META, TerminalMap } from "@/components/terminal-map";
 import { DelayLoungeCard } from "@/components/monetization-cards";
 import {
   Button,
+  Callout,
   MetricTile,
   Modal,
+  PageHeader,
   Panel,
   StatusBadge,
+  TextInput,
 } from "@/components/ui";
 
 const AirportGroundsMap = dynamic(
@@ -49,8 +51,8 @@ const AirportGroundsMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[580px] w-full items-center justify-center rounded-2xl border border-line bg-[#081320]">
-        <p className="text-xs text-muted">Loading airfield map…</p>
+      <div className="flex h-[520px] w-full items-center justify-center rounded-xl border border-line/70 bg-surface">
+        <p className="text-sm text-muted">Loading airfield map…</p>
       </div>
     ),
   },
@@ -121,17 +123,24 @@ export default function AirportsPage() {
 
   const [level, setLevel] = useState<number>(1);
 
-  // Synchronize level and view mode whenever airport changes
+  // Reset the view only when the airport itself changes. Level changes must not
+  // bounce the user back to the grounds map mid-exploration.
   useEffect(() => {
-    if (layout) {
-      if (!layout.availableLevels.includes(level)) {
-        setLevel(layout.availableLevels.includes(1) ? 1 : layout.availableLevels[0] ?? 0);
-      }
-    }
     setViewMode("GROUNDS");
     setSelected(null);
     setQuery("");
-  }, [airportCode, layout, level]);
+  }, [airportCode]);
+
+  // Keep the selected level valid for the current terminal layout.
+  useEffect(() => {
+    if (layout && !layout.availableLevels.includes(level)) {
+      setLevel(
+        layout.availableLevels.includes(1)
+          ? 1
+          : (layout.availableLevels[0] ?? 0),
+      );
+    }
+  }, [layout, level]);
 
   // Deep-link support from query parameters (?airport=... / ?code=... & ?gate=...)
   useEffect(() => {
@@ -307,7 +316,7 @@ export default function AirportsPage() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <Panel className="p-6 text-center">
-          <p className="text-sm font-bold text-ink">Airport not found</p>
+          <p className="text-sm font-semibold text-ink">Airport not found</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {airportCode} is not in AeroQuest&apos;s reference catalog. No airport data
             is substituted.
@@ -323,124 +332,129 @@ export default function AirportsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1720px] px-4 py-4 lg:px-6">
-      {/* Top Navigation & Airport Status Bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="label-caps text-accent">Airport Terminal & Wayfinding</span>
-            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.2 font-mono text-[9px] text-subtle">
-              {airportNode.region}
-            </span>
-          </div>
-          <h1 className="mt-1 flex flex-wrap items-center gap-2.5 text-2xl font-black tracking-tight text-ink">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8 lg:py-8">
+      <PageHeader
+        eyebrow={`Airport wayfinding · ${airportNode.region}`}
+        title={
+          <span className="flex flex-wrap items-center gap-2.5">
             <span>{airportNode.name}</span>
-            <span className="flex items-center rounded-lg border border-accent/40 bg-accent-soft px-2 py-0.5 font-mono text-xs font-bold text-accent">
+            <span className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-sm font-semibold text-accent">
               {airportNode.iata}
-              {airportNode.icao && <span className="ml-1 text-[10px] text-accent/70">/ {airportNode.icao}</span>}
+              {airportNode.icao && (
+                <span className="ml-1 text-xs font-normal text-accent/70">
+                  / {airportNode.icao}
+                </span>
+              )}
             </span>
             {layout && (
-              <span className="rounded-md border border-line bg-surface-2 px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+              <span className="rounded-md border border-line/70 px-2 py-0.5 font-mono text-sm font-medium text-muted">
                 {layout.terminalId}
               </span>
             )}
             {airportNode.historical && (
-              <span className="rounded-md border border-delayed/40 bg-delayed/10 px-2 py-0.5 text-[10px] font-bold text-delayed">
+              <span className="rounded-md border border-delayed/40 bg-delayed/10 px-2 py-0.5 text-xs font-semibold text-delayed">
                 Historical · closed
               </span>
             )}
-          </h1>
-          <p className="mt-0.5 text-xs text-muted">
+          </span>
+        }
+        description={
+          <>
             {airportNode.city}, {airportNode.country}
             {airportNode.timezone ? ` · ${airportNode.timezone}` : ""}
-            {airportNode.historical ? " · Historical · closed" : ""}
-          </p>
-        </div>
+            {" · "}
+            Grounds and indoor diagrams are a reference guide, not live
+            operational data.
+          </>
+        }
+        actions={
+          <>
+            <div className="flex rounded-lg border border-line/70 bg-surface-2/50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("GROUNDS")}
+                aria-pressed={viewMode === "GROUNDS"}
+                className={cn(
+                  "flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors",
+                  viewMode === "GROUNDS"
+                    ? "bg-surface-4 text-ink"
+                    : "text-muted hover:text-ink",
+                )}
+              >
+                <Compass className="size-3.5" />
+                Grounds
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (layout) setViewMode("INDOOR");
+                }}
+                disabled={!layout}
+                aria-pressed={viewMode === "INDOOR"}
+                className={cn(
+                  "flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors",
+                  viewMode === "INDOOR"
+                    ? "bg-surface-4 text-ink"
+                    : layout
+                      ? "text-muted hover:text-ink"
+                      : "cursor-not-allowed text-subtle opacity-40",
+                )}
+              >
+                <Layers className="size-3.5" />
+                Terminal
+              </button>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* View Mode Switcher */}
-          <div className="flex rounded-lg border border-line bg-surface-2 p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("GROUNDS")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
-                viewMode === "GROUNDS"
-                  ? "bg-accent text-[color:var(--bg)] shadow-sm"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <Compass className="size-3.5" />
-              Airfield & Grounds
-            </button>
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => {
-                if (layout) setViewMode("INDOOR");
+                setPickerSearch("");
+                setAirportPickerOpen(true);
               }}
-              disabled={!layout}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors",
-                viewMode === "INDOOR"
-                  ? "bg-accent text-[color:var(--bg)] shadow-sm"
-                  : layout
-                    ? "text-muted hover:text-ink"
-                    : "cursor-not-allowed opacity-40 text-subtle",
-              )}
             >
-              <Layers className="size-3.5" />
-              Terminal Concourse
-            </button>
-          </div>
-
-          <button
-            onClick={() => {
-              setPickerSearch("");
-              setAirportPickerOpen(true);
-            }}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-accent/40 bg-surface-2 px-3 text-xs font-bold text-accent transition-colors hover:bg-accent-soft"
-          >
-            <Building2 className="size-3.5" />
-            Switch Airport
-            <ChevronRight className="size-3" />
-          </button>
-
-          <Link href="/airplanes">
-            <Button size="sm" variant="outline">
-              <Plane className="size-3.5 text-accent" /> Aircraft Seatmaps
+              <Building2 className="size-4" />
+              Switch airport
             </Button>
-          </Link>
-        </div>
-      </div>
 
-      {/* Quick Hubs Strip */}
-      <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-        <span className="shrink-0 text-subtle font-medium mr-1 flex items-center gap-1">
-          <Sparkles className="size-3 text-accent" /> Featured Hubs:
+            <Link href="/airplanes">
+              <Button size="sm" variant="ghost">
+                <Plane className="size-4" /> Seatmaps
+              </Button>
+            </Link>
+          </>
+        }
+      />
+
+      {/* Quick hubs */}
+      <div className="mt-5 flex items-center gap-1.5 overflow-x-auto pb-1">
+        <span className="mr-1 flex shrink-0 items-center gap-1 text-xs text-subtle">
+          <Sparkles className="size-3.5" /> Featured hubs
         </span>
         {terminalLayouts.map((t) => (
           <button
             key={t.airportCode}
+            type="button"
             onClick={() => {
               setAirportCode(t.airportCode);
               setLevel(t.availableLevels[0] ?? 1);
               setSelected(null);
             }}
+            aria-pressed={t.airportCode === airportCode}
             className={cn(
-              "flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 transition-colors",
+              "flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors",
               t.airportCode === airportCode
-                ? "border-accent bg-accent-soft font-bold text-accent"
-                : "border-line bg-surface-2 text-muted hover:border-accent/40 hover:text-ink",
+                ? "border-accent/40 bg-accent-soft font-medium text-accent"
+                : "border-line/60 text-muted hover:border-line-strong hover:text-ink",
             )}
           >
-            <span className="font-mono font-bold">{t.airportCode}</span>
-            <span className="text-[10px] text-subtle">{t.city}</span>
-            <span className="size-1.5 rounded-full bg-cyan-400" />
+            <span className="font-mono font-semibold">{t.airportCode}</span>
+            <span className="text-subtle">{t.city}</span>
           </button>
         ))}
       </div>
 
-      <div className="mb-3">
+      <div className="mt-4">
         <DelayLoungeCard
           compact
           delayMinutes={Math.max(
@@ -453,46 +467,44 @@ export default function AirportsPage() {
       </div>
 
       {/* Static terminal data is a guide, not live operational data. */}
-      <div className="mb-3 flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft px-3 py-2 text-[10px] leading-relaxed text-muted">
-        <Info className="mt-0.5 size-3.5 shrink-0 text-accent" />
-        <span>
-          Terminal diagrams, amenity locations, walking distances, and wait
-          times are an illustrative reference guide. They are not live gate,
-          security, or facility data. Live flight status is shown separately
-          from AeroDataBox.
-        </span>
-      </div>
+      <Callout tone="info" className="mt-3">
+        Terminal diagrams, amenity locations, walking distances, and wait times
+        are an illustrative reference guide — not live gate, security, or
+        facility data. Live flight status is shown separately.
+      </Callout>
 
-      {/* Non-CAD Notice Banner (if in Grounds view for airports without pre-modeled indoor CAD) */}
+      {/* Non-CAD notice for airports without a modelled indoor schematic. */}
       {!layout && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <Info className="size-4 shrink-0 text-accent" />
-            <p className="text-xs text-muted">
-              <strong className="text-ink">{airportNode.name}</strong> airfield & terminal grounds map rendered from OpenStreetMap/OpenFreeMap vector tiles. Full multi-level indoor CAD schematics are currently active for premier hubs (CAI, DXB, LHR, JFK, SFO).
-            </p>
-          </div>
-          <button
+        <div className="mt-3 flex flex-col gap-3 rounded-lg border border-line/70 bg-surface-2/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[13px] leading-relaxed text-muted">
+            <strong className="font-medium text-ink">{airportNode.name}</strong>{" "}
+            airfield and terminal grounds are rendered from OpenStreetMap
+            vector tiles. Multi-level indoor schematics are available for CAI,
+            DXB, LHR, JFK and SFO.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
             onClick={() => {
               setAirportCode("CAI");
               setViewMode("INDOOR");
             }}
-            className="shrink-0 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent hover:bg-accent hover:text-[color:var(--bg)] transition-colors"
           >
-            Explore CAI Terminal 3 CAD
-          </button>
+            Open CAI T3
+          </Button>
         </div>
       )}
 
       {/* Main 3-Column Layout */}
-      <div className="grid gap-3.5 xl:grid-cols-[250px_minmax(0,1fr)_340px]">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_340px] xl:gap-6">
         {/* Left Sidebar: Controls & Concourse Levels */}
-        <aside className="space-y-3">
+        <aside className="space-y-4">
           {/* Level Switcher (When in Indoor CAD mode) */}
           {layout && floor ? (
-            <Panel className="p-3">
-              <p className="label-caps text-subtle">Terminal Levels</p>
-              <div className="mt-2 space-y-1.5">
+            <Panel className="p-4">
+              <p className="label-caps text-subtle">Terminal levels</p>
+              <div className="mt-2.5 space-y-1.5">
                 {layout.availableLevels.map((lvl) => {
                   const levelFloor = layout.floors[String(lvl)];
                   if (!levelFloor) return null;
@@ -501,24 +513,26 @@ export default function AirportsPage() {
                   return (
                     <button
                       key={lvl}
+                      type="button"
                       onClick={() => {
                         setLevel(lvl);
                         setSelected(null);
                         setViewMode("INDOOR");
                       }}
+                      aria-pressed={active}
                       className={cn(
-                        "flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left text-xs transition-colors",
+                        "flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 text-left text-[13px] transition-colors",
                         active
-                          ? "border-accent/60 bg-accent-soft font-bold text-accent"
-                          : "border-line bg-surface-2 text-ink hover:bg-surface-3",
+                          ? "border-accent/40 bg-accent-soft font-medium text-accent"
+                          : "border-line/70 bg-surface-2/40 text-ink hover:border-line-strong",
                       )}
                     >
-                      <div>
-                        <span className="font-mono font-bold">L{lvl}</span>{" "}
-                        <span className="font-medium text-[11px]">{levelFloor.levelName}</span>
-                      </div>
-                      <span className="rounded px-1.5 py-0.5 font-mono text-[9px] bg-surface text-subtle border border-line">
-                        {count} pts
+                      <span className="min-w-0 truncate">
+                        <span className="font-mono font-semibold">L{lvl}</span>{" "}
+                        <span className="text-muted">{levelFloor.levelName}</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-xs text-subtle">
+                        {count}
                       </span>
                     </button>
                   );
@@ -526,59 +540,79 @@ export default function AirportsPage() {
               </div>
 
               {/* Quick Gate Finder */}
-              <form onSubmit={handleGateJump} className="mt-3.5 border-t border-line/60 pt-3">
-                <label className="label-caps block text-[9px] text-subtle">Quick Gate Finder</label>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="e.g. G4, B14, A2..."
+              <form
+                onSubmit={handleGateJump}
+                className="mt-4 border-t border-line/60 pt-3"
+              >
+                <label
+                  htmlFor="gate-quick-jump"
+                  className="label-caps block text-subtle"
+                >
+                  Find a gate
+                </label>
+                <div className="mt-2 flex items-center gap-2">
+                  <TextInput
+                    id="gate-quick-jump"
                     value={gateQuickJump}
                     onChange={(e) => setGateQuickJump(e.target.value)}
-                    className="h-8 w-full rounded-md border border-line bg-surface px-2.5 text-xs text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
+                    placeholder="B14"
+                    maxLength={6}
+                    className="h-10 font-mono uppercase"
+                    autoComplete="off"
+                    spellCheck={false}
                   />
-                  <Button type="submit" size="sm" variant="outline" className="h-8 px-2.5 text-xs">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                  >
                     Find
                   </Button>
                 </div>
               </form>
             </Panel>
           ) : (
-            <Panel className="p-3">
-              <p className="label-caps text-subtle">Airfield Specifications</p>
-              <div className="mt-2 space-y-2 text-xs">
-                <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
-                  <span>IATA / ICAO:</span>
-                  <span className="font-mono font-bold text-ink">{airportNode.iata} / {airportNode.icao || "—"}</span>
+            <Panel className="p-4">
+              <p className="label-caps text-subtle">Airfield</p>
+              <dl className="mt-2.5 space-y-2.5 text-[13px]">
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-muted">IATA / ICAO</dt>
+                  <dd className="text-right font-mono font-medium text-ink">
+                    {airportNode.iata} / {airportNode.icao || "—"}
+                  </dd>
                 </div>
-                <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
-                  <span>Timezone:</span>
-                  <span className="font-mono text-ink">{airportNode.timezone || "Not reported"}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-muted">Timezone</dt>
+                  <dd className="text-right font-mono text-ink">
+                    {airportNode.timezone || "Not reported"}
+                  </dd>
                 </div>
-                <div className="flex justify-between border-b border-line/60 pb-1.5 text-muted">
-                  <span>Hub Carriers:</span>
-                  <span className="font-semibold text-ink text-right truncate max-w-[140px]">
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-muted">Hub carriers</dt>
+                  <dd className="max-w-[150px] text-right text-ink">
                     {airportNode.hubAirlines?.length
                       ? airportNode.hubAirlines.join(", ")
                       : "Not reported"}
-                  </span>
+                  </dd>
                 </div>
-                <div className="flex justify-between text-muted">
-                  <span>Direct Routes:</span>
-                  <span className="font-mono font-bold text-accent">
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-muted">Direct routes</dt>
+                  <dd className="text-right font-medium text-ink">
                     {airportNode.destCount != null
-                      ? `${airportNode.destCount} catalog reference destinations`
-                      : "Destination count not reported"}
-                  </span>
+                      ? `${airportNode.destCount} in catalog`
+                      : "Not reported"}
+                  </dd>
                 </div>
-              </div>
+              </dl>
             </Panel>
           )}
 
           {/* Amenity Category Filter (Indoor Mode) */}
           {layout && floor && (
-            <Panel className="p-3">
-              <p className="label-caps text-subtle">Indoor Categories</p>
-              <div className="mt-2 space-y-1">
+            <Panel className="p-4">
+              <p className="label-caps text-subtle">Indoor categories</p>
+              <div className="mt-2.5 space-y-1">
                 {CATEGORY_ORDER.map((cat) => {
                   const meta = AMENITY_META[cat];
                   const Icon = CATEGORY_ICONS[cat];
@@ -590,27 +624,24 @@ export default function AirportsPage() {
                   return (
                     <button
                       key={cat}
+                      type="button"
                       onClick={() => setCategory(cat)}
+                      aria-pressed={active}
                       className={cn(
-                        "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors",
+                        "flex min-h-10 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors",
                         active
-                          ? "bg-accent-soft font-bold text-accent"
+                          ? "bg-accent-soft font-medium text-accent"
                           : "text-muted hover:bg-surface-2 hover:text-ink",
                       )}
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
                         <Icon
-                          className="size-3.5"
+                          className="size-3.5 shrink-0"
                           style={{ color: active ? undefined : meta.color }}
                         />
-                        <span>{meta.label}</span>
+                        <span className="truncate">{meta.label}</span>
                       </span>
-                      <span
-                        className={cn(
-                          "rounded px-1.5 font-mono text-[9px]",
-                          active ? "bg-accent/20 text-accent font-bold" : "text-subtle",
-                        )}
-                      >
+                      <span className="shrink-0 font-mono text-xs text-subtle">
                         {count}
                       </span>
                     </button>
@@ -622,38 +653,36 @@ export default function AirportsPage() {
 
           {/* Wayfinding Walk Engine Summary */}
           {layout && floor && (
-            <Panel className="p-3">
-              <p className="label-caps text-subtle">Wayfinding Engine</p>
-              <div className="mt-2 space-y-2 text-xs">
-                <div className="flex items-center justify-between text-muted">
-                  <span className="flex items-center gap-1.5">
-                    <Shield className="size-3.5 text-red-400" /> Origin:
+            <Panel className="p-4">
+              <p className="label-caps text-subtle">Wayfinding</p>
+              <div className="mt-2.5 space-y-2.5 text-[13px]">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <Shield className="size-3.5 shrink-0" /> Origin
                   </span>
-                  <span className="font-semibold text-ink">
-                    Security checkpoint (reference)
+                  <span className="text-right font-medium text-ink">
+                    Security (reference)
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-muted">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="size-3.5 text-accent" /> Destination:
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <MapPin className="size-3.5 shrink-0" /> Destination
                   </span>
-                  <span className="font-semibold text-ink truncate max-w-[130px]">
-                    {selected ? selected.name : "Select point on map"}
+                  <span className="max-w-[150px] truncate text-right font-medium text-ink">
+                    {selected ? selected.name : "None selected"}
                   </span>
                 </div>
 
                 {selected && (
-                  <div className="mt-2 rounded-lg border border-accent/30 bg-accent-soft p-2.5 text-accent">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-bold">
-                        <Footprints className="size-3.5" /> Walk time:
+                  <div className="rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-muted">
+                        <Footprints className="size-3.5" /> Walk time
                       </span>
-                      <span className="font-mono text-sm font-black text-ink">
-                        Illustrative
-                      </span>
+                      <span className="font-medium text-ink">Illustrative</span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-[9px] text-subtle">
-                      <span>Concourse distance:</span>
+                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-subtle">
+                      <span>Distance</span>
                       <span className="font-mono">Not reported</span>
                     </div>
                   </div>
@@ -664,7 +693,7 @@ export default function AirportsPage() {
         </aside>
 
         {/* Center Main Viewport */}
-        <main className="space-y-3">
+        <div className="min-w-0 space-y-4">
           {viewMode === "INDOOR" && layout && floor ? (
             <TerminalMap
               layout={layout}
@@ -673,12 +702,12 @@ export default function AirportsPage() {
               selectedAmenity={selected}
               showWalkingRoute={walkingRoute}
               onSelectAmenity={selectAmenity}
-              className="h-[580px] w-full"
+              className="h-[520px] w-full lg:h-[600px]"
             />
           ) : (
             <AirportGroundsMap
               airport={airportNode}
-              className="h-[580px] w-full"
+              className="h-[520px] w-full lg:h-[600px]"
               hasIndoorSchematic={Boolean(layout)}
               onSelectTerminal={() => {
                 if (layout) setViewMode("INDOOR");
@@ -742,100 +771,106 @@ export default function AirportsPage() {
               />
             </div>
           )}
-        </main>
+        </div>
 
         {/* Right Sidebar: Item Details, Boarding Flights, and Amenity Directory */}
-        <aside className="space-y-3">
+        <aside className="space-y-4">
           {/* Selected Item Details */}
           {selected && (
-            <Panel className="p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
+            <Panel className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <span
-                    className="inline-block rounded px-2 py-0.5 text-[9px] font-bold text-white shadow-sm"
+                    className="inline-block rounded-md px-2 py-1 text-xs font-medium text-[color:var(--bg)]"
                     style={{ backgroundColor: AMENITY_META[selected.category].color }}
                   >
                     {AMENITY_META[selected.category].label}
                   </span>
-                  <h3 className="mt-1 text-sm font-black text-ink">{selected.name}</h3>
-                  <p className="text-[11px] text-muted">{selected.locationDescription}</p>
+                  <h2 className="mt-2 text-[15px] font-semibold text-ink">
+                    {selected.name}
+                  </h2>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+                    {selected.locationDescription}
+                  </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelected(null)}
-                  className="rounded p-1 text-subtle hover:bg-surface-2 hover:text-ink"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-md text-subtle transition-colors hover:bg-surface-2 hover:text-ink"
                   aria-label="Close details"
                 >
                   <X className="size-4" />
                 </button>
               </div>
 
-              <div className="mt-3 space-y-2 border-t border-line/60 pt-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-muted">
-                    <Clock className="size-3.5 text-accent" /> Walk from security
-                  </span>
-                  <span className="font-mono font-bold text-accent">
-                    Illustrative
-                  </span>
+              <dl className="mt-3 space-y-2.5 border-t border-line/60 pt-3 text-[13px]">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="flex items-center gap-1.5 text-muted">
+                    <Clock className="size-3.5" /> Walk from security
+                  </dt>
+                  <dd className="font-medium text-ink">Illustrative</dd>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-muted">
-                    <Footprints className="size-3.5" /> Distance from security
-                  </span>
-                  <span className="font-mono text-ink">Not reported</span>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="flex items-center gap-1.5 text-muted">
+                    <Footprints className="size-3.5" /> Distance
+                  </dt>
+                  <dd className="font-mono text-ink">Not reported</dd>
                 </div>
                 {selected.openingHours && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted">Opening hours</span>
-                    <span className="font-medium text-ink">{selected.openingHours}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted">Opening hours</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {selected.openingHours}
+                    </dd>
                   </div>
                 )}
                 {selected.accessInfo && (
-                  <div className="rounded-md bg-surface-2 p-2">
-                    <span className="text-[9px] uppercase tracking-wider text-subtle font-semibold">
-                      Access & Eligibility
-                    </span>
-                    <p className="mt-0.5 text-[11px] text-muted">{selected.accessInfo}</p>
+                  <div className="rounded-lg bg-surface-2/50 p-3">
+                    <p className="label-caps text-subtle">Access</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted">
+                      {selected.accessInfo}
+                    </p>
                   </div>
                 )}
                 {selected.features && selected.features.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
                     {selected.features.map((feature, i) => (
                       <span
                         key={i}
-                        className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[9px] text-muted"
+                        className="rounded-md bg-surface-2 px-2 py-1 text-xs text-muted"
                       >
                         {feature}
                       </span>
                     ))}
                   </div>
                 )}
-              </div>
+              </dl>
 
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-1 text-xs"
+                  className="flex-1"
                   onClick={() => setWalkingRoute((val) => !val)}
                 >
-                  <Navigation className="size-3.5" />
+                  <Navigation className="size-4" />
                   {walkingRoute ? "Hide route" : "Show route"}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
+                  aria-label="Share wayfinding info"
+                  title="Share wayfinding info"
                   onClick={() => {
-                    const text = `${airportNode.iata} Terminal ${layout?.terminalId ?? ""} - ${selected.name} (${selected.locationDescription})`;
+                    const text = `${airportNode.iata} Terminal ${layout?.terminalId ?? ""} — ${selected.name} (${selected.locationDescription})`;
                     if (navigator.share) {
                       navigator.share({ title: selected.name, text }).catch(() => {});
                     } else {
-                      navigator.clipboard.writeText(text);
+                      void navigator.clipboard.writeText(text);
                     }
                   }}
-                  title="Share wayfinding info"
                 >
-                  <Share2 className="size-3.5" />
+                  <Share2 className="size-4" />
                 </Button>
               </div>
             </Panel>
@@ -846,17 +881,21 @@ export default function AirportsPage() {
             flightsLoading ||
             Boolean(selected?.gateNumber) ||
             Boolean(flightsError)) && (
-            <Panel className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="label-caps text-subtle flex items-center gap-1">
-                  <PlaneTakeoff className="size-3 text-accent" />
-                  {selected?.gateNumber ? `Departures at Gate ${selected.gateNumber}` : `Upcoming Departures (${airportNode.iata})`}
-                </p>
+            <Panel className="p-4">
+              <div className="mb-2.5 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="label-caps flex items-center gap-1.5 text-subtle">
+                    <PlaneTakeoff className="size-3.5" />
+                    {selected?.gateNumber
+                      ? `Gate ${selected.gateNumber}`
+                      : `${airportNode.iata} departures`}
+                  </p>
+                </div>
                 {flightsLoading ? (
-                  <span className="font-mono text-[9px] text-accent animate-pulse">Syncing...</span>
+                  <span className="shrink-0 text-xs text-accent">Syncing…</span>
                 ) : (
-                  <span className="font-mono text-[9px] text-muted">
-                    {gateDepartures.length} flights
+                  <span className="shrink-0 font-mono text-xs text-subtle">
+                    {gateDepartures.length}
                     {flightsFetchedAt
                       ? ` · ${new Date(flightsFetchedAt).toLocaleTimeString()}`
                       : ""}
@@ -864,18 +903,20 @@ export default function AirportsPage() {
                 )}
               </div>
               {flightsLoading && gateDepartures.length === 0 ? (
-                <p className="py-4 text-center text-xs text-subtle">Loading airport departures...</p>
+                <p className="py-4 text-center text-[13px] text-subtle">
+                  Loading airport departures…
+                </p>
               ) : flightsError ? (
-                <p className="py-4 text-center text-xs leading-relaxed text-delayed">
+                <p className="py-4 text-center text-[13px] leading-relaxed text-delayed">
                   {flightsError} No substitute board is shown.
                 </p>
               ) : gateDepartures.length === 0 ? (
-                <p className="py-4 text-center text-xs leading-relaxed text-muted">
+                <p className="py-4 text-center text-[13px] leading-relaxed text-muted">
                   No departures from {airportCode}
                   {selected?.gateNumber
-                    ? ` at Gate ${selected.gateNumber}`
+                    ? ` at gate ${selected.gateNumber}`
                     : ""}{" "}
-                  were returned by AeroDataBox&apos;s current board. This is not
+                  were returned by the provider&apos;s current board. This is not
                   proof that no flight operates.
                 </p>
               ) : (
@@ -883,29 +924,43 @@ export default function AirportsPage() {
                   {gateDepartures.map((flight) => (
                     <Link
                       key={`${flight.id}-${flight.flightDate ?? "any"}`}
-                      href={`/flight/${encodeURIComponent(flight.id)}`}
-                      className="flex items-center justify-between rounded-lg border border-line bg-surface-2 p-2 transition-colors hover:border-accent/40"
+                      href={
+                        flight.flightDate
+                          ? `/flight/${encodeURIComponent(flight.id)}?date=${encodeURIComponent(flight.flightDate)}`
+                          : `/flight/${encodeURIComponent(flight.id)}`
+                      }
+                      className="flex min-h-14 items-center justify-between gap-2 rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2 transition-colors hover:border-line-strong"
                     >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs font-bold text-ink">{flight.flightNumber}</span>
-                          <span className="text-[10px] text-subtle truncate max-w-[90px]">{flight.airline}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[13px] font-semibold text-ink">
+                            {flight.flightNumber}
+                          </span>
+                          <span className="truncate text-xs text-subtle">
+                            {flight.airline}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] text-muted mt-0.5">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
                           <span>{flight.origin.code}</span>
-                          <ArrowRight className="size-2.5 text-subtle" />
-                          <span className="font-semibold text-ink">{flight.destination.code}</span>
+                          <ArrowRight className="size-3 text-subtle" />
+                          <span className="font-medium text-ink">
+                            {flight.destination.code}
+                          </span>
                           {normalizeGate(flight.gateDeparture) && (
-                            <span className="font-mono text-[9px] text-accent ml-1">Gate {flight.gateDeparture}</span>
+                            <span className="ml-1 font-mono text-accent">
+                              {flight.gateDeparture}
+                            </span>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="shrink-0 text-right">
                         <StatusBadge
                           status={flight.status}
                           statusReported={flight.statusReported}
                         />
-                        <p className="mt-0.5 font-mono text-[9px] text-subtle">{flight.departureTimeScheduled}</p>
+                        <p className="mt-1 font-mono text-xs text-subtle">
+                          {flight.departureTimeScheduled}
+                        </p>
                       </div>
                     </Link>
                   ))}
@@ -916,68 +971,70 @@ export default function AirportsPage() {
 
           {/* Directory Search & List (When CAD layout is available) */}
           {layout && floor && (
-            <Panel className="flex max-h-[460px] flex-col p-3">
-              <div className="mb-2">
-                <p className="label-caps text-subtle">Terminal Directory</p>
-                <div className="relative mt-1.5">
-                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-subtle" />
-                  <input
-                    type="text"
-                    placeholder="Search gate, lounge, coffee..."
+            <Panel className="flex max-h-[480px] flex-col p-4">
+              <div>
+                <p className="label-caps text-subtle">Terminal directory</p>
+                <div className="relative mt-2">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
+                  <TextInput
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="h-8 w-full rounded-md border border-line bg-surface-2 pl-8 pr-7 text-xs text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
+                    placeholder="Gate, lounge, coffee…"
+                    className="h-10 pl-9 pr-9"
+                    aria-label="Search terminal directory"
+                    autoComplete="off"
                   />
                   {query && (
                     <button
+                      type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
+                      className="absolute right-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:text-ink"
+                      aria-label="Clear search"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-4" />
                     </button>
                   )}
                 </div>
               </div>
 
-              <div className="flex-1 divide-y divide-line/40 overflow-y-auto pr-1">
+              <div className="mt-2 flex-1 divide-y divide-line/40 overflow-y-auto pr-1">
                 {amenities.map((item) => {
                   const isSelected = selected?.id === item.id;
                   const meta = AMENITY_META[item.category];
                   return (
                     <button
                       key={item.id}
+                      type="button"
                       onClick={() => selectAmenity(item)}
                       className={cn(
-                        "flex w-full items-center justify-between py-2 text-left transition-colors",
+                        "flex min-h-14 w-full items-center justify-between gap-2 py-2.5 text-left transition-colors",
                         isSelected
-                          ? "bg-accent-soft px-1.5 font-bold text-accent"
-                          : "hover:bg-surface-2 hover:px-1.5",
+                          ? "rounded-md bg-accent-soft px-2 font-medium text-accent"
+                          : "px-2 text-muted hover:bg-surface-2",
                       )}
                     >
-                      <div className="min-w-0 pr-2">
-                        <div className="flex items-center gap-1.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
                           <span
-                            className="size-1.5 rounded-full shrink-0"
+                            className="size-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: meta.color }}
                           />
-                          <span className="truncate text-xs font-semibold text-ink">
+                          <span className="truncate text-[13px] font-medium text-ink">
                             {item.name}
                           </span>
                         </div>
-                        <span className="block truncate text-[10px] text-subtle">
+                        <span className="mt-0.5 block truncate text-xs text-subtle">
                           {item.locationDescription}
                         </span>
                       </div>
-                      <span className="shrink-0 font-mono text-[10px] text-muted">
-                        Ref
-                      </span>
+                      <ChevronRight className="size-4 shrink-0 text-subtle" />
                     </button>
                   );
                 })}
                 {amenities.length === 0 && (
-                  <div className="py-6 text-center text-xs text-subtle">
-                    No indoor points match your filter on this level.
-                  </div>
+                  <p className="py-6 text-center text-[13px] leading-relaxed text-subtle">
+                    No indoor points match this filter on this level.
+                  </p>
                 )}
               </div>
             </Panel>
@@ -989,101 +1046,122 @@ export default function AirportsPage() {
       <Modal
         open={airportPickerOpen}
         onClose={() => setAirportPickerOpen(false)}
-        title="Select Airport or Terminal Map"
+        title="Select airport"
+        subtitle="Search the worldwide reference catalog, or pick a modelled terminal."
+        size="md"
       >
-        <div className="space-y-3 py-1">
-          {/* Search bar */}
+        <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-subtle" />
-            <input
-              type="text"
-              placeholder="Search worldwide by city, name, or IATA code (e.g. CAI, JFK, London, Tokyo)..."
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
+            <TextInput
               value={pickerSearch}
               onChange={(e) => setPickerSearch(e.target.value)}
-              className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-9 pr-7 text-xs text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
+              placeholder="City, airport name or IATA code"
+              className="pl-9 pr-9"
+              aria-label="Search airports"
+              autoComplete="off"
+              spellCheck={false}
             />
             {pickerSearch && (
               <button
+                type="button"
                 onClick={() => setPickerSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle hover:text-ink"
+                className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-subtle hover:text-ink"
+                aria-label="Clear search"
               >
-                <X className="size-3.5" />
+                <X className="size-4" />
               </button>
             )}
           </div>
 
-          {/* Filtered Search Results */}
           {pickerSearch.trim() ? (
-            <div className="max-h-[360px] divide-y divide-line/40 overflow-y-auto pr-1">
+            <div className="max-h-[400px] divide-y divide-line/50 overflow-y-auto pr-1">
               {filteredAirports.map((airport) => {
-                const hasCAD = terminalLayouts.some((t) => t.airportCode === airport.iata);
+                const hasCAD = terminalLayouts.some(
+                  (t) => t.airportCode === airport.iata,
+                );
                 return (
                   <button
                     key={airport.iata}
+                    type="button"
                     onClick={() => {
                       setAirportCode(airport.iata);
                       setAirportPickerOpen(false);
                     }}
-                    className="flex w-full items-center justify-between py-2 text-left hover:bg-surface-2 px-2 rounded-lg transition-colors"
+                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-accent">{airport.iata}</span>
-                        <span className="text-xs font-bold text-ink">{airport.name}</span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[13px] font-semibold text-accent">
+                          {airport.iata}
+                        </span>
+                        <span className="truncate text-[13px] font-medium text-ink">
+                          {airport.name}
+                        </span>
                         {hasCAD && (
-                          <span className="rounded bg-cyan-400/20 px-1.5 py-0.2 font-mono text-[8px] font-bold text-cyan-400">
-                            CAD INDOOR
+                          <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-xs text-accent">
+                            Indoor
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-muted">
+                      <p className="mt-0.5 truncate text-xs text-muted">
                         {airport.city}, {airport.country}
                         {airport.timezone ? ` · ${airport.timezone}` : ""}
                         {airport.historical ? " · historical" : ""}
                       </p>
                     </div>
-                    <ChevronRight className="size-3.5 text-subtle" />
+                    <ChevronRight className="size-4 shrink-0 text-subtle" />
                   </button>
                 );
               })}
               {filteredAirports.length === 0 && (
-                <p className="py-6 text-center text-xs text-subtle">No airports found matching &ldquo;{pickerSearch}&rdquo;.</p>
+                <p className="py-8 text-center text-[13px] text-subtle">
+                  No airports match &ldquo;{pickerSearch}&rdquo;.
+                </p>
               )}
             </div>
           ) : (
             <div>
-              <p className="label-caps mb-2 text-subtle">Premier Hubs with Multi-Level Indoor CAD Maps</p>
-              <div className="grid gap-2 sm:grid-cols-2 max-h-[340px] overflow-y-auto pr-1">
+              <p className="label-caps mb-2 text-subtle">
+                Modelled terminals
+              </p>
+              <div className="grid max-h-[380px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                 {terminalLayouts.map((t) => (
                   <button
                     key={t.airportCode}
+                    type="button"
                     onClick={() => {
                       setAirportCode(t.airportCode);
                       setLevel(t.availableLevels[0] ?? 1);
                       setSelected(null);
                       setAirportPickerOpen(false);
                     }}
+                    aria-pressed={t.airportCode === airportCode}
                     className={cn(
-                      "flex items-center justify-between rounded-xl border p-2.5 text-left transition-colors",
+                      "flex min-h-16 items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors",
                       t.airportCode === airportCode
-                        ? "border-accent bg-accent-soft"
-                        : "border-line bg-surface-2 hover:bg-surface-3",
+                        ? "border-accent/40 bg-accent-soft"
+                        : "border-line/60 bg-surface-2/40 hover:border-line-strong",
                     )}
                   >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-sm font-black text-accent">{t.airportCode}</span>
-                        <span className="text-xs font-bold text-ink">{t.airportName}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-accent">
+                          {t.airportCode}
+                        </span>
+                        <span className="truncate text-[13px] font-medium text-ink">
+                          {t.airportName}
+                        </span>
                       </div>
-                      <p className="mt-0.5 text-[10px] text-muted">
+                      <p className="mt-0.5 truncate text-xs text-muted">
                         {t.terminalName} · {t.city}
                       </p>
-                      <span className="mt-1 inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.2 font-mono text-[9px] text-accent">
-                        <Layers className="size-2.5" />
-                        {t.availableLevels.length} levels · {t.amenities.length} indoor points
-                      </span>
+                      <p className="mt-1 flex items-center gap-1 font-mono text-xs text-subtle">
+                        <Layers className="size-3" />
+                        {t.availableLevels.length} levels · {t.amenities.length} points
+                      </p>
                     </div>
-                    <ChevronRight className="size-4 text-subtle" />
+                    <ChevronRight className="size-4 shrink-0 text-subtle" />
                   </button>
                 ))}
               </div>

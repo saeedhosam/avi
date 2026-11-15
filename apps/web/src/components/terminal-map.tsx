@@ -83,7 +83,7 @@ export function TerminalMap({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-line bg-surface",
+        "relative overflow-hidden rounded-xl border border-line/70 bg-surface",
         className,
       )}
     >
@@ -438,41 +438,44 @@ export function TerminalMap({
         </g>
       </svg>
 
-      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-lg border border-line/70 bg-surface/85 px-2 py-1 backdrop-blur">
-        <Route className="size-3 text-accent" />
-        <span className="text-[9px] font-bold uppercase tracking-wider text-ink">
+      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-lg border border-line/70 bg-surface/95 px-2.5 py-1.5 backdrop-blur">
+        <Route className="size-3.5 text-accent" />
+        <span className="text-xs font-medium text-ink">
           Level {floor.level} · {floor.levelName}
         </span>
       </div>
 
-      <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+      <div className="absolute bottom-3 right-3 flex flex-col gap-1 rounded-lg border border-line/70 bg-surface/95 p-1 backdrop-blur">
         <button
+          type="button"
           onClick={() => setZoom((value) => Math.min(2.8, value + 0.25))}
-          className="flex size-7 items-center justify-center rounded-md border border-line/70 bg-surface/90 text-muted backdrop-blur transition-colors hover:text-accent"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Zoom in"
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-4" />
         </button>
         <button
+          type="button"
           onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
-          className="flex size-7 items-center justify-center rounded-md border border-line/70 bg-surface/90 text-muted backdrop-blur transition-colors hover:text-accent"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Zoom out"
         >
-          <Minus className="size-3.5" />
+          <Minus className="size-4" />
         </button>
         <button
+          type="button"
           onClick={() => {
             setZoom(1);
             setPan({ x: 0, y: 0 });
           }}
-          className="flex size-7 items-center justify-center rounded-md border border-line/70 bg-surface/90 text-muted backdrop-blur transition-colors hover:text-accent"
+          className="flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Reset map view"
         >
-          <RotateCcw className="size-3.5" />
+          <RotateCcw className="size-4" />
         </button>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border border-line/70 bg-surface/85 px-2 py-1 text-[8px] font-semibold text-subtle backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border border-line/70 bg-surface/95 px-2.5 py-1.5 text-xs text-subtle backdrop-blur">
         {layout.airportCode} {layout.terminalId} · {amenities.length} amenities ·{" "}
         {zoom.toFixed(1)}×
       </div>

@@ -14,7 +14,7 @@ import {
 import { getSupabase } from "@/lib/supabase";
 import { useApp, type AccountUsage } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui";
+import { Button, Callout, PageHeader, Panel } from "@/components/ui";
 
 type CheckoutTarget = "PLUS" | "PRO" | "TRIP_PASS";
 
@@ -49,13 +49,7 @@ const TRIP_PASS_FEATURES = [
 ];
 
 export function PricingContent() {
-  const {
-    account,
-    accountUsage,
-    refreshUsage,
-    signIn,
-    authBusy,
-  } = useApp();
+  const { account, accountUsage, refreshUsage, signIn, authBusy } = useApp();
   const [checkingBilling, setCheckingBilling] = useState(false);
   const [busy, setBusy] = useState<CheckoutTarget | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -81,9 +75,7 @@ export function PricingContent() {
   // provider. The trip pass has its own hosted-checkout seam on the gateway,
   // so it is allowed to answer for itself (including a graceful 503).
   const planDisabled =
-    busy !== null ||
-    checkingBilling ||
-    (account.isSignedIn && !billingReady);
+    busy !== null || checkingBilling || (account.isSignedIn && !billingReady);
   const tripPassDisabled = busy !== null;
   const proIsCurrent = accountUsage?.plan === "PRO";
   const plusIsCurrent =
@@ -252,47 +244,45 @@ export function PricingContent() {
 
   return (
     <>
-      <header className="mb-6">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
-          <CreditCard className="size-3.5" />
-          Plans &amp; trip pass
-        </div>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-ink lg:text-5xl">
-          Pay for the trip, not the browsing
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-          The route explorer, flight lookup, 2D terminal maps, and 3D cabin
-          preview stay free. Choose Pro for year-round live travel tools, or a
-          one-time $4.99 Single-Trip Pass when you only need them for one trip.
-        </p>
-      </header>
-
-      <BillingState
-        signedIn={account.isSignedIn}
-        checking={checkingBilling}
-        usage={accountUsage}
-        authBusy={authBusy}
-        onSignIn={() => void signIn()}
-        onRetry={checkBilling}
+      <PageHeader
+        eyebrow="Plans & trip pass"
+        title="Pay for the trip, not the browsing"
+        description="The route explorer, flight lookup, 2D terminal maps, and 3D cabin preview stay free. Choose Pro for year-round live travel tools, or a one-time $4.99 Single-Trip Pass when you only need them for one trip."
+        actions={
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-line/70 bg-surface-2/50 px-3 py-2 text-xs font-medium text-muted">
+            <CreditCard className="size-3.5" />
+            USD · hosted checkout
+          </span>
+        }
       />
 
+      <div className="mt-5">
+        <BillingState
+          signedIn={account.isSignedIn}
+          checking={checkingBilling}
+          usage={accountUsage}
+          authBusy={authBusy}
+          onSignIn={() => void signIn()}
+          onRetry={checkBilling}
+        />
+      </div>
+
       {feedback ? (
-        <div
-          role="status"
-          className={cn(
-            "mt-3 rounded-2xl border px-4 py-3 text-xs leading-relaxed",
+        <Callout
+          tone={
             feedback.kind === "error"
-              ? "border-cancelled/45 bg-cancelled/10 text-ink"
+              ? "danger"
               : feedback.kind === "success"
-                ? "border-landed/45 bg-landed/10 text-ink"
-                : "border-accent/40 bg-accent-soft text-ink",
-          )}
+                ? "success"
+                : "info"
+          }
+          className="mt-3"
         >
           {feedback.message}
-        </div>
+        </Callout>
       ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-4 lg:grid-cols-3">
         <PlanCard
           icon={<ShieldCheck className="size-4" />}
           name="AeroQuest Free"
@@ -303,7 +293,7 @@ export function PricingContent() {
           cta={
             <Link
               href="/explore/CAI"
-              className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-line bg-surface-2 text-sm font-semibold text-ink transition-colors hover:border-accent/50 hover:text-accent"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-line-strong/60 text-sm font-semibold text-ink transition-colors hover:border-accent/50 hover:text-accent"
             >
               Start exploring
             </Link>
@@ -319,7 +309,7 @@ export function PricingContent() {
           features={PRO_FEATURES}
           featured
           cta={
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <Button
                 className="w-full"
                 disabled={planDisabled || proIsCurrent}
@@ -330,13 +320,15 @@ export function PricingContent() {
                 ) : (
                   <BadgeCheck className="size-4" />
                 )}
-                {proIsCurrent ? "Current plan" : planLabel("PRO", "Upgrade to Pro")}
+                {proIsCurrent
+                  ? "Current plan"
+                  : planLabel("PRO", "Upgrade to Pro")}
               </Button>
               <button
                 type="button"
                 disabled={planDisabled || plusIsCurrent}
                 onClick={() => void startCheckout("PLUS")}
-                className="w-full text-center text-[10px] font-semibold leading-relaxed text-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full text-center text-xs leading-relaxed text-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {plusIsCurrent ? "Included in your plan" : plusLabel}
               </button>
@@ -346,7 +338,7 @@ export function PricingContent() {
 
         <PlanCard
           icon={<Ticket className="size-4" />}
-          name="$4.99 Single-Trip Pass"
+          name="Single-Trip Pass"
           price="$4.99"
           cadence="one-time"
           description="One payment unlocks the Pro travel features for a single trip."
@@ -372,7 +364,7 @@ export function PricingContent() {
                       ? "Opening checkout…"
                       : "Buy Single-Trip Pass"}
               </Button>
-              <p className="mt-2 text-center text-[9px] leading-relaxed text-subtle">
+              <p className="mt-2.5 text-center text-xs leading-relaxed text-subtle">
                 Trip-pass availability is confirmed by the gateway at checkout.
                 If it isn&apos;t configured, nothing is charged. The trip pass
                 is separate from the Plus/Pro subscription provider.
@@ -382,7 +374,7 @@ export function PricingContent() {
         />
       </div>
 
-      <div className="mt-5 space-y-2 rounded-2xl border border-line/80 bg-surface p-4 text-[10px] leading-relaxed text-subtle">
+      <Panel className="mt-5 space-y-2.5 p-4 text-xs leading-relaxed text-subtle">
         <p>
           Prices are in USD. Subscriptions renew monthly until cancelled; the
           Single-Trip Pass is a one-time purchase. Tax and final currency are
@@ -394,7 +386,7 @@ export function PricingContent() {
           or pass is granted. Free features remain available whether or not
           checkout is configured.
         </p>
-      </div>
+      </Panel>
     </>
   );
 }
@@ -416,10 +408,10 @@ function BillingState({
 }) {
   if (!signedIn) {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-line/70 bg-surface/70 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" />
-          <p className="text-xs leading-relaxed text-muted">
+          <p className="text-[13px] leading-relaxed text-muted">
             Sign in with Google before buying a plan or trip pass. Browsing the
             route explorer and cabin preview stays free without an account.
           </p>
@@ -433,7 +425,7 @@ function BillingState({
 
   if (checking) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-4 text-xs text-muted">
+      <div className="flex items-center gap-2 rounded-lg border border-line/70 bg-surface/70 p-4 text-[13px] text-muted">
         <Loader2 className="size-4 animate-spin text-accent" />
         Checking billing availability with the gateway…
       </div>
@@ -442,9 +434,11 @@ function BillingState({
 
   if (usage?.billing.upgradeEnabled) {
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-landed/35 bg-landed/10 p-4 text-xs text-ink">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-landed/30 bg-landed/8 p-4 text-[13px] text-ink">
         <BadgeCheck className="size-4 text-landed" />
-        <span className="font-semibold">Subscription checkout is configured.</span>
+        <span className="font-semibold">
+          Subscription checkout is configured.
+        </span>
         <span className="text-muted">
           Current plan: <strong className="text-ink">{usage.plan}</strong>
           {usage.tripPass?.active && usage.tripPass.expiresAt
@@ -457,26 +451,21 @@ function BillingState({
 
   if (usage) {
     return (
-      <div className="rounded-2xl border border-delayed/35 bg-delayed/10 p-4 text-xs leading-relaxed text-ink">
-        <p className="font-semibold">
-          Subscription checkout is not configured in this build.
-        </p>
-        <p className="mt-1 text-muted">
-          The billing provider is <strong className="text-ink">{usage.billing.provider}</strong>,
-          so Plus and Pro are assigned manually today. The Single-Trip Pass uses
-          its own hosted checkout and reports whether it is available when you
-          continue.
-        </p>
-      </div>
+      <Callout tone="attention" title="Subscription checkout is not configured">
+        The billing provider is{" "}
+        <strong className="text-ink">{usage.billing.provider}</strong>, so Plus
+        and Pro are assigned manually today. The Single-Trip Pass uses its own
+        hosted checkout and reports whether it is available when you continue.
+      </Callout>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-delayed/35 bg-delayed/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs leading-relaxed text-ink">
+    <div className="flex flex-col gap-3 rounded-lg border border-delayed/30 bg-delayed/8 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-[13px] leading-relaxed text-muted">
         Subscription billing availability could not be confirmed from the
-        gateway. The Single-Trip Pass checkout reports its own availability
-        when you continue.
+        gateway. The Single-Trip Pass checkout reports its own availability when
+        you continue.
       </p>
       <Button size="sm" variant="outline" onClick={onRetry}>
         Retry
@@ -507,44 +496,47 @@ function PlanCard({
   return (
     <section
       className={cn(
-        "flex flex-col rounded-3xl border p-5",
+        "flex h-full flex-col rounded-xl border p-5",
         featured
-          ? "border-accent/50 bg-accent-soft shadow-[0_20px_60px_-35px_rgba(0,229,255,0.55)]"
-          : "border-line bg-surface",
+          ? "border-accent/35 bg-surface shadow-[var(--shadow-glow)]"
+          : "border-line/70 bg-surface/70",
       )}
     >
       <div className="flex items-center gap-2">
         <span
           className={cn(
-            "flex size-8 items-center justify-center rounded-xl border",
+            "flex size-8 items-center justify-center rounded-lg border",
             featured
-              ? "border-accent/50 bg-accent/10 text-accent"
-              : "border-line bg-surface-2 text-muted",
+              ? "border-accent/35 bg-accent-soft text-accent"
+              : "border-line/70 bg-surface-2 text-muted",
           )}
         >
           {icon}
         </span>
-        <h2 className="text-sm font-black text-ink">{name}</h2>
+        <h2 className="text-sm font-semibold text-ink">{name}</h2>
         {featured ? (
-          <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-[color:var(--bg)]">
+          <span className="ml-auto rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold uppercase tracking-wide text-accent">
             Most popular
           </span>
         ) : null}
       </div>
 
-      <p className="mt-4 flex items-baseline gap-1">
-        <span className="text-4xl font-black tracking-tight text-ink">
+      <p className="mt-5 flex items-baseline gap-1.5">
+        <span className="text-4xl font-semibold tracking-tight text-ink">
           {price}
         </span>
-        <span className="text-xs font-semibold text-muted">{cadence}</span>
+        <span className="text-xs font-medium text-subtle">{cadence}</span>
       </p>
-      <p className="mt-2 min-h-10 text-[11px] leading-relaxed text-muted">
+      <p className="mt-2 min-h-10 text-[13px] leading-relaxed text-muted">
         {description}
       </p>
 
-      <ul className="mt-4 flex-1 space-y-2">
+      <ul className="mt-5 flex-1 space-y-2.5 border-t border-line/50 pt-4">
         {features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-[11px] text-muted">
+          <li
+            key={feature}
+            className="flex items-start gap-2 text-[13px] leading-relaxed text-muted"
+          >
             <Check
               className={cn(
                 "mt-0.5 size-3.5 shrink-0",

@@ -169,7 +169,7 @@ export default function OsmTerminalGraphScreen({
         <Svg width="100%" height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
           <Path
             d={`M 0 0 H ${MAP_WIDTH} V ${MAP_HEIGHT} H 0 Z`}
-            fill="#06111d"
+            fill={COLORS.cockpit}
           />
           {graph.edges.map((edge) => {
             const from = graph.nodes.find((node) => node.id === edge.from);
@@ -237,6 +237,8 @@ export default function OsmTerminalGraphScreen({
           {QUICK_POI_FILTERS.map((item) => (
             <Pressable
               key={item.category}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === item.category }}
               onPress={() => setFilter(item.category)}
               style={[
                 styles.pill,
@@ -300,14 +302,16 @@ export default function OsmTerminalGraphScreen({
 const styles = StyleSheet.create({
   mapCard: { padding: 10, gap: 10 },
   pill: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  pillText: { color: COLORS.text, fontSize: 10, fontWeight: "700" },
-  nodeTitle: { color: COLORS.white, fontSize: 20, fontWeight: "800", marginTop: 2 },
-  route: { color: COLORS.radar, fontSize: 13, fontWeight: "700" },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
+  pillText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  nodeTitle: { color: COLORS.white, fontSize: 20, fontWeight: "700", marginTop: 2 },
+  route: { color: COLORS.radar, fontSize: 13, fontWeight: "600" },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
 });

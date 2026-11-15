@@ -3,6 +3,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
+import { COLORS } from "./theme";
 
 export interface PushRegistration {
   token: string;
@@ -119,7 +120,7 @@ export async function registerForPushNotifications(): Promise<PushRegistration |
       name: "Flight alerts",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#22d3ee",
+      lightColor: COLORS.radar,
     });
   }
 

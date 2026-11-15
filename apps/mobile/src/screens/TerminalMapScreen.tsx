@@ -117,11 +117,26 @@ export default function TerminalMapScreen() {
     flightContext?.origin.code ??
     "JFK"
   ).toUpperCase();
-  const layout = useMemo<AirportTerminalLayout | null>(
-    () =>
-      LAYOUTS.find((candidate) => candidate.airportCode === airportCode) ?? null,
-    [airportCode],
-  );
+  const requestedTerminal = useMemo(() => {
+    const raw = params.terminal?.trim().toUpperCase();
+    if (!raw) return null;
+    return /^\d+$/.test(raw) ? `T${raw}` : raw;
+  }, [params.terminal]);
+  const layout = useMemo<AirportTerminalLayout | null>(() => {
+    const candidates = LAYOUTS.filter(
+      (candidate) => candidate.airportCode === airportCode,
+    );
+    if (requestedTerminal) {
+      // Never open a different terminal's curated plan than the one requested.
+      return (
+        candidates.find(
+          (candidate) =>
+            candidate.terminalId.trim().toUpperCase() === requestedTerminal,
+        ) ?? null
+      );
+    }
+    return candidates[0] ?? null;
+  }, [airportCode, requestedTerminal]);
   const [level, setLevel] = useState<number>(layout?.availableLevels[0] ?? 1);
   const [filter, setFilter] = useState<AmenityCategory>("ALL");
   const [selected, setSelected] = useState<TerminalAmenity | null>(null);
@@ -392,7 +407,7 @@ export default function TerminalMapScreen() {
 
       <Card style={styles.mapCard}>
         <Svg width="100%" height={MAP_HEIGHT} viewBox={viewBox}>
-          <Rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} fill="#06111d" />
+          <Rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} fill={COLORS.cockpit} />
           {Array.from({ length: 8 }, (_, index) => (
             <Line
               key={`grid-${index}`}
@@ -437,7 +452,7 @@ export default function TerminalMapScreen() {
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke="#12293a"
+                  stroke={COLORS.surface3}
                   strokeWidth={20 * section.width * 8}
                   strokeLinecap="round"
                 />
@@ -449,7 +464,7 @@ export default function TerminalMapScreen() {
             const [x, y] = iso(floor.centralHubCenter);
             return (
               <G>
-                <Circle cx={x} cy={y} r={34} fill="#0d1c2c" stroke={COLORS.line} />
+                <Circle cx={x} cy={y} r={34} fill={COLORS.surface2} stroke={COLORS.line} />
                 <SvgText x={x} y={y + 3} fill={COLORS.muted} fontSize={7} textAnchor="middle">
                   {floor.levelName}
                 </SvgText>
@@ -467,11 +482,11 @@ export default function TerminalMapScreen() {
                   width={52}
                   height={12}
                   rx={4}
-                  fill="#1e2838"
+                  fill={COLORS.surface3}
                   stroke={COLORS.red}
                   strokeWidth={1}
                 />
-                <SvgText x={x} y={y + 2.5} fill="#fca5a5" fontSize={5} textAnchor="middle">
+                <SvgText x={x} y={y + 2.5} fill={COLORS.red} fontSize={5} textAnchor="middle">
                   SECURITY
                 </SvgText>
               </G>
@@ -507,7 +522,7 @@ export default function TerminalMapScreen() {
                   cx={x}
                   cy={y}
                   r={isSelected ? 7 : 5}
-                  fill={isSelected ? meta.color : "#0b1424"}
+                  fill={isSelected ? meta.color : COLORS.cockpit}
                   stroke={meta.color}
                   strokeWidth={1.4}
                   onPress={() => {
@@ -534,6 +549,8 @@ export default function TerminalMapScreen() {
           {layout.availableLevels.map((option) => (
             <Pressable
               key={option}
+              accessibilityRole="button"
+              accessibilityState={{ selected: level === option }}
               onPress={() => changeLevel(option)}
               style={[styles.level, level === option && styles.levelActive]}
             >
@@ -559,6 +576,8 @@ export default function TerminalMapScreen() {
           {QUICK_POI_FILTERS.map((item) => (
             <Pressable
               key={item.category}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === item.category }}
               onPress={() => setFilter(item.category)}
               style={[
                 styles.pill,
@@ -667,46 +686,58 @@ function Stat({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   mapCard: { padding: 10, gap: 10 },
   sprintCard: {
-    borderColor: COLORS.amber,
-    backgroundColor: "#1a1408",
+    borderColor: `${COLORS.amber}66`,
+    backgroundColor: COLORS.amberSurface,
   },
-  sprintMinutes: { color: COLORS.amber, fontSize: 26, fontWeight: "900" },
-  sprintTitle: { color: COLORS.white, fontSize: 22, fontWeight: "900" },
+  sprintMinutes: {
+    color: COLORS.amber,
+    fontSize: 26,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+  },
+  sprintTitle: { color: COLORS.white, fontSize: 20, fontWeight: "700" },
   sprintDetail: { color: COLORS.amber, fontSize: 13, fontWeight: "600" },
   sprintGates: { color: COLORS.muted, fontSize: 12, letterSpacing: 1 },
   contextFlight: {
     color: COLORS.white,
     fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0.4,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-  contextWarning: { borderColor: COLORS.amber, backgroundColor: "#1a1408" },
+  contextWarning: {
+    borderColor: `${COLORS.amber}66`,
+    backgroundColor: COLORS.amberSurface,
+  },
   level: {
     borderRadius: 9,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   levelActive: { backgroundColor: COLORS.radar, borderColor: COLORS.radar },
-  levelText: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  levelText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
   pill: {
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.line,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  pillText: { color: COLORS.text, fontSize: 10, fontWeight: "700" },
-  amenityName: { color: COLORS.white, fontSize: 20, fontWeight: "800", marginTop: 2 },
+  pillText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  amenityName: { color: COLORS.white, fontSize: 20, fontWeight: "700", marginTop: 2 },
   stat: { flex: 1, minWidth: 80 },
   statLabel: {
     color: COLORS.muted,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  statValue: { color: COLORS.white, fontSize: 16, fontWeight: "800" },
-  routeText: { color: COLORS.radar, fontSize: 12, fontWeight: "700" },
-  note: { color: COLORS.muted, fontSize: 11, lineHeight: 17 },
+  statValue: { color: COLORS.white, fontSize: 16, fontWeight: "600" },
+  routeText: { color: COLORS.radar, fontSize: 12, fontWeight: "600" },
+  note: { color: COLORS.muted, fontSize: 12, lineHeight: 18 },
 });
