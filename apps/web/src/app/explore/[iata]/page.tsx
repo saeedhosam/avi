@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ExploreGlobe } from "@/components/explore-globe";
-import { findAirportNode } from "@/lib/data";
+import { findAirportNode, routeAirports } from "@/lib/data";
 import { getExploreRoutes } from "@/lib/explore-routes.server";
 
 const HUBS = ["CAI", "DXB", "LHR", "JFK", "IST", "DOH", "FRA", "CDG", "JED", "SIN", "HND", "SFO"];
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const place = node ? `${node.city} (${code})` : code;
   const title = `Direct flights from ${place} · AeroQuest Route Explorer`;
   const description = node
-    ? `Explore every non-stop destination from ${node.name} in ${node.city}, ${node.country}. Filter by airline and haul, inspect distance and cached arrival weather, then unlock the 3D Cabin & Seat Twin.`
+    ? `Explore every non-stop destination from ${node.name} in ${node.city}, ${node.country}. Compare each airport's approximate connectivity, distance, and cached arrival weather, then unlock the 3D Cabin & Seat Twin.`
     : `Explore non-stop destinations from ${code} on the AeroQuest globe.`;
   return {
     title,
@@ -64,6 +64,9 @@ async function ExploreContent({ params }: Props) {
   // unavailable or unconfigured; the client retries and shows an honest
   // unavailable state rather than a bundled static route dataset.
   const initialRoutes = await getExploreRoutes(code);
+  const trafficByIata = Object.fromEntries(
+    routeAirports.map((airport) => [airport.iata, airport.destCount ?? 0]),
+  ) as Record<string, number>;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -90,6 +93,7 @@ async function ExploreContent({ params }: Props) {
         airportName={node.name}
         city={node.city}
         country={node.country}
+        trafficByIata={trafficByIata}
         initialRoutes={initialRoutes}
       />
     </>

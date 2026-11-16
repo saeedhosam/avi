@@ -35,13 +35,13 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Explore",
     items: [
-      { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
+      { href: "/explore", label: "Explore", icon: Globe2, matches: ["/explore"] },
     ],
   },
 ];
 
 const MOBILE_ITEMS: NavItem[] = [
-  { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
+  { href: "/explore", label: "Explore", icon: Globe2, matches: ["/explore"] },
 ];
 
 function isActive(pathname: string, item: NavItem) {
@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Desktop rail */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line/60 bg-surface/70 backdrop-blur-xl lg:flex">
         <Link
-          href="/explore/CAI"
+          href="/explore"
           className="flex h-[68px] items-center gap-2.5 border-b border-line/50 px-5 transition-colors hover:bg-surface-2/40"
         >
           <span className="flex size-9 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent">

@@ -17,20 +17,20 @@ import {
   setGeoJson,
 } from "@/lib/maplibre";
 import { routeCoordinates } from "@/lib/geo";
+import {
+  AIRPORT_TRAFFIC_BUCKETS,
+  AIRPORT_TRAFFIC_COLOR_EXPRESSION,
+} from "@/lib/airport-traffic";
 import { PALETTE } from "@/lib/palette";
 import { cn } from "@/lib/utils";
-
-const HAUL_COLORS: Record<string, string> = {
-  SHORT_HAUL: PALETTE.haul.SHORT_HAUL,
-  MEDIUM_HAUL: PALETTE.haul.MEDIUM_HAUL,
-  LONG_HAUL: PALETTE.haul.LONG_HAUL,
-};
 
 export interface ExploreGlobeProps {
   iata: string;
   airportName: string;
   city: string;
   country: string;
+  /** Approximate non-stop route count keyed by airport IATA. */
+  trafficByIata: Record<string, number>;
   /**
    * Route network rendered by the server. `null` means the gateway was
    * unconfigured or unreachable; the client then retries on mount.
@@ -43,6 +43,7 @@ export function ExploreGlobe({
   airportName,
   city,
   country,
+  trafficByIata,
   initialRoutes,
 }: ExploreGlobeProps) {
   const seededCount = initialRoutes?.length ?? 0;
@@ -153,8 +154,8 @@ export function ExploreGlobe({
         ) as [number, number][],
         {
           id: connection.id,
-          haul: connection.haulCategory,
           destination: connection.destination.iata,
+          count: trafficByIata[connection.destination.iata] ?? 0,
         },
       ),
     );
@@ -164,17 +165,7 @@ export function ExploreGlobe({
       type: "line",
       source: "avi-explore-routes",
       paint: {
-        "line-color": [
-          "match",
-          ["get", "haul"],
-          "SHORT_HAUL",
-          HAUL_COLORS.SHORT_HAUL,
-          "MEDIUM_HAUL",
-          HAUL_COLORS.MEDIUM_HAUL,
-          "LONG_HAUL",
-          HAUL_COLORS.LONG_HAUL,
-          PALETTE.haul.ALL,
-        ],
+        "line-color": AIRPORT_TRAFFIC_COLOR_EXPRESSION,
         "line-width": 1.4,
         "line-opacity": 0.82,
       },
@@ -192,7 +183,7 @@ export function ExploreGlobe({
               id: connection.id,
               iata: connection.destination.iata,
               city: connection.destination.city,
-              haul: connection.haulCategory,
+              count: trafficByIata[connection.destination.iata] ?? 0,
             },
           ),
         ),
@@ -204,17 +195,7 @@ export function ExploreGlobe({
       source: "avi-explore-points",
       paint: {
         "circle-radius": 4.2,
-        "circle-color": [
-          "match",
-          ["get", "haul"],
-          "SHORT_HAUL",
-          HAUL_COLORS.SHORT_HAUL,
-          "MEDIUM_HAUL",
-          HAUL_COLORS.MEDIUM_HAUL,
-          "LONG_HAUL",
-          HAUL_COLORS.LONG_HAUL,
-          PALETTE.haul.ALL,
-        ],
+        "circle-color": AIRPORT_TRAFFIC_COLOR_EXPRESSION,
         "circle-stroke-color": "rgba(226,239,255,0.75)",
         "circle-stroke-width": 0.8,
       },
@@ -250,7 +231,7 @@ export function ExploreGlobe({
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: 70, duration: 0, maxZoom: 3.1 });
     }
-  }, [map, origin, connections]);
+  }, [map, origin, connections, trafficByIata]);
 
   useEffect(() => {
     if (!map || !selected || !origin) return;
@@ -369,9 +350,24 @@ export function ExploreGlobe({
             {airportName} · {iata}
           </p>
           <p className="mt-2 hidden text-xs leading-relaxed text-muted sm:block">
-            Non-stop destinations are colour-coded by haul and paired with
-            cached arrival weather.
+            Destinations are coloured by each airport&apos;s approximate
+            non-stop connectivity and paired with cached arrival weather.
           </p>
+          <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1">
+            {AIRPORT_TRAFFIC_BUCKETS.map((bucket) => (
+              <span
+                key={bucket.id}
+                title={bucket.range}
+                className="inline-flex items-center gap-1.5 text-[11px] text-muted"
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: bucket.color }}
+                />
+                {bucket.label}
+              </span>
+            ))}
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line/70 px-2.5 text-xs text-muted">
               <MapPin className="size-3.5" /> {origin?.city ?? city}, {country}
@@ -416,6 +412,11 @@ export function ExploreGlobe({
                   </h2>
                   <p className="text-[13px] text-muted">
                     {selected.destination.name}
+                  </p>
+                  <p className="mt-1 text-[11px] text-subtle">
+                    {(trafficByIata[selected.destination.iata] ?? 0) > 0
+                      ? `~${trafficByIata[selected.destination.iata]} non-stop routes`
+                      : "No reported non-stop routes"}
                   </p>
                 </div>
                 <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium tabular text-muted">
