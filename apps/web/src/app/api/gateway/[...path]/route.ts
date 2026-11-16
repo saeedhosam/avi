@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 /**
- * Same-origin proxy for the AeroQuest caching gateway.
+ * Same-origin proxy for the Avi caching gateway.
  *
  * The browser never holds an AeroDataBox key and never calls AeroDataBox. This
  * route forwards only `/api/gateway/*` to the Hetzner gateway, preserving the
@@ -16,7 +16,7 @@ export async function GET(
     return NextResponse.json(
       {
         error: "gateway_not_configured",
-        message: "The AeroQuest caching gateway is not configured.",
+        message: "The Avi caching gateway is not configured.",
       },
       { status: 503 },
     );
@@ -44,8 +44,8 @@ export async function GET(
         "Content-Type":
           response.headers.get("content-type") ?? "application/json",
         "Cache-Control": response.headers.get("cache-control") ?? "no-store",
-        ...(response.headers.get("x-aeroquest-cache")
-          ? { "X-AeroQuest-Cache": response.headers.get("x-aeroquest-cache")! }
+        ...(response.headers.get("x-avi-cache")
+          ? { "X-Avi-Cache": response.headers.get("x-avi-cache")! }
           : {}),
       },
     });
@@ -53,7 +53,7 @@ export async function GET(
     return NextResponse.json(
       {
         error: "gateway_unreachable",
-        message: "The AeroQuest caching gateway is temporarily unreachable.",
+        message: "The Avi caching gateway is temporarily unreachable.",
       },
       { status: 502 },
     );

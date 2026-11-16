@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "../config.js";
 
 // ── Lemon Squeezy adapter (P1 Track M, Track M of Pass 4) ──────────────────
-// Merchant of Record: the seller (AeroQuest) gets paid out without needing a
+// Merchant of Record: the seller (Avi) gets paid out without needing a
 // US/UK entity, worldwide tax is LS's problem, and the same checkout/webhook
 // surface can be re-implemented for Stripe by adding a "stripe" branch.
 

@@ -7,8 +7,6 @@
 **/coverage
 **/.turbo
 .turbo
-**/.expo
-.expo
 **/*.log
 docs
 backups

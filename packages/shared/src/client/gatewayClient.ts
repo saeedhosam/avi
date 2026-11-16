@@ -12,7 +12,7 @@ import {
 } from "../models/gateway.js";
 
 export interface GatewayClientOptions {
-  /** Hetzner gateway origin, e.g. `https://api.aeroquest.app`. */
+  /** Hetzner gateway origin, e.g. `https://api.codestep.org`. */
   baseUrl: string;
   /** Supabase access token for per-user quota/entitlements. */
   accessToken?: string | null;
@@ -43,7 +43,7 @@ interface RequestOptions {
  * Every response is validated; a malformed gateway payload fails loudly instead
  * of entering the UI as trusted flight data.
  */
-export class AeroQuestGatewayClient {
+export class AviGatewayClient {
   private readonly baseUrl: string;
   private readonly accessToken: string | null;
   private readonly fetchImpl: typeof fetch;
@@ -52,7 +52,7 @@ export class AeroQuestGatewayClient {
   constructor(options: GatewayClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     if (!this.baseUrl) {
-      throw new Error("AeroQuestGatewayClient requires a gateway base URL");
+      throw new Error("AviGatewayClient requires a gateway base URL");
     }
     this.accessToken = options.accessToken ?? null;
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -192,6 +192,6 @@ export class AeroQuestGatewayClient {
 
 export function createGatewayClient(
   options: GatewayClientOptions,
-): AeroQuestGatewayClient {
-  return new AeroQuestGatewayClient(options);
+): AviGatewayClient {
+  return new AviGatewayClient(options);
 }

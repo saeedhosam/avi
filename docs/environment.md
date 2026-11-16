@@ -1,16 +1,14 @@
 # Environment setup
 
-This repository uses three gitignored env files:
+This repository uses two gitignored env files:
 
 | File | Used by |
 | --- | --- |
 | `apps/web/.env.local` | Next.js web |
 | `services/api/.env` | Fastify gateway, watch engine, push |
-| `apps/mobile/.env` | Expo client |
 
 Copy the matching `.env.example` if a file is missing. **Never commit these
-files or put provider/Supabase secret keys in `NEXT_PUBLIC_*` or `EXPO_PUBLIC_*`
-variables.**
+files or put provider/Supabase secret keys in `NEXT_PUBLIC_*` variables.**
 
 ---
 
@@ -22,8 +20,7 @@ Already linked: project `avi` (`uiabvbndrpscsscvwofc`).
 | --- | --- | --- |
 | `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Project Settings → API | Public project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Dashboard → API → publishable/anon key | Safe in the browser; RLS still applies |
-| `SUPABASE_SECRET_KEY` | Dashboard → API → secret/service-role key | **Server only**. Never send to web/mobile |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Same publishable key as web | Mobile uses it for auth |
+| `SUPABASE_SECRET_KEY` | Dashboard → API → secret/service-role key | **Server only**. Never send to the browser |
 | `SUPABASE_ACCESS_TOKEN` | Supabase account → Access Tokens | CLI only; not read by the apps |
 | `SUPABASE_DB_PASSWORD` | Project database password | CLI only |
 
@@ -33,8 +30,8 @@ Apply migrations:
 npx supabase@3.1.0 db push --remote --yes
 ```
 
-The two AeroQuest migrations have been applied and verified:
-`20261114000100_aeroquest_gateway.sql` and
+The two Avi migrations have been applied and verified:
+`20261114000100_aeroquest_gateway.sql` (historical filename) and
 `20261114000200_terminal_graphs.sql`.
 
 ---
@@ -43,7 +40,7 @@ The two AeroQuest migrations have been applied and verified:
 
 | Variable | Where to get it | Notes |
 | --- | --- | --- |
-| `AERODATABOX_API_KEY` | AeroDataBox / RapidAPI dashboard | Never expose to web/mobile |
+| `AERODATABOX_API_KEY` | AeroDataBox / RapidAPI dashboard | Never expose to the web client |
 | `AERODATABOX_API_HOST` | `api.aerodatabox.com`, or the RapidAPI host | Must match the key type |
 
 For local web-only work, `apps/web/.env.local` may hold a direct key as a
@@ -57,8 +54,6 @@ gateway exclusively.
 | Variable | Local value | Production |
 | --- | --- | --- |
 | `AVI_API_BASE_URL` (web) | `http://localhost:8080` (or `:8180` if 8080 is occupied) | `https://api.codestep.org` or the staging API |
-| `EXPO_PUBLIC_AEROQUEST_API_URL` (mobile) | staging/LAN gateway URL | Hetzner gateway HTTPS URL |
-| `EXPO_PUBLIC_AEROQUEST_WEB_URL` (mobile) | `http://localhost:3000` | Production web origin for pricing/checkout |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated production web origins |
 | `PUBLIC_WEB_URL` | `http://localhost:3000` | Production web origin |
 | `REDIS_URL` | leave empty for in-process cache | `redis://redis:6379` in Docker |
@@ -93,62 +88,8 @@ npx web-push generate-vapid-keys
 | `VAPID_PRIVATE_KEY` | API | **Server only** |
 | `VAPID_SUBJECT` | API | `mailto:` contact for push services |
 
-### Expo Push
-
-| Variable | File | Meaning |
-| --- | --- | --- |
-| `EXPO_ACCESS_TOKEN` | API | Optional; required only when Expo push security is enabled |
-
-Native push tokens come from `expo-notifications`; the gateway fans them out
-after `flightStateDiffer` detects a gate/terminal/status/baggage change.
-
----
-
-## EAS project
-
-EAS means **Expo Application Services** — Expo's cloud build, submit, and update
-service. An **EAS project** is the cloud record that links this mobile app to
-your Expo account. It is identified by a UUID and stored in `app.json`:
-
-```json
-{
-  "expo": {
-    "extra": {
-      "eas": { "projectId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" }
-    }
-  }
-}
-```
-
-You need it for:
-
-- `expo-notifications` to obtain an Expo push token
-  (`getExpoPushTokenAsync({ projectId })`)
-- EAS cloud builds (`eas build`)
-- EAS Submit / OTA updates
-
-Create it once:
-
-```bash
-cd apps/mobile
-npx eas-cli login
-npx eas-cli init
-```
-
-`eas init` creates the project (or links an existing one), writes
-`extra.eas.projectId` into `app.json`, and may add an EAS project ID to
-`eas.json`. Commit the `app.json` change, but never commit credentials.
-
-Until a valid project ID exists, `registerForPushNotifications()` returns
-`null` by design; the rest of the app works normally.
-
-Build profiles are already in `apps/mobile/eas.json`:
-
-```bash
-npx eas-cli build --profile development --platform android
-npx eas-cli build --profile preview --platform ios
-npx eas-cli build --profile production --platform all
-```
+Native push was retired with the mobile apps. The gateway keeps inserting
+alert rows so the Web Push loop can deliver them to browser subscriptions.
 
 ---
 

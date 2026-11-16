@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "AeroQuest shared domain models, Zod contracts, and cross-platform services.",
+  "description": "Avi shared domain models, Zod contracts, and services.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

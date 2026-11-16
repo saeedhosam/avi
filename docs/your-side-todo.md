@@ -133,51 +133,17 @@ than receiving), set up a proper mailbox and re-sweep the 3 places in §1a.
 
 ---
 
-## 4. Android platform
+## 4. Web platform
 
-Track R shipped: gateway-only flight pipeline, no mock data, no provider key
-in the APK, date-scoped watchlist, plan gating. What remains, split by
-biçim:
+The Android/iOS and Expo clients are retired. Remaining work is web-focused:
 
-### 4a. Google OAuth readiness for Android sign-in (checkpoint for later)
+### 4a. Ongoing hygiene (when convenient)
 
-1. Google Cloud Console → Credentials → your OAuth client
-2. Add your keystore's SHA-1/SHA-256 fingerprints (via
-   `keytool -list -v -keystore my-upload-key.jks`) to the Android client
-3. Store the keystore somewhere safe (`*.jks` files are gitignored)
-4. The `GOOGLE_WEB_CLIENT_ID` secret in the Android `.env` is what links
-   Android sign-in to the web experience — currently it's
-   `DEFAULT_GOOGLE_WEB_CLIENT_ID`
-
-### 4b. Firebase Cloud Messaging for device push
-
-If/when you want the same engine-generated flight alerts delivered to
-Android when the app is closed:
-
-1. Add the app to a **Firebase project** &
-   follow docs at firebase.google.com for the `google-services.json>`
-2. The FCM worker currently isn't yet wired to a delivery provider; ask me
-   to finish it (~1 day) once the FCM console pieces exist
-3. Keep `POST_NOTIFICATIONS` runtime permission (app already requests it)
-
-### 4c. Release signing (near-publish)
-
-1. Generate a release keystore —
-   `keytool -genkeypair -v -keystore my-upload-key.jks -alias upload ...`
-2. Keep it safe (backed up outside the repo; `*.jks` already gitignored)
-3. Set `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD` secrets when CI
-   builds a release; the `Build and deploy` path won't publish an APK
-   anyway — CI currently only does debug builds
-
-### 4d. Ongoing hygiene (when convenient)
-
-- Room watchlist-table collapse (engine is already unified; this is purely
-  the schema migration + DAO consolidation) — ~half a day, on request
-- A Playwright/E2E pass on web; RLS tests against a local Supabase in CI —
-  on request
+- A Playwright/E2E pass on web; RLS tests against a local Supabase in CI — on
+  request.
 - Re-check the provider Terms pages every ~6–12 months: AeroDataBox and
-  Open-Meteo both updated theirs in Sep–Oct 2026, and that's what surfaced
-  the attribution/caching/commercial-use notes in `docs/launch-checklist.md`
+  Open-Meteo both updated theirs in Sep–Oct 2026, and that's what surfaced the
+  attribution/caching/commercial-use notes in `docs/launch-checklist.md`.
 
 ---
 
@@ -199,8 +165,6 @@ These are pre-scoped, so "go with [name]" is enough:
 
 | Item | Size | Trigger |
 |---|---|---|
-| Android Room watchlist-table collapse | ~half a day | "Android next pass" |
-| FCM client wiring (once Firebase console exists) | ~1 day | "FCM now" |
 | Playwright smoke + CI migration/RLS jobs | ~2 days | "tests next" |
 | Paymob adapter (if Polar/Egypt fails permanently) | ~1–2 days | decide only after Polar support replies |
 | Legal-page email/porting sweep after mailbox swap | ~5 min | traded in §1a steps |

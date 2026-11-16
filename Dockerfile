@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# AeroQuest unified monorepo image. Two targets share one pruner:
+# Avi unified monorepo image. Two targets share one pruner:
 #   docker build --target web -t avi-web .
 #   docker build --target api -t avi-api .
 #

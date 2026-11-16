@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Avi web notes
 
-- This app is `@avi/web` in the AeroQuest monorepo. The Expo client lives in `../mobile`, shared domain code in `../../packages/shared`, and shared UI/3D in `../../packages/ui`.
+- This app is `@avi/web` in the Avi monorepo. Shared domain code lives in `../../packages/shared`, and shared UI/3D in `../../packages/ui`.
 - Stack: Next.js App Router, React 19, TypeScript, Tailwind CSS v4, Supabase, MapLibre, React Three Fiber.
 - The Avi API in `../../services/api` is the provider gateway. Do not ship provider or Supabase secret keys to the browser.
 - Preserve the aviation cockpit design language: deep-space surfaces, radar cyan, aero blue,

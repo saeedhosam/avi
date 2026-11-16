@@ -2,7 +2,7 @@ begin;
 
 select plan(14);
 
--- AeroQuest tables must all have RLS enabled.
+-- Avi tables must all have RLS enabled.
 select is(
   (select relrowsecurity from pg_class where oid = 'public.cabin_layouts'::regclass),
   true,

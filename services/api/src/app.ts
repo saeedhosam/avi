@@ -68,7 +68,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(swagger, {
     openapi: {
       info: {
-        title: "AeroQuest API",
+        title: "Avi API",
         description:
           "Provider gateway for live flights, airports, weather, maps, and alerts.",
         version: "1.1.0",
@@ -77,7 +77,7 @@ export async function buildApp(config: AppConfig) {
         { name: "system", description: "Health and configuration" },
         { name: "flights", description: "Live flight data" },
         { name: "airports", description: "Airport boards, routes, and search" },
-        { name: "gateway", description: "AeroQuest Starter-safe caching gateway" },
+        { name: "gateway", description: "Avi Starter-safe caching gateway" },
         { name: "billing", description: "Plans and the time-boxed trip pass" },
       ],
     },

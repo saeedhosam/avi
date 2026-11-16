@@ -180,7 +180,7 @@ describe("gateway Postgres read-through cache", () => {
         url: "/api/gateway/airports/CAI/routes",
       });
       expect(routes.statusCode).toBe(200);
-      expect(routes.headers["x-aeroquest-cache"]).toBe("HIT");
+      expect(routes.headers["x-avi-cache"]).toBe("HIT");
       expect(routes.json().provenance).toMatchObject({
         cached: true,
         stale: false,
@@ -193,7 +193,7 @@ describe("gateway Postgres read-through cache", () => {
         url: "/api/gateway/aircraft/SU-GAA",
       });
       expect(aircraft.statusCode).toBe(200);
-      expect(aircraft.headers["x-aeroquest-cache"]).toBe("HIT");
+      expect(aircraft.headers["x-avi-cache"]).toBe("HIT");
       expect(aircraft.json().provenance).toMatchObject({
         cached: true,
         stale: false,

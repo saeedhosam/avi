@@ -72,14 +72,14 @@ function sendError(
   log.warn({ err: error }, "gateway request failed");
   return reply.code(502).send({
     error: "gateway_failure",
-    message: "The AeroQuest gateway could not complete that request.",
+    message: "The Avi gateway could not complete that request.",
   });
 }
 
 /**
  * AeroDataBox Starter-safe caching gateway.
  *
- * These exact paths are consumed by web and mobile; clients never hold a
+ * These exact paths are consumed by the web app; clients never hold a
  * provider key. Provider calls are coalesced by the shared cache, and the
  * response advertises cache provenance so the UI can label stale data.
  */
@@ -127,7 +127,7 @@ export const gatewayRoutes: FastifyPluginAsyncZod<GatewayRouteOptions> = async (
           "Cache-Control",
           "public, max-age=30, stale-while-revalidate=120",
         );
-        reply.header("X-AeroQuest-Cache", result.provenance.cached ? "HIT" : "MISS");
+        reply.header("X-Avi-Cache", result.provenance.cached ? "HIT" : "MISS");
         return result;
       } catch (error) {
         await refundProviderQuota(request, options.userQuota, units);
@@ -173,7 +173,7 @@ export const gatewayRoutes: FastifyPluginAsyncZod<GatewayRouteOptions> = async (
           "Cache-Control",
           "public, max-age=3600, stale-while-revalidate=86400",
         );
-        reply.header("X-AeroQuest-Cache", result.provenance.cached ? "HIT" : "MISS");
+        reply.header("X-Avi-Cache", result.provenance.cached ? "HIT" : "MISS");
         return result;
       } catch (error) {
         await refundProviderQuota(request, options.userQuota, units);
@@ -257,7 +257,7 @@ export const gatewayRoutes: FastifyPluginAsyncZod<GatewayRouteOptions> = async (
           "Cache-Control",
           "public, max-age=60, stale-while-revalidate=300",
         );
-        reply.header("X-AeroQuest-Cache", result.provenance.cached ? "HIT" : "MISS");
+        reply.header("X-Avi-Cache", result.provenance.cached ? "HIT" : "MISS");
         return result;
       } catch (error) {
         await refundProviderQuota(request, options.userQuota, units);
@@ -305,7 +305,7 @@ export const gatewayRoutes: FastifyPluginAsyncZod<GatewayRouteOptions> = async (
           "Cache-Control",
           "public, max-age=86400, stale-while-revalidate=2592000",
         );
-        reply.header("X-AeroQuest-Cache", result.provenance.cached ? "HIT" : "MISS");
+        reply.header("X-Avi-Cache", result.provenance.cached ? "HIT" : "MISS");
         return result;
       } catch (error) {
         await refundProviderQuota(request, options.userQuota, units);

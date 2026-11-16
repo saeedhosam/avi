@@ -1,13 +1,13 @@
 import type { MetadataRoute } from "next";
 import { PALETTE } from "@/lib/palette";
 
-/** Installs AeroQuest as a home-screen web app (required for iOS web push). */
+/** Installs Avi as a home-screen web app (required for iOS web push). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AeroQuest · Flight Tracking & Route Explorer",
-    short_name: "AeroQuest",
+    name: "Avi · Flight Tracking & Route Explorer",
+    short_name: "Avi",
     description:
-      "Direct-route discovery, live flight tracking, terminal wayfinding, 3D cabin seat twins, and offline in-flight awareness.",
+      "Direct-route discovery, live flight tracking, airport boards, terminal wayfinding, 3D cabin seat twins, and flight alerts.",
     id: "/",
     start_url: "/",
     display: "standalone",

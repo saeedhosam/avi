@@ -55,7 +55,7 @@ export function NotificationsDialog({
       open={open}
       onClose={onClose}
       title="Alerts & push"
-      subtitle="Generated only by real status changes AeroQuest receives."
+      subtitle="Generated only by real status changes Avi receives."
       icon={<BellRing className="size-4" />}
       size="lg"
       footer={
@@ -226,7 +226,7 @@ export function NotificationsDialog({
         </div>
 
         <p className="rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2.5 text-xs leading-relaxed text-subtle">
-          Alerts come from comparing successive live snapshots AeroQuest has
+          Alerts come from comparing successive live snapshots Avi has
           actually received. No fabricated alerts and no test notifications.
         </p>
       </div>

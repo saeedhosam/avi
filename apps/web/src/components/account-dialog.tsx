@@ -345,7 +345,7 @@ export function AccountDialog({
                   )}
 
                 <p className="text-xs leading-relaxed text-subtle">
-                  This monthly budget covers all AeroQuest users and pauses the
+                  This monthly budget covers all Avi users and pauses the
                   live engine at the cap. Saved data and alerts keep working.
                 </p>
               </div>
@@ -365,7 +365,7 @@ export function AccountDialog({
             </p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted">
               Deleting your account erases your profile, watchlist, notes,
-              alerts, and push settings from AeroQuest — immediately and
+              alerts, and push settings from Avi — immediately and
               irreversibly.
             </p>
             {!confirmDelete ? (

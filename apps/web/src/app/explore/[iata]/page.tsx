@@ -18,10 +18,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const code = iata.trim().toUpperCase();
   const node = findAirportNode(code);
   const place = node ? `${node.city} (${code})` : code;
-  const title = `Direct flights from ${place} · AeroQuest Route Explorer`;
+  const title = `Direct flights from ${place} · Avi Route Explorer`;
   const description = node
     ? `Explore every non-stop destination from ${node.name} in ${node.city}, ${node.country}. Compare each airport's approximate connectivity, distance, and cached arrival weather, then unlock the 3D Cabin & Seat Twin.`
-    : `Explore non-stop destinations from ${code} on the AeroQuest globe.`;
+    : `Explore non-stop destinations from ${code} on the Avi globe.`;
   return {
     title,
     description,
@@ -42,7 +42,7 @@ export default function ExplorePage({ params }: Props) {
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center bg-surface p-8 text-sm text-muted">
-            Loading the AeroQuest direct-route globe…
+            Loading the Avi direct-route globe…
           </div>
         }
       >

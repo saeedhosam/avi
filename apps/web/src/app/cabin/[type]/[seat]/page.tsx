@@ -55,7 +55,7 @@ export default function CabinPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8 lg:py-8">
       <PageHeader
-        eyebrow="AeroQuest Pro · 3D cabin"
+        eyebrow="Avi Pro · 3D cabin"
         title={
           <span className="flex flex-wrap items-center gap-3">
             {layout.aircraftType} seat {seatNumber || "—"}
@@ -64,18 +64,11 @@ export default function CabinPage() {
         }
         description="A free interactive preview of the parametric cabin reconstruction. Tap a seat to inspect window alignment, pitch, power, nearby lavatories, galleys and exits. Details are reconstructed from the aircraft type, not a certified cabin plan."
         actions={
-          <>
-            <Link href="/explore/CAI">
-              <Button size="sm" variant="ghost">
-                Route explorer
-              </Button>
-            </Link>
-            <a href={`aeroquest://cabin/${layout.aircraftType}/${seatNumber}`}>
-              <Button size="sm" variant="outline">
-                Open in app
-              </Button>
-            </a>
-          </>
+          <Link href="/explore/CAI">
+            <Button size="sm" variant="ghost">
+              Route explorer
+            </Button>
+          </Link>
         }
       />
 

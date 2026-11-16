@@ -87,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="min-w-0">
             <span className="block text-[17px] font-semibold leading-none tracking-tight text-ink">
-              AeroQuest
+              Avi
             </span>
             <span className="mt-1 block whitespace-nowrap text-xs font-medium text-subtle">
               Direct-route explorer

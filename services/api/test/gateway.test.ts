@@ -8,7 +8,7 @@ let app: FastifyInstance;
 const flightDto = {
   number: "AQ 100",
   status: "Scheduled",
-  airline: { name: "AeroQuest Air", iata: "AQ" },
+  airline: { name: "Avi Air", iata: "AQ" },
   aircraft: { reg: "SU-GAA", model: "Boeing 777-300ER" },
   departure: {
     airport: {
@@ -135,7 +135,7 @@ beforeEach(() => {
   );
 });
 
-describe("AeroQuest gateway", () => {
+describe("Avi gateway", () => {
   it("caches flight status and reports a cache hit", async () => {
     const first = await app.inject({
       method: "GET",
@@ -154,7 +154,7 @@ describe("AeroQuest gateway", () => {
       gateDeparture: "Gate B14",
       baggageCarousel: "Carousel 12",
     });
-    expect(first.headers["x-aeroquest-cache"]).toBe("MISS");
+    expect(first.headers["x-avi-cache"]).toBe("MISS");
 
     const second = await app.inject({
       method: "GET",
@@ -162,7 +162,7 @@ describe("AeroQuest gateway", () => {
     });
     expect(second.statusCode).toBe(200);
     expect(second.json().provenance.cached).toBe(true);
-    expect(second.headers["x-aeroquest-cache"]).toBe("HIT");
+    expect(second.headers["x-avi-cache"]).toBe("HIT");
   });
 
   it("maps route statistics into explorer connections with estimated durations", async () => {

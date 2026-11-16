@@ -67,7 +67,7 @@ export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) 
       paint: {
         "circle-radius": AIRPORT_TRAFFIC_RADIUS_EXPRESSION,
         "circle-color": AIRPORT_TRAFFIC_COLOR_EXPRESSION,
-        "circle-opacity": ["case", ["==", ["get", "count"], 0], 0.35, 0.9],
+        "circle-opacity": 0.9,
         "circle-stroke-color": "rgba(233,239,245,0.35)",
         "circle-stroke-width": 0.5,
       },

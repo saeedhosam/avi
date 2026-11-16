@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "AeroQuest API",
+    "title": "Avi API",
     "description": "Provider gateway for live flights, airports, weather, maps, and alerts.",
     "version": "1.1.0"
   },
@@ -7514,7 +7514,7 @@
     },
     {
       "name": "gateway",
-      "description": "AeroQuest Starter-safe caching gateway"
+      "description": "Avi Starter-safe caching gateway"
     },
     {
       "name": "billing",

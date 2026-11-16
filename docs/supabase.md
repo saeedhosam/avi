@@ -32,10 +32,10 @@ Applied migrations:
 
 ## Client boundary
 
-- Web and mobile use the **publishable** key and RLS.
+- The web uses the **publishable** key and RLS.
 - The API uses the **secret** key or service role only for server-owned caches,
   snapshots, alert generation, plan reads, and push delivery.
-- The secret key must never be shipped in an APK, IPA, or web bundle.
+- The secret key must never be shipped in the web bundle.
 - `profiles.plan` is enforced server-side (`FREE`/`PLUS`/`PRO` concurrency
   limits of 3/15/50 tracked flights); authenticated clients hold only
   column-level UPDATE/INSERT grants, so they cannot self-upgrade.
@@ -77,15 +77,14 @@ merged snapshots + change alerts. Realtime keeps open clients live; the
 
 ## Smoke test
 
-A temporary auth user was created through the admin API, signed in with the publishable key, upserted its own profile, and inserted/read a tracked flight and alert. The user was deleted afterwards. This verifies the auth trigger and the RLS/grant path used by web and Android.
+A temporary auth user was created through the admin API, signed in with the publishable key, upserted its own profile, and inserted/read a tracked flight and alert. The user was deleted afterwards. This verifies the auth trigger and the RLS/grant path used by the web app.
 
 ## Google OAuth
 
-The Supabase Google provider still requires the Google Cloud OAuth client ID and secret. Configure it in Supabase Dashboard → Authentication → Providers → Google, then add the web and mobile redirect URLs:
+The Supabase Google provider still requires the Google Cloud OAuth client ID and secret. Configure it in Supabase Dashboard → Authentication → Providers → Google, then add the web redirect URL:
 
 - `http://localhost:3000/auth/callback`
 - `https://app.2-31-110-53.sslip.io/auth/callback`
 - production domain callback
-- Android deep link / iOS URL scheme
 
 Email magic-link auth remains available for testing until Google is configured.

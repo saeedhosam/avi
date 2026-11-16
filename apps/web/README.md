@@ -1,9 +1,8 @@
-# AeroQuest Web
+# Avi Web
 
-> This app is `@avi/web` in the AeroQuest monorepo. The provider gateway lives in
+> This app is `@avi/web` in the Avi monorepo. The provider gateway lives in
 > `../../services/api`, the schema in `../../supabase`, and the deployment
-> pipeline in `../../.github/workflows`. Firebase and Google Maps were removed;
-> this README describes the current build.
+> pipeline in `../../.github/workflows`. This README describes the current build.
 
 Live flight tracking, airport boards, route network, terminal wayfinding, and
 flight alerts. Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4,
@@ -70,7 +69,7 @@ live-tracked** flight days (3 / 15 / 50) enforced by the engine. Plans are
 assigned in Supabase Studio/SQL (`profiles.plan`); clients cannot write the
 column.
 
-`/pricing` shows Free, AeroQuest Pro, and the one-time $4.99 Single-Trip Pass.
+`/pricing` shows Free, Avi Pro, and the one-time $4.99 Single-Trip Pass.
 Plan checkout uses `/api/billing/checkout`; the trip pass uses
 `/api/billing/trip-pass`, which proxies the gateway's `/v1/billing/trip-pass`
 endpoint. The pricing UI enables Plus/Pro only after `/api/me` reports a

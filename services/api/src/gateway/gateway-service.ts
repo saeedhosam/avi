@@ -253,7 +253,7 @@ function flightTtlForDate(date: string, now = new Date()): {
  *
  * Every AeroDataBox call goes through the shared provider cache, with a
  * Starter-specific TTL policy and Redis single-flight coalescing. Fresh flight
- * responses are diffed against the last Supabase snapshot before an Expo push
+ * responses are diffed against the last Supabase snapshot before an alert
  * fan-out, and the diff itself is coalesced through the cache so a burst of
  * refreshes produces one notification decision.
  */
@@ -426,7 +426,7 @@ export class GatewayService {
           ttlMs: 5 * 60_000,
           staleTtlMs: 0,
           source: "AERODATABOX",
-          attribution: "AeroQuest gateway",
+          attribution: "Avi gateway",
           query: diffKey,
           cacheable: () => true,
         },

@@ -1,11 +1,11 @@
 /**
  * The "console" flight contract: the web client's `Flight` face, now served by
- * the gateway so every client (web and Expo mobile) consumes one mapping.
+ * the gateway so every consumer receives the same mapping.
  * Ported verbatim from apps/web/src/lib/types.ts.
  */
 
 /**
- * Canonical AeroQuest flight domain types. `@avi/shared` is the single source
+ * Canonical Avi flight domain types. `@avi/shared` is the single source
  * of truth; these re-exports keep the legacy console contract compatible for
  * the OpenAPI export, web client, and gateway mapper.
  */

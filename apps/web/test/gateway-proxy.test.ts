@@ -26,7 +26,7 @@ describe("gateway proxy GET", () => {
         headers: {
           "content-type": "application/json",
           "cache-control": "public, max-age=3600",
-          "x-aeroquest-cache": "HIT",
+          "x-avi-cache": "HIT",
         },
       }),
     );
@@ -42,7 +42,7 @@ describe("gateway proxy GET", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(payload);
-    expect(response.headers.get("x-aeroquest-cache")).toBe("HIT");
+    expect(response.headers.get("x-avi-cache")).toBe("HIT");
     expect(response.headers.get("cache-control")).toBe("public, max-age=3600");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -74,7 +74,7 @@ describe("gateway proxy GET", () => {
     expect(response.status).toBe(502);
     expect(await response.json()).toMatchObject({
       error: "gateway_unreachable",
-      message: "The AeroQuest caching gateway is temporarily unreachable.",
+      message: "The Avi caching gateway is temporarily unreachable.",
     });
   });
 

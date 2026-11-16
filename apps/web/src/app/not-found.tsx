@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Plane } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: { absolute: "Not found · AeroQuest" },
+  title: { absolute: "Not found · Avi" },
 };
 
 export default function NotFound() {

@@ -29,7 +29,7 @@ export default function AuthCallbackPage() {
       }
 
       if (!cancelled) {
-        setMessage("Signed in. Returning to AeroQuest…");
+        setMessage("Signed in. Returning to Avi…");
         router.replace("/");
         router.refresh();
       }
@@ -37,7 +37,7 @@ export default function AuthCallbackPage() {
 
     void finish().catch(() => {
       if (!cancelled) {
-        setMessage("Sign-in could not be completed. Returning to AeroQuest…");
+        setMessage("Sign-in could not be completed. Returning to Avi…");
         router.replace("/");
       }
     });
@@ -57,7 +57,7 @@ export default function AuthCallbackPage() {
         <div className="mx-auto flex size-11 items-center justify-center rounded-full border border-accent/30 bg-accent-soft text-accent">
           <ShieldCheck className="size-5" />
         </div>
-        <p className="label-caps mt-4 text-subtle">AeroQuest account</p>
+        <p className="label-caps mt-4 text-subtle">Avi account</p>
         <p className="mt-2 text-sm leading-relaxed text-muted">{message}</p>
         <Loader2 className="mx-auto mt-5 size-4 animate-spin text-accent" />
       </div>

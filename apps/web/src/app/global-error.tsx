@@ -48,7 +48,7 @@ export default function GlobalError({
             System error
           </p>
           <h1 style={{ fontSize: "20px", margin: "10px 0 6px", fontWeight: 600 }}>
-            AeroQuest could not start this session.
+            Avi could not start this session.
           </h1>
           <p
             style={{
@@ -74,7 +74,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            Reload AeroQuest
+            Reload Avi
           </button>
           {error.digest && (
             <p

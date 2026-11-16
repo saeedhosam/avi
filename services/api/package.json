@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "AeroQuest provider gateway: flights, airports, weather, maps, alerts, and push.",
+  "description": "Avi provider gateway: flights, airports, weather, maps, alerts, and Web Push.",
   "main": "dist/server.js",
   "scripts": {
     "predev": "pnpm --filter @avi/shared build && pnpm --filter @avi/contracts build",

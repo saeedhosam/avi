@@ -33,6 +33,12 @@ export const PALETTE = {
     MEDIUM_HAUL: "#5BA7D9",
     LONG_HAUL: "#E0A24C",
   },
+  traffic: {
+    LOW: "#123B65",
+    MEDIUM: "#3478B9",
+    HIGH: "#78A9D1",
+    MEGA: "#DCEAF7",
+  },
   alerts: {
     GATE_CHANGE: "#35D3E6",
     TERMINAL_CHANGE: "#A78BFA",

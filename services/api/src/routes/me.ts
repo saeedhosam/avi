@@ -6,7 +6,7 @@ import { billingUpgradeEnabled } from "../lib/billing.js";
 import type { UserQuotaService } from "../lib/user-quota.js";
 import { PLAN_LIMITS, type PlanTier } from "../engine/plans.js";
 import {
-  AEROQUEST_FEATURES,
+  AVI_FEATURES,
   activeTripPass,
   entitlementContextFromProfile,
   entitlementsFor,
@@ -104,7 +104,7 @@ export const meRoutes: FastifyPluginAsyncZod<MeOptions> = async (
       });
       const decisions = entitlementsFor(entitlementContext);
       const features = Object.fromEntries(
-        AEROQUEST_FEATURES.map((feature) => [
+        AVI_FEATURES.map((feature) => [
           feature,
           decisions[feature].allowed,
         ]),

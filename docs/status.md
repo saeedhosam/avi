@@ -1,10 +1,10 @@
-> **2026-11-14: architecture superseded.** The Kotlin/Compose and SwiftUI clients
-> have been removed. The current monorepo (web, Expo mobile, shared packages,
+> **2026-11-14: architecture superseded.** The Kotlin/Compose, SwiftUI, and Expo
+> mobile clients have been removed. The current monorepo (web, shared packages,
 > Hetzner caching gateway) is documented in [`README.md`](../README.md) and
 > [`REMAINING_WORK.md`](../REMAINING_WORK.md). Sections below are historical
-> notes from the native-client era unless they describe web/API behaviour.
+> notes from earlier product eras unless they describe web/API behaviour.
 
-# AeroQuest status (historical)
+# Avi status (historical)
 
 Updated: 2026-11-07
 

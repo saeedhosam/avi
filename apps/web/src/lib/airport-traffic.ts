@@ -5,39 +5,34 @@ import { PALETTE } from "./palette";
  * Approximate airport connectivity buckets.
  *
  * Counts come from the bundled OpenFlights-derived reference catalog
- * (`destCount`), not from live schedules. The colours reuse the existing
- * cockpit haul palette so the map stays within the established theme.
+ * (`destCount`), not from live schedules. The ramp runs from deep ocean blue
+ * for quiet airports to pale ice blue for the busiest hubs, so density reads
+ * at a glance without leaving the dark instrument theme.
  */
 export const AIRPORT_TRAFFIC_BUCKETS = [
   {
     id: "MEGA",
     label: "40+",
     range: "40+ non-stop routes",
-    color: PALETTE.haul.LONG_HAUL,
+    color: PALETTE.traffic.MEGA,
   },
   {
     id: "HIGH",
     label: "10–39",
     range: "10–39 non-stop routes",
-    color: PALETTE.haul.MEDIUM_HAUL,
+    color: PALETTE.traffic.HIGH,
   },
   {
     id: "MEDIUM",
     label: "3–9",
     range: "3–9 non-stop routes",
-    color: PALETTE.haul.SHORT_HAUL,
+    color: PALETTE.traffic.MEDIUM,
   },
   {
     id: "LOW",
     label: "1–2",
     range: "1–2 non-stop routes",
-    color: PALETTE.haul.ALL,
-  },
-  {
-    id: "NONE",
-    label: "0",
-    range: "No reported routes",
-    color: PALETTE.subtle,
+    color: PALETTE.traffic.LOW,
   },
 ] as const;
 
@@ -47,26 +42,24 @@ export const AIRPORT_TRAFFIC_COLOR_EXPRESSION: ExpressionSpecification = [
   ["get", "count"],
   PALETTE.subtle,
   1,
-  PALETTE.haul.ALL,
+  PALETTE.traffic.LOW,
   3,
-  PALETTE.haul.SHORT_HAUL,
+  PALETTE.traffic.MEDIUM,
   10,
-  PALETTE.haul.MEDIUM_HAUL,
+  PALETTE.traffic.HIGH,
   40,
-  PALETTE.haul.LONG_HAUL,
+  PALETTE.traffic.MEGA,
 ];
 
-/** Slightly larger dots for busier airports. */
+/**
+ * One dot size for every airport; connectivity is conveyed by colour alone.
+ * The radius grows gently with zoom so the dots stay comfortable close-up.
+ */
 export const AIRPORT_TRAFFIC_RADIUS_EXPRESSION: ExpressionSpecification = [
-  "step",
-  ["get", "count"],
-  1.9,
-  3,
-  2.3,
-  10,
-  2.7,
-  40,
-  3.2,
-  120,
-  3.9,
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  2, 2,
+  5, 5,
+  9, 9,
 ];

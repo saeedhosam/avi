@@ -39,6 +39,6 @@
     "typescript": "^5",
     "vitest": "^5.1.0"
   },
-  "description": "AeroQuest web — direct-route globe, flight dossier, terminal maps, 3D cabin, alerts, and offline watchlist.",
+  "description": "Avi web — direct-route globe, flight dossier, terminal maps, 3D cabin, alerts, and offline watchlist.",
   "packageManager": "pnpm@11.7.0"
 }

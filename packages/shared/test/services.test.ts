@@ -73,7 +73,7 @@ describe("entitlements", () => {
   });
 
   it("maps RevenueCat/Stripe product ids", () => {
-    expect(planFromProductId("aeroquest_pro_annual")).toBe("PRO");
+    expect(planFromProductId("avi_pro_annual")).toBe("PRO");
     expect(planFromProductId("single_trip_pass_499")).toBe("TRIP_PASS");
     expect(resolveProduct({ plan: "PLUS" })).toBe("PLUS_MONTHLY");
   });

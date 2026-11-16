@@ -1,13 +1,12 @@
-# AeroQuest
+# Avi
 
-AeroQuest is a flight-tracking, route-discovery, terminal-wayfinding, and 3D-cabin
+Avi is a flight-tracking, route-discovery, terminal-wayfinding, and 3D-cabin
 travel companion. The repository is a **pnpm + Turborepo TypeScript monorepo**:
-one shared domain layer, one Starter-safe AeroDataBox caching gateway, a Next.js
-web app, and an Expo mobile app.
+one shared domain layer, one Starter-safe AeroDataBox caching gateway, and one
+Next.js web app.
 
-The previous native clients (`apps/android` Kotlin/Compose and `apps/ios` SwiftUI)
-have been removed. Their valuable models, diffing logic, weather mapping, and
-terminal POI schema were ported to `packages/shared` before deletion.
+The native Android/iOS and Expo clients have been removed. Avi is now a
+web-only product.
 
 ---
 
@@ -16,14 +15,13 @@ terminal POI schema were ported to `packages/shared` before deletion.
 | Path | Purpose |
 | --- | --- |
 | `apps/web` | Next.js 16 App Router web app: public route explorer, flight dossier, terminal maps, 3D cabin, SEO pages, `/api/gateway/*` same-origin proxy |
-| `apps/mobile` | Expo / React Native app: route explorer, terminal radar + Sprint Mode, 3D cabin, BCBP scanner, AR bag sizer, offline in-flight HUD |
 | `packages/shared` | Canonical TypeScript models, Zod schemas, flight differ, Open-Meteo client, terminal graph, cabin layouts, BCBP parser, in-flight math, entitlements, gateway SDK |
-| `packages/ui` | Shared cross-platform UI primitives and the React Three Fiber cabin scene |
+| `packages/ui` | Shared UI primitives and the React Three Fiber cabin scene |
 | `packages/contracts` | Existing OpenAPI console-flight contract (kept for the gateway/web migration) |
 | `packages/catalog` | Bundled airport, terminal-layout, and world-country reference data |
 | `packages/design-tokens` | Shared dark-cockpit design tokens (CSS) |
 | `packages/map-style` | Positron-derived MapLibre style |
-| `services/api` | Fastify gateway + Redis cache + watch engine + Expo/Web Push |
+| `services/api` | Fastify gateway + Redis cache + watch engine + Web Push |
 | `supabase` | Postgres schema, RLS, migrations, tests |
 | `infra/server` | Hetzner Docker Compose, Caddy, production env templates |
 
@@ -32,23 +30,22 @@ terminal POI schema were ported to `packages/shared` before deletion.
 ## Architecture
 
 ```text
-Web (Next.js) ─┐
-               ├─→ /api/gateway/* (same-origin proxy) ─→ Hetzner Fastify gateway ─→ AeroDataBox
-Mobile (Expo) ─┘                                          │
+Web (Next.js) ─→ /api/gateway/* (same-origin proxy) ─→ Hetzner Fastify gateway ─→ AeroDataBox
+                                                          │
                                                           ├─→ Redis provider cache (single-flight)
                                                           ├─→ Supabase (auth, trips, snapshots,
                                                           │             cabin layouts, alerts)
                                                           └─→ Open-Meteo (free arrival weather)
 ```
 
-**Clients never call AeroDataBox directly.** The Starter plan is protected by a
-shared cache and request coalescing:
+**The browser never calls AeroDataBox directly.** The Starter plan is protected
+by a shared cache and request coalescing:
 
-- 50 passengers refreshing the same flight produce **one** provider call and one
+- 50 visitors refreshing the same flight produce **one** provider call and one
   fan-out.
 - `flightStateDiffer` runs only on a fresh response; gate, terminal, delay,
-  status, and baggage changes are written to Supabase and fanned out with Expo
-  Push (native) or Web Push.
+  status, and baggage changes are written to Supabase and delivered with Web
+  Push.
 - The diff itself is coalesced through the same Redis lock, so a burst cannot
   duplicate notifications across replicas.
 
@@ -76,8 +73,8 @@ so the browser stays same-origin and never receives a provider key.
 ### 1. Direct Route Explorer Globe
 `/explore/[iata]` is public, shareable, and SEO-indexed. It renders a MapLibre
 globe with great-circle route arcs colour-coded by haul, airline filters, and
-cached destination weather. The same network is available in the mobile app with
-a 2D world map and destination weather on tap.
+cached destination weather. `/explore` adds a world airport map coloured by
+approximate non-stop connectivity.
 
 ### 2. 3D Cabin & Seat Twin
 `packages/ui/src/cabin/CabinViewer3D.tsx` renders a parametric deck for the
@@ -86,13 +83,11 @@ generic fallback). Selecting a seat highlights it and reports window alignment,
 pitch, power/USB, lavatory/exit proximity, and overhead-bin dimensions. Layouts
 are cached in the Supabase `cabin_layouts` table.
 
-### 3. Terminal Radar and Sprint Mode
-`apps/mobile/src/screens/TerminalMapScreen.tsx` renders an isometric terminal
-from the curated indoor POI catalog. Quick-filter pills route to the nearest
-restroom, security, immigration, water, power, or lounge. `evaluateSprintMode`
-activates below 45 minutes between arrival and boarding, returns the fastest
-graph path, and highlights moving walkways or terminal trains. Fog-of-war
-passport visits are stored in Supabase (`passport_visits`).
+### 3. Flight tracking and terminal wayfinding
+The server watch engine polls only tracked flights, writes merged snapshots and
+change alerts, and keeps the web client live through Supabase Realtime and Web
+Push. Terminal graphs and curated indoor layouts power the terminal map and
+Sprint Mode.
 
 Curated layouts remain the deterministic fallback. To ingest OpenStreetMap
 indoor tags into the `terminal_graphs` table:
@@ -102,37 +97,22 @@ pnpm --filter @avi/api ingest:indoor -- CAI --terminal=T3 --radius=2500
 ```
 
 The gateway exposes the result at
-`/api/gateway/airports/:iata/terminal-graph`; the mobile terminal screen uses it
-as a fallback when no curated layout exists and a terminal id is supplied.
+`/api/gateway/airports/:iata/terminal-graph`.
 
-### 4. Boarding Pass Scanner + AR Carry-On Sizer
-BCBP (IATA Resolution 792) data from PDF417/Aztec/QR is parsed **on-device** by
-`packages/shared/src/services/boardingPassParser.ts`: PNR, flight, Julian date,
-origin/destination, seat, and cabin are extracted with zero API cost. The mobile
-scanner then fetches live status from the gateway. The carry-on sizer compares a
-measured bag against the aircraft's overhead-bin envelope.
-
-### 5. Offline In-Flight HUD
-The mobile HUD reads the phone barometer via `expo-sensors`, estimates cabin
-altitude, detects climb/cruise/top-of-descent, interpolates the cached
-great-circle route from the actual takeoff time, and shows an estimated cabin
-timeline and offline landmark callouts.
+### 4. Boarding pass parsing
+BCBP (IATA Resolution 792) data from PDF417/Aztec/QR is parsed **in the browser**
+by `packages/shared/src/services/boardingPassParser.ts`: PNR, flight, Julian
+date, origin/destination, seat, and cabin are extracted with zero API cost.
 
 ### Monetisation
 - Free: route explorer, basic flight lookup, 2D terminal map.
-- Pro: instant gate/terminal/status alerts, 3D cabin, Sprint Mode, offline HUD,
-  fog-of-war passport, AR bag sizer.
+- Pro: instant gate/terminal/status alerts, 3D cabin, Sprint Mode, fog-of-war
+  passport.
 - `$4.99 Single-Trip Pass`: trip-scoped access to the Pro travel features.
 - Contextual cards only: a 2h+ delay shows a lounge affiliate hook; a landed
   international flight shows an eSIM hook. No banner ads.
 - `/pricing` presents the plans; checkout stays explicitly unavailable until a
   provider or hosted trip-pass URL is configured.
-
-### Mobile account and flights
-The Expo app has email/password Supabase auth, session refresh, Expo push
-registration after sign-in, a flight lookup/airport board screen, tracked-flight
-offline snapshots, and a flight dossier with Terminal Map / Offline HUD actions.
-Passport visits sync when signed in and remain local when offline.
 
 ---
 
@@ -161,16 +141,14 @@ pnpm dev
 - Web: <http://localhost:3000>
 - Gateway: <http://localhost:8080>
 - OpenAPI: <http://localhost:8080/openapi.json>
-- Mobile: `pnpm --filter @avi/mobile start` (Expo Go / dev client)
 
 Copy root `.env.example` values as needed. A full explanation of each value,
-including Supabase, AeroDataBox, VAPID, Expo Push, EAS, and affiliate setup, is
-in [`docs/environment.md`](docs/environment.md).
+including Supabase, AeroDataBox, VAPID, and affiliate setup, is in
+[`docs/environment.md`](docs/environment.md).
 
 ```bash
 cp apps/web/.env.example apps/web/.env.local
 cp services/api/.env.example services/api/.env
-cp apps/mobile/.env.example apps/mobile/.env
 ```
 
 `AERODATABOX_API_KEY` is server-only. Production must set `AVI_API_BASE_URL`; the
@@ -217,8 +195,7 @@ the release.
 
 Documented in `.env.example`: `AERODATABOX_API_KEY`, `SUPABASE_URL`,
 `SUPABASE_ANON_KEY` / `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`,
-`REDIS_URL`, `AVI_API_BASE_URL`, VAPID/Expo push keys, and public web/mobile
-origins.
+`REDIS_URL`, `AVI_API_BASE_URL`, VAPID push keys, and the public web origin.
 
 ---
 

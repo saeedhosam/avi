@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Globe2, MapPin, RefreshCw } from "lucide-react";
 import { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
 import {
@@ -467,12 +468,12 @@ export function ExploreGlobe({
                 </p>
               ) : null}
               <div className="mt-4 grid gap-2">
-                <a
-                  href="aeroquest://cabin/B77W/14A"
+                <Link
+                  href="/cabin/B77W/14A"
                   className="rounded-lg bg-accent px-3 py-2.5 text-center text-[13px] font-semibold text-[color:var(--bg)]"
                 >
-                  Open AeroQuest mobile
-                </a>
+                  Open 3D cabin preview
+                </Link>
               </div>
             </section>
           ) : null}

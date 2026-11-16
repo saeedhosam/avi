@@ -485,7 +485,7 @@ export class SupabaseServer {
     return expiresAt;
   }
 
-  // ── Gateway push fan-out (AeroQuest) ───────────────────────────────────────
+  // ── Gateway push fan-out (Avi) ───────────────────────────────────────
 
   /**
    * Users tracking a specific flight on a specific operating date. Watchlist

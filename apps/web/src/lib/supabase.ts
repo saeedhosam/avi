@@ -329,8 +329,3 @@ export function subscribeToUserData(
     void supabase.removeChannel(channel);
   };
 }
-
-// Web Push is implemented in the next phase; keep the current UI contract stable.
-export async function requestFcmToken(): Promise<string | null> {
-  return null;
-}

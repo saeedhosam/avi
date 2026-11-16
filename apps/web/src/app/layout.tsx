@@ -26,12 +26,12 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "AeroQuest · Flight Tracking & Route Explorer",
-    template: "%s · AeroQuest",
+    default: "Avi · Flight Tracking & Route Explorer",
+    template: "%s · Avi",
   },
   description:
-    "AeroQuest is a travel companion for direct-route discovery, live flight tracking, terminal wayfinding, 3D cabin seat twins, boarding-pass import, and offline in-flight awareness.",
-  applicationName: "AeroQuest",
+    "Avi is a web travel companion for direct-route discovery, live flight tracking, airport boards, terminal wayfinding, 3D cabin seat twins, and flight alerts.",
+  applicationName: "Avi",
   keywords: [
     "flight tracker",
     "direct flights",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     "airport terminal map",
     "3d cabin seat map",
     "aviation weather",
-    "boarding pass scanner",
+    "flight alerts",
   ],
 };
 

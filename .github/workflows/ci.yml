@@ -42,35 +42,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-  mobile-bundle:
-    name: Expo iOS JS bundle
-    runs-on: ubuntu-latest
-    env:
-      CI: "1"
-      EXPO_NO_TELEMETRY: "1"
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.7.0 --activate
-      - name: Install
-        run: pnpm install --frozen-lockfile
-      - name: Build shared packages
-        run: |
-          pnpm --filter @avi/shared build
-          pnpm --filter @avi/ui build
-      - name: Export iOS bundle
-        working-directory: apps/mobile
-        run: |
-          pnpm exec expo export --platform ios --output-dir /tmp/avi-mobile-export
-      - name: Verify export output
-        run: test -d /tmp/avi-mobile-export
-
   docker-smoke:
     name: Docker API/web smoke test
     runs-on: ubuntu-latest
@@ -83,7 +54,7 @@ jobs:
           docker system prune -af --volumes
       # Full multi-stage builds are intentional: the job must prove the same
       # Dockerfile used by deploy.yml still builds. Both targets share the
-      # pruner/BuildKit cache, and no registry or EAS/cloud credentials are used.
+      # pruner/BuildKit cache, and no registry or cloud credentials are used.
       - name: Build API image
         run: docker build --target api -f Dockerfile -t avi-api:ci .
       - name: Build web image with dummy public env

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const AEROQUEST_FEATURES = [
+export const AVI_FEATURES = [
   "DIRECT_ROUTE_EXPLORER",
   "BASIC_FLIGHT_LOOKUP",
   "TERMINAL_MAP_2D",
@@ -12,15 +12,15 @@ export const AEROQUEST_FEATURES = [
   "AR_BAG_SIZER",
 ] as const;
 
-export type AeroQuestFeature = (typeof AEROQUEST_FEATURES)[number];
+export type AviFeature = (typeof AVI_FEATURES)[number];
 
-export const AEROQUEST_PRODUCTS = [
+export const AVI_PRODUCTS = [
   "FREE",
   "PLUS_MONTHLY",
   "PRO_MONTHLY",
   "TRIP_PASS_4_99",
 ] as const;
-export type AeroQuestProduct = (typeof AEROQUEST_PRODUCTS)[number];
+export type AviProduct = (typeof AVI_PRODUCTS)[number];
 
 export interface EntitlementContext {
   plan: string;
@@ -36,29 +36,29 @@ export const entitlementContextSchema: z.ZodType<EntitlementContext> = z.object(
 });
 
 export interface EntitlementDecision {
-  feature: AeroQuestFeature;
+  feature: AviFeature;
   allowed: boolean;
   reason: "PLAN" | "TRIP_PASS" | "FREE_TIER" | "PAYWALLED" | "EXPIRED";
-  product: AeroQuestProduct;
+  product: AviProduct;
   upgradePrompt: string | null;
 }
 
 export const entitlementDecisionSchema: z.ZodType<EntitlementDecision> =
   z.object({
-    feature: z.enum(AEROQUEST_FEATURES),
+    feature: z.enum(AVI_FEATURES),
     allowed: z.boolean(),
     reason: z.enum(["PLAN", "TRIP_PASS", "FREE_TIER", "PAYWALLED", "EXPIRED"]),
-    product: z.enum(AEROQUEST_PRODUCTS),
+    product: z.enum(AVI_PRODUCTS),
     upgradePrompt: z.string().nullable(),
   });
 
-export const FREE_FEATURES: readonly AeroQuestFeature[] = [
+export const FREE_FEATURES: readonly AviFeature[] = [
   "DIRECT_ROUTE_EXPLORER",
   "BASIC_FLIGHT_LOOKUP",
   "TERMINAL_MAP_2D",
 ];
 
-export const PRO_FEATURES: readonly AeroQuestFeature[] = [
+export const PRO_FEATURES: readonly AviFeature[] = [
   ...FREE_FEATURES,
   "PUSH_GATE_ALERTS",
   "CABIN_VIEWER_3D",
@@ -68,7 +68,7 @@ export const PRO_FEATURES: readonly AeroQuestFeature[] = [
   "AR_BAG_SIZER",
 ];
 
-export const TRIP_PASS_FEATURES: readonly AeroQuestFeature[] = [
+export const TRIP_PASS_FEATURES: readonly AviFeature[] = [
   "PUSH_GATE_ALERTS",
   "CABIN_VIEWER_3D",
   "SPRINT_MODE",

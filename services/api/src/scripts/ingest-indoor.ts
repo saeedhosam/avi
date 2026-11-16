@@ -81,7 +81,7 @@ out skel qt;`;
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
-      "User-Agent": "AeroQuest-Indoor-Ingest/1.0 (ops@aeroquest.local)",
+      "User-Agent": "Avi-Indoor-Ingest/1.0 (ops@avi.local)",
     },
     body: new URLSearchParams({ data: query }),
     signal: AbortSignal.timeout(120_000),

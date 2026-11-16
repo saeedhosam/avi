@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Shared AeroQuest cross-platform UI and 3D cabin scene primitives.",
+  "description": "Shared Avi UI and 3D cabin scene primitives.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -1,15 +1,15 @@
 import {
-  AEROQUEST_FEATURES,
+  AVI_FEATURES,
   FREE_FEATURES,
   PRO_FEATURES,
   TRIP_PASS_FEATURES,
-  type AeroQuestFeature,
-  type AeroQuestProduct,
+  type AviFeature,
+  type AviProduct,
   type EntitlementContext,
   type EntitlementDecision,
 } from "../models/entitlements.js";
 
-const PLUS_LIKE = new Set(["PLUS", "PRO", "PREMIUM", "AEROQUEST_PRO"]);
+const PLUS_LIKE = new Set(["PLUS", "PRO", "PREMIUM", "AVI_PRO"]);
 
 function nowMs(context: EntitlementContext): number {
   const parsed = context.now ? Date.parse(context.now) : Date.now();
@@ -24,16 +24,16 @@ export function activeTripPass(
   return Number.isFinite(expiry) && expiry > nowMs(context);
 }
 
-export function resolveProduct(context: EntitlementContext): AeroQuestProduct {
+export function resolveProduct(context: EntitlementContext): AviProduct {
   if (activeTripPass(context)) return "TRIP_PASS_4_99";
   const plan = context.plan.trim().toUpperCase();
-  if (plan === "PRO" || plan === "AEROQUEST_PRO") return "PRO_MONTHLY";
+  if (plan === "PRO" || plan === "AVI_PRO") return "PRO_MONTHLY";
   if (plan === "PLUS" || plan === "PREMIUM") return "PLUS_MONTHLY";
   return "FREE";
 }
 
 export function canUseFeature(
-  feature: AeroQuestFeature,
+  feature: AviFeature,
   context: EntitlementContext,
 ): EntitlementDecision {
   const product = resolveProduct(context);
@@ -79,28 +79,28 @@ export function canUseFeature(
 
 export function entitlementsFor(
   context: EntitlementContext,
-): Record<AeroQuestFeature, EntitlementDecision> {
+): Record<AviFeature, EntitlementDecision> {
   return Object.fromEntries(
-    AEROQUEST_FEATURES.map((feature) => [feature, canUseFeature(feature, context)]),
-  ) as Record<AeroQuestFeature, EntitlementDecision>;
+    AVI_FEATURES.map((feature) => [feature, canUseFeature(feature, context)]),
+  ) as Record<AviFeature, EntitlementDecision>;
 }
 
-export function upgradePromptFor(feature: AeroQuestFeature): string {
+export function upgradePromptFor(feature: AviFeature): string {
   switch (feature) {
     case "CABIN_VIEWER_3D":
-      return "Unlock the 3D Cabin & Seat Twin with AeroQuest Pro or a $4.99 Single-Trip Pass.";
+      return "Unlock the 3D Cabin & Seat Twin with Avi Pro or a $4.99 Single-Trip Pass.";
     case "SPRINT_MODE":
-      return "Tight connection? Unlock Sprint Mode with AeroQuest Pro or a $4.99 Single-Trip Pass.";
+      return "Tight connection? Unlock Sprint Mode with Avi Pro or a $4.99 Single-Trip Pass.";
     case "PUSH_GATE_ALERTS":
-      return "Get instant gate, terminal, and baggage alerts with AeroQuest Pro.";
+      return "Get instant gate, terminal, and baggage alerts with Avi Pro.";
     case "OFFLINE_INFLIGHT_HUD":
-      return "Unlock the offline in-flight barometer HUD with AeroQuest Pro or a $4.99 Single-Trip Pass.";
+      return "Unlock the offline in-flight barometer HUD with Avi Pro or a $4.99 Single-Trip Pass.";
     case "AR_BAG_SIZER":
-      return "Check your carry-on against the overhead bin with AeroQuest Pro or a $4.99 Single-Trip Pass.";
+      return "Check your carry-on against the overhead bin with Avi Pro or a $4.99 Single-Trip Pass.";
     case "FOG_OF_WAR":
-      return "Clear terminal fog and collect passport badges with AeroQuest Pro.";
+      return "Clear terminal fog and collect passport badges with Avi Pro.";
     default:
-      return "This feature is included in AeroQuest Pro.";
+      return "This feature is included in Avi Pro.";
   }
 }
 

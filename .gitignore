@@ -13,7 +13,6 @@ coverage/
 *.tsbuildinfo
 .turbo/
 .turbo-cache/
-.expo/
 
 # Editor / IDE
 .idea/

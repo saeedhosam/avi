@@ -1,5 +1,5 @@
 /**
- * Domain types for AeroQuest web.
+ * Domain types for Avi web.
  *
  * The console `Flight` contract (and its dependent airport/telemetry shapes)
  * is the *shared* `@avi/contracts` type set, re-exported here so every page
