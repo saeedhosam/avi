@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import {
   Armchair,
   Bolt,
   Check,
-  ChevronRight,
   Circle,
   Clock3,
   Plane,
@@ -106,11 +104,9 @@ export function FlightTimelineView({
 
 export function AircraftInfoCard({
   aircraft,
-  airlineCode,
   className,
 }: {
   aircraft: AircraftInfo;
-  airlineCode?: string;
   className?: string;
 }) {
   return (
@@ -154,22 +150,13 @@ export function AircraftInfoCard({
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-surface-2/50 px-3 py-2.5">
+      <div className="mt-2 flex items-center gap-2 rounded-lg bg-surface-2/50 px-3 py-2.5">
         <div className="flex min-w-0 items-start gap-2">
           <Armchair className="mt-0.5 size-3.5 shrink-0 text-subtle" />
           <p className="text-xs leading-relaxed text-muted">
             {aircraft.seatLayout ?? "Seat layout not reported."}
           </p>
         </div>
-        <Link
-          href={`/airplanes?model=${encodeURIComponent(aircraft.model)}${
-            airlineCode ? `&airline=${encodeURIComponent(airlineCode)}` : ""
-          }`}
-          className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent transition-colors hover:text-ink"
-        >
-          Seatmap
-          <ChevronRight className="size-3.5" />
-        </Link>
       </div>
     </div>
   );

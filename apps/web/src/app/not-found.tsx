@@ -18,21 +18,15 @@ export default function NotFound() {
           We couldn&apos;t find that page
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          The link may point to a flight or destination that is not available.
-          Your watchlist and saved data are untouched.
+          The link may point to a destination that is not available. Your saved
+          data is untouched.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <Link
-            href="/search"
+            href="/explore/CAI"
             className="inline-flex min-h-10 items-center rounded-lg bg-accent px-4 text-[13px] font-semibold text-[color:var(--bg)]"
           >
-            Go to search
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex min-h-10 items-center rounded-lg border border-line/70 px-4 text-[13px] font-medium text-ink transition-colors hover:border-line-strong"
-          >
-            Home
+            Explore routes
           </Link>
         </div>
       </div>

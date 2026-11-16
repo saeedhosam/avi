@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Globe2, MapPin, RefreshCw } from "lucide-react";
 import { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
 import {
   gatewayRoutesResponseSchema,
   type DirectFlightConnection,
   type DestinationArrivalForecast,
-  type HaulCategory,
 } from "@avi/shared";
 import { useMapLibre } from "@/lib/use-maplibre";
 import {
@@ -21,7 +19,6 @@ import {
 import { routeCoordinates } from "@/lib/geo";
 import { PALETTE } from "@/lib/palette";
 import { cn } from "@/lib/utils";
-import { UpgradeCta } from "@/components/upgrade-cta";
 
 const HAUL_COLORS: Record<string, string> = {
   SHORT_HAUL: PALETTE.haul.SHORT_HAUL,
@@ -29,17 +26,11 @@ const HAUL_COLORS: Record<string, string> = {
   LONG_HAUL: PALETTE.haul.LONG_HAUL,
 };
 
-const HAUL_LABELS: Record<HaulCategory, string> = {
-  ALL: "All ranges",
-  SHORT_HAUL: "Short-haul",
-  MEDIUM_HAUL: "Medium-haul",
-  LONG_HAUL: "Long-haul",
-};
-
 export interface ExploreGlobeProps {
   iata: string;
   airportName: string;
   city: string;
+  country: string;
   /**
    * Route network rendered by the server. `null` means the gateway was
    * unconfigured or unreachable; the client then retries on mount.
@@ -51,6 +42,7 @@ export function ExploreGlobe({
   iata,
   airportName,
   city,
+  country,
   initialRoutes,
 }: ExploreGlobeProps) {
   const seededCount = initialRoutes?.length ?? 0;
@@ -60,8 +52,6 @@ export function ExploreGlobe({
   const [loading, setLoading] = useState(seededCount === 0);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [airline, setAirline] = useState<string | null>(null);
-  const [haul, setHaul] = useState<HaulCategory>("ALL");
   const [selected, setSelected] = useState<DirectFlightConnection | null>(
     initialRoutes?.[0] ?? null,
   );
@@ -130,52 +120,18 @@ export function ExploreGlobe({
 
   const origin = connections[0]?.origin ?? null;
 
-  const airlines = useMemo(() => {
-    const map = new Map<string, { code: string; name: string; count: number }>();
-    for (const connection of connections) {
-      for (const carrier of connection.operatingCarriers) {
-        const key = carrier.airlineCode || carrier.airlineName;
-        const current = map.get(key);
-        if (current) current.count += 1;
-        else
-          map.set(key, {
-            code: carrier.airlineCode,
-            name: carrier.airlineName,
-            count: 1,
-          });
-      }
-    }
-    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 10);
-  }, [connections]);
-
-  const visible = useMemo(
-    () =>
-      connections.filter((connection) => {
-        if (haul !== "ALL" && connection.haulCategory !== haul) return false;
-        if (airline) {
-          return connection.operatingCarriers.some(
-            (carrier) =>
-              carrier.airlineCode === airline || carrier.airlineName === airline,
-          );
-        }
-        return true;
-      }),
-    [connections, haul, airline],
-  );
-
-  // Keep the inspected destination inside the active filter set. Changing a
-  // filter must not leave a hidden route open in the detail panel.
+  // Keep the inspected destination valid when the network is refreshed.
   useEffect(() => {
-    if (!visible.length) {
+    if (!connections.length) {
       setSelected(null);
       return;
     }
     setSelected((current) =>
-      current && visible.some((route) => route.id === current.id)
+      current && connections.some((route) => route.id === current.id)
         ? current
-        : (visible[0] ?? null),
+        : (connections[0] ?? null),
     );
-  }, [visible]);
+  }, [connections]);
 
   // Globe projection + route layers.
   useEffect(() => {
@@ -189,7 +145,7 @@ export function ExploreGlobe({
 
   useEffect(() => {
     if (!map || !origin) return;
-    const features = visible.map((connection) =>
+    const features = connections.map((connection) =>
       lineFeature(
         routeCoordinates(
           [origin.longitude, origin.latitude],
@@ -228,7 +184,7 @@ export function ExploreGlobe({
       map,
       "avi-explore-points",
       collection(
-        visible.map((connection) =>
+        connections.map((connection) =>
           pointFeature(
             connection.id,
             [connection.destination.longitude, connection.destination.latitude],
@@ -285,7 +241,7 @@ export function ExploreGlobe({
 
     const bounds = new LngLatBounds();
     bounds.extend([origin.longitude, origin.latitude]);
-    for (const connection of visible) {
+    for (const connection of connections) {
       bounds.extend([
         connection.destination.longitude,
         connection.destination.latitude,
@@ -294,7 +250,7 @@ export function ExploreGlobe({
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: 70, duration: 0, maxZoom: 3.1 });
     }
-  }, [map, origin, visible]);
+  }, [map, origin, connections]);
 
   useEffect(() => {
     if (!map || !selected || !origin) return;
@@ -328,7 +284,7 @@ export function ExploreGlobe({
     const onClick = (event: MapLayerMouseEvent) => {
       const id = event.features?.[0]?.properties?.id;
       if (typeof id !== "string") return;
-      const connection = visible.find((item) => item.id === id);
+      const connection = connections.find((item) => item.id === id);
       if (connection) setSelected(connection);
     };
     const onEnter = () => {
@@ -347,7 +303,7 @@ export function ExploreGlobe({
       map.off("mouseenter", "avi-explore-point-circles", onEnter);
       map.off("mouseleave", "avi-explore-point-circles", onLeave);
     };
-  }, [map, visible]);
+  }, [map, connections]);
 
   useEffect(() => {
     if (!selected) {
@@ -384,189 +340,142 @@ export function ExploreGlobe({
   }, [selected]);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="relative overflow-hidden rounded-xl border border-line/70 bg-surface">
-        <div ref={containerRef} className="h-[440px] w-full sm:h-[540px] xl:h-[620px]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4">
-          <div className="rounded-lg border border-line/70 bg-bg/85 px-3 py-2 backdrop-blur">
-            <p className="label-caps text-accent">Globe · live cache</p>
-            <p className="mt-1 text-sm font-medium text-ink">
-              {origin ? `${origin.city} (${origin.iata})` : city}
-            </p>
-            <p className="text-xs text-subtle">
+    <div className="explore-map relative h-full w-full overflow-hidden bg-surface">
+      <div ref={containerRef} className="absolute inset-0" />
+
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <header className="pointer-events-auto absolute left-3 right-3 top-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 sm:top-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
+          <div className="flex items-center gap-2">
+            <Globe2 className="size-3.5 text-accent" />
+            <span className="label-caps text-accent">Direct route explorer</span>
+            <span className="ml-auto flex items-center gap-1.5 rounded-full border border-line/70 px-2 py-1 text-[11px] font-medium text-muted">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  loading
+                    ? "animate-pulse-dot bg-accent"
+                    : error
+                      ? "bg-delayed"
+                      : "bg-landed",
+                )}
+              />
+              {loading ? "Syncing" : error ? "Unavailable" : "Live cache"}
+            </span>
+          </div>
+          <h1 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+            Non-stop from {origin?.city ?? city}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            {airportName} · {iata}
+          </p>
+          <p className="mt-2 hidden text-xs leading-relaxed text-muted sm:block">
+            Non-stop destinations are colour-coded by haul and paired with
+            cached arrival weather.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line/70 px-2.5 text-xs text-muted">
+              <MapPin className="size-3.5" /> {origin?.city ?? city}, {country}
+            </span>
+            <span className="text-xs text-subtle">
               {loading && connections.length === 0
                 ? "Loading direct network…"
-                : `${visible.length} of ${connections.length} direct destinations`}
-            </p>
+                : `${connections.length} direct destinations`}
+            </span>
             <button
               type="button"
               onClick={() => setRefreshToken((value) => value + 1)}
               disabled={loading}
-              className="pointer-events-auto mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-line/70 px-2 text-xs font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
+              aria-label="Refresh route data"
+              title="Refresh route data"
+              className="ml-auto inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line/70 px-2.5 text-xs font-medium text-muted transition-colors hover:border-accent/40 hover:text-ink disabled:opacity-50"
             >
               <RefreshCw className={cn("size-3", loading && "animate-spin")} />
-              Refresh
+              <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
-          <div className="pointer-events-auto flex max-w-[70%] flex-wrap justify-end gap-1.5">
-            {(["ALL", "SHORT_HAUL", "MEDIUM_HAUL", "LONG_HAUL"] as HaulCategory[]).map(
-              (option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setHaul(option)}
-                  aria-pressed={haul === option}
-                  className={cn(
-                    "min-h-9 rounded-md border px-2.5 text-xs font-medium backdrop-blur transition-colors",
-                    haul === option
-                      ? "border-accent/40 bg-accent-soft text-accent"
-                      : "border-line/70 bg-bg/80 text-muted hover:text-ink",
-                  )}
-                >
-                  {option === "ALL" ? "All" : HAUL_LABELS[option]}
-                </button>
-              ),
-            )}
-          </div>
-        </div>
-        {error ? (
-          <div className="absolute inset-x-3 bottom-3 rounded-lg border border-cancelled/30 bg-surface/95 p-3.5 text-sm leading-relaxed text-ink backdrop-blur sm:inset-x-4 sm:bottom-4">
-            {error} The explorer never falls back to a static route dataset.
-          </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-4">
-        <section className="rounded-xl border border-line/70 bg-surface/80 p-4">
-          <p className="label-caps text-subtle">Filter by airline</p>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setAirline(null)}
-              aria-pressed={!airline}
-              className={cn(
-                "min-h-9 rounded-md border px-2.5 text-xs font-medium",
-                !airline
-                  ? "border-accent/40 bg-accent-soft text-accent"
-                  : "border-line/70 text-muted hover:text-ink",
-              )}
+          {error ? (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-cancelled/30 bg-cancelled/10 px-3 py-2 text-xs leading-relaxed text-ink"
             >
-              All
-            </button>
-            {airlines.map((carrier) => {
-              const code = carrier.code || carrier.name;
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setAirline(code)}
-                  aria-pressed={airline === code}
-                  className={cn(
-                    "min-h-9 rounded-md border px-2.5 text-xs font-medium",
-                    airline === code
-                      ? "border-accent/40 bg-accent-soft text-accent"
-                      : "border-line/70 text-muted hover:text-ink",
-                  )}
-                >
-                  {code} · {carrier.count}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+              {error} The explorer never falls back to a static route dataset.
+            </p>
+          ) : null}
+        </header>
 
-        {selected ? (
-          <section className="rounded-xl border border-line/70 bg-surface/80 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-mono text-xs font-semibold tracking-[0.14em] text-accent">
-                  {selected.destination.iata}
+        <div className="pointer-events-auto absolute inset-x-3 bottom-3 lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-4 lg:w-[360px]">
+          {selected ? (
+            <section className="rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-mono text-xs font-semibold tracking-[0.14em] text-accent">
+                    {selected.destination.iata}
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink">
+                    {selected.destination.city}
+                  </h2>
+                  <p className="text-[13px] text-muted">
+                    {selected.destination.name}
+                  </p>
+                </div>
+                <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium tabular text-muted">
+                  {Math.round(selected.distanceKm).toLocaleString()} km
+                </span>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+                <div>
+                  <dt className="text-xs text-subtle">Duration</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    {selected.durationFormatted
+                      ? `~${selected.durationFormatted}`
+                      : "Not reported"}
+                    {selected.durationEstimated ? (
+                      <span className="ml-1 text-xs font-normal text-subtle">
+                        estimate
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-subtle">Daily flights</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    {selected.dailyFlightsCount ?? "Not reported"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-subtle">Airlines</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    {selected.operatingCarriers.length}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-subtle">Weather</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    {weatherLoading
+                      ? "Loading…"
+                      : weather?.dataAvailable
+                        ? `${weather.arrivalTempC}°C · ${weather.arrivalCondition}`
+                        : "Unavailable"}
+                  </dd>
+                </div>
+              </dl>
+              {weather?.dataAvailable ? (
+                <p className="mt-2.5 text-xs leading-relaxed text-muted">
+                  {weather.windCondition} · {weather.visibility} ·{" "}
+                  {weather.advisory.arrivalNotice}
                 </p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink">
-                  {selected.destination.city}
-                </h2>
-                <p className="text-[13px] text-muted">{selected.destination.name}</p>
+              ) : null}
+              <div className="mt-4 grid gap-2">
+                <a
+                  href="aeroquest://cabin/B77W/14A"
+                  className="rounded-lg bg-accent px-3 py-2.5 text-center text-[13px] font-semibold text-[color:var(--bg)]"
+                >
+                  Open AeroQuest mobile
+                </a>
               </div>
-              <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium tabular text-muted">
-                {Math.round(selected.distanceKm).toLocaleString()} km
-              </span>
-            </div>
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-              <div>
-                <dt className="text-xs text-subtle">Duration</dt>
-                <dd className="mt-0.5 font-medium text-ink">
-                  {selected.durationFormatted ? `~${selected.durationFormatted}` : "Not reported"}
-                  {selected.durationEstimated ? (
-                    <span className="ml-1 text-xs font-normal text-subtle">
-                      estimate
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Daily flights</dt>
-                <dd className="mt-0.5 font-medium text-ink">
-                  {selected.dailyFlightsCount ?? "Not reported"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Airlines</dt>
-                <dd className="mt-0.5 font-medium text-ink">
-                  {selected.operatingCarriers.length}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Weather</dt>
-                <dd className="mt-0.5 font-medium text-ink">
-                  {weatherLoading
-                    ? "Loading…"
-                    : weather?.dataAvailable
-                      ? `${weather.arrivalTempC}°C · ${weather.arrivalCondition}`
-                      : "Unavailable"}
-                </dd>
-              </div>
-            </dl>
-            {weather?.dataAvailable ? (
-              <p className="mt-2.5 text-xs leading-relaxed text-muted">
-                {weather.windCondition} · {weather.visibility} ·{" "}
-                {weather.advisory.arrivalNotice}
-              </p>
-            ) : null}
-            <div className="mt-4 grid gap-2">
-              <Link
-                href={`/cabin/B77W/14A`}
-                className="rounded-lg bg-accent px-3 py-2.5 text-center text-[13px] font-semibold text-[color:var(--bg)]"
-              >
-                Track &amp; unlock 3D cabin in app
-              </Link>
-              <a
-                href="aeroquest://cabin/B77W/14A"
-                className="rounded-lg border border-line/70 px-3 py-2.5 text-center text-[13px] font-medium text-ink"
-              >
-                Open AeroQuest mobile
-              </a>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-xl border border-line/70 bg-surface/80 p-4 text-xs leading-relaxed text-muted">
-          <p className="label-caps text-subtle">What this page shows</p>
-          <p className="mt-2">
-            Non-stop destinations from {airportName}. Distances are computed from
-            verified airport coordinates; durations are distance-derived
-            estimates unless marked as a schedule. Route statistics are cached
-            for 7 days on the Hetzner gateway.
-          </p>
-          <p className="mt-2">
-            Missing providers, weather, or airline frequencies are shown as
-            unavailable. AeroQuest never fills them with a guessed value.
-          </p>
-        </section>
-
-        <UpgradeCta
-          title="Keep the globe. Unlock the trip."
-          body="The route explorer stays free. AeroQuest Pro or the $4.99 Single-Trip Pass adds live tracking, saved trip cabins, Sprint Mode, and the offline in-flight HUD."
-        />
+            </section>
+          ) : null}
+        </div>
       </div>
     </div>
   );

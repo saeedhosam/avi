@@ -150,8 +150,8 @@ export default function FlightMapPage() {
                 : "We could not find a live record for this flight and date. The provider may not cover it."
             }
             action={
-              <Link href="/search">
-                <Button size="sm">Back to search</Button>
+              <Link href="/explore/CAI">
+                <Button size="sm">Back to explore</Button>
               </Link>
             }
           />

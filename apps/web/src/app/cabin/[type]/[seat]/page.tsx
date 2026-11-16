@@ -10,7 +10,6 @@ import {
   type CabinSeat,
 } from "@avi/shared";
 import { cn } from "@/lib/utils";
-import { UpgradeCta } from "@/components/upgrade-cta";
 import { Button, PageHeader, Panel } from "@/components/ui";
 
 const CabinViewer3D = dynamic(
@@ -211,11 +210,6 @@ export default function CabinPage() {
               {layout.disclaimer}
             </p>
           </Panel>
-
-          <UpgradeCta
-            title="This cabin preview is free."
-            body="AeroQuest Pro or the $4.99 Single-Trip Pass unlocks saved trip cabins, live seat tracking, Sprint Mode, and the offline in-flight HUD. The 3D preview never requires payment."
-          />
         </div>
       </div>
     </div>

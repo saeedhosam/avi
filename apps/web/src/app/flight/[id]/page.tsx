@@ -5,11 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  ChevronRight,
   Edit3,
   Expand,
   Glasses,
-  Layers,
   Map as MapIcon,
   MapPin,
   NotebookPen,
@@ -233,8 +231,8 @@ export default function FlightDetailPage() {
                       : "No live data found for this number and date. It may not be operating, or the provider may not cover it."
               }
               action={
-                <Link href="/search">
-                  <Button size="sm">Search live flights</Button>
+                <Link href="/explore/CAI">
+                  <Button size="sm">Explore direct routes</Button>
                 </Link>
               }
             />
@@ -493,11 +491,6 @@ export default function FlightDetailPage() {
                 <Button size="sm" onClick={() => setMapExpanded((value) => !value)} variant="outline">
                   <Expand className="size-3.5" /> {mapExpanded ? "Compact radar" : "Expand radar"}
                 </Button>
-                <Link href={`/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`}>
-                  <Button size="sm" variant="outline">
-                    <Layers className="size-3.5" /> Airport indoor map
-                  </Button>
-                </Link>
                 <Button size="sm" variant="ghost" onClick={() => setShareOpen(true)}>
                   <Share2 className="size-3.5" /> Share status
                 </Button>
@@ -526,11 +519,6 @@ export default function FlightDetailPage() {
               )}
               secondary={reportedOrUnavailable(flight.checkInCounter)}
               icon={<PlaneTakeoff className="size-4" />}
-              onMap={() =>
-                router.push(
-                  `/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
-                )
-              }
             />
             <GateTile
               label="Arrival gate"
@@ -540,11 +528,6 @@ export default function FlightDetailPage() {
               )}
               secondary={reportedOrUnavailable(flight.baggageCarousel)}
               icon={<PlaneLanding className="size-4" />}
-              onMap={() =>
-                router.push(
-                  `/airports?airport=${flight.destination.code}&gate=${encodeURIComponent(flight.gateArrival)}`,
-                )
-              }
             />
           </div>
 
@@ -656,15 +639,6 @@ export default function FlightDetailPage() {
                 label={refreshingCurrent ? "Refreshing flight" : "Refresh flight"}
                 onClick={() => void refreshCurrentFlight()}
               />
-              <MiniAction
-                icon={<Layers className="size-3.5" />}
-                label="Indoor Map"
-                onClick={() =>
-                  router.push(
-                    `/airports?airport=${flight.origin.code}&gate=${encodeURIComponent(flight.gateDeparture)}`,
-                  )
-                }
-              />
             </div>
           </Panel>
 
@@ -706,10 +680,7 @@ export default function FlightDetailPage() {
             )}
           </Panel>
 
-          <AircraftInfoCard
-            aircraft={flight.aircraft}
-            airlineCode={flight.airlineCode}
-          />
+          <AircraftInfoCard aircraft={flight.aircraft} />
 
           <Panel className="p-3.5">
             <p className="label-caps text-subtle">Flight data</p>
@@ -843,13 +814,11 @@ function GateTile({
   primary,
   secondary,
   icon,
-  onMap,
 }: {
   label: string;
   primary: string;
   secondary: string;
   icon: React.ReactNode;
-  onMap: () => void;
 }) {
   return (
     <div className="rounded-xl border border-line/70 bg-surface p-3.5">
@@ -859,12 +828,6 @@ function GateTile({
       </div>
       <p className="mt-1.5 truncate text-sm font-semibold text-ink">{primary}</p>
       <p className="mt-0.5 truncate text-xs text-accent-2">{secondary}</p>
-      <button
-        onClick={onMap}
-        className="-mx-1 mt-2 flex min-h-9 items-center gap-1 rounded-md px-1 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
-      >
-        Open terminal map <ChevronRight className="size-3" />
-      </button>
     </div>
   );
 }

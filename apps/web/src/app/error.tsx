@@ -25,15 +25,19 @@ export default function RouteError({
           icon={<Plane className="size-6" />}
           title="This screen hit turbulence"
           description={
-            "A live data error interrupted this page. Your watchlist, notes, and alerts are safe — retry the view or head back to search."
+            "A live data error interrupted this page. Your saved data and alerts are safe — retry the view or head back to the route explorer."
           }
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button size="sm" onClick={reset}>
                 Retry
               </Button>
-              <Button size="sm" variant="outline" onClick={() => router.push("/search")}>
-                Back to search
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push("/explore/CAI")}
+              >
+                Back to explore
               </Button>
             </div>
           }

@@ -4,20 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  BadgeDollarSign,
   Bell,
-  Building2,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
-  Glasses,
   Globe2,
   Info,
   LayoutGrid,
-  Network,
   Plane,
   RefreshCw,
-  Search,
   Settings2,
   X,
 } from "lucide-react";
@@ -38,39 +33,15 @@ type NavItem = {
 
 const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
-    label: "Plan",
+    label: "Explore",
     items: [
-      { href: "/search", label: "Search", icon: Search },
       { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
-      { href: "/routes", label: "Routes", icon: Network },
-    ],
-  },
-  {
-    label: "At the airport",
-    items: [
-      { href: "/airports", label: "Airports", icon: Building2 },
-      {
-        href: "/airplanes",
-        label: "Airplanes",
-        icon: Plane,
-        matches: ["/airplanes", "/cabin"],
-      },
-    ],
-  },
-  {
-    label: "Your account",
-    items: [
-      { href: "/watchlist", label: "Watchlist", icon: Glasses },
-      { href: "/pricing", label: "Plans", icon: BadgeDollarSign },
     ],
   },
 ];
 
 const MOBILE_ITEMS: NavItem[] = [
-  { href: "/search", label: "Search", icon: Search },
   { href: "/explore/CAI", label: "Explore", icon: Globe2, matches: ["/explore"] },
-  { href: "/airports", label: "Airports", icon: Building2 },
-  { href: "/watchlist", label: "Watchlist", icon: Glasses },
 ];
 
 function isActive(pathname: string, item: NavItem) {
@@ -83,7 +54,6 @@ function isActive(pathname: string, item: NavItem) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
-    watchlist,
     unreadAlertCount,
     account,
     refreshData,
@@ -99,9 +69,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const source = DATA_SOURCE_META[dataSourceMode];
-  const moreActive = ["/routes", "/airplanes", "/cabin", "/pricing"].some(
-    (href) => pathname === href || pathname.startsWith(`${href}/`),
-  );
 
   return (
     <div className="app-bg min-h-screen">
@@ -112,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Desktop rail */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line/60 bg-surface/70 backdrop-blur-xl lg:flex">
         <Link
-          href="/search"
+          href="/explore/CAI"
           className="flex h-[68px] items-center gap-2.5 border-b border-line/50 px-5 transition-colors hover:bg-surface-2/40"
         >
           <span className="flex size-9 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent">
@@ -123,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               AeroQuest
             </span>
             <span className="mt-1 block whitespace-nowrap text-xs font-medium text-subtle">
-              Route · Terminal · Cabin
+              Direct-route explorer
             </span>
           </span>
         </Link>
@@ -158,11 +125,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         )}
                       />
                       <span className="flex-1">{item.label}</span>
-                      {item.href === "/watchlist" && watchlist.length > 0 && (
-                        <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-xs font-semibold tabular text-muted">
-                          {watchlist.length}
-                        </span>
-                      )}
                     </Link>
                   );
                 })}
@@ -258,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-surface/95 backdrop-blur-xl lg:hidden"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-2">
           {MOBILE_ITEMS.map((item) => {
             const active = isActive(pathname, item);
             const Icon = item.icon;
@@ -274,9 +236,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <span className="relative">
                   <Icon className="size-5" />
-                  {item.href === "/watchlist" && watchlist.length > 0 && (
-                    <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-accent" />
-                  )}
                 </span>
                 {item.label}
               </Link>
@@ -288,9 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-expanded={moreOpen}
             className={cn(
               "flex min-h-[58px] flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
-              moreActive || moreOpen
-                ? "text-accent"
-                : "text-subtle hover:text-ink",
+              moreOpen ? "text-accent" : "text-subtle hover:text-ink",
             )}
           >
             <span className="relative">
@@ -315,7 +272,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <MoreSheet
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
-        pathname={pathname}
         onAlerts={() => {
           setMoreOpen(false);
           setNotificationsOpen(true);
@@ -433,7 +389,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function MoreSheet({
   open,
   onClose,
-  pathname,
   onAlerts,
   onAccount,
   onSource,
@@ -441,53 +396,30 @@ function MoreSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  pathname: string;
   onAlerts: () => void;
   onAccount: () => void;
   onSource: () => void;
   accountName: string;
 }) {
-  const rows: Array<
-    | { kind: "link"; href: string; label: string; icon: LucideIcon; detail: string }
-    | { kind: "action"; label: string; icon: LucideIcon; detail: string; onPress: () => void }
-  > = [
+  const rows: Array<{
+    label: string;
+    icon: LucideIcon;
+    detail: string;
+    onPress: () => void;
+  }> = [
     {
-      kind: "link",
-      href: "/routes",
-      label: "Routes",
-      icon: Network,
-      detail: "Global connection planner",
-    },
-    {
-      kind: "link",
-      href: "/airplanes",
-      label: "Airplanes",
-      icon: Plane,
-      detail: "Cabin and seat maps",
-    },
-    {
-      kind: "link",
-      href: "/pricing",
-      label: "Plans",
-      icon: BadgeDollarSign,
-      detail: "Free · Pro · Trip Pass",
-    },
-    {
-      kind: "action",
       label: "Alerts",
       icon: Bell,
       detail: "Watchlist notifications",
       onPress: onAlerts,
     },
     {
-      kind: "action",
       label: accountName,
       icon: Settings2,
       detail: "Account and sync",
       onPress: onAccount,
     },
     {
-      kind: "action",
       label: "Data & API status",
       icon: Info,
       detail: "Sources and availability",
@@ -500,17 +432,14 @@ function MoreSheet({
       <div className="divide-y divide-line/60">
         {rows.map((row) => {
           const Icon = row.icon;
-          const active =
-            row.kind === "link" &&
-            (pathname === row.href || pathname.startsWith(`${row.href}/`));
-          const inner = (
-            <>
-              <span
-                className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface-2",
-                  active ? "text-accent" : "text-muted",
-                )}
-              >
+          return (
+            <button
+              key={row.label}
+              type="button"
+              onClick={row.onPress}
+              className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface-2 text-muted">
                 <Icon className="size-4" />
               </span>
               <span className="min-w-0 flex-1">
@@ -522,25 +451,6 @@ function MoreSheet({
                 </span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-subtle" />
-            </>
-          );
-          return row.kind === "link" ? (
-            <Link
-              key={row.href}
-              href={row.href}
-              onClick={onClose}
-              className="flex min-h-14 items-center gap-3 py-2.5"
-            >
-              {inner}
-            </Link>
-          ) : (
-            <button
-              key={row.label}
-              type="button"
-              onClick={row.onPress}
-              className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left"
-            >
-              {inner}
             </button>
           );
         })}

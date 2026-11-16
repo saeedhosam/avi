@@ -127,6 +127,32 @@ body {
   box-shadow: var(--shadow-glow);
 }
 
+/* Full-bleed explorer canvas that fills the app content area. */
+.explore-viewport {
+  height: calc(
+    100dvh - 4.5rem - env(safe-area-inset-top, 0px) -
+      env(safe-area-inset-bottom, 0px)
+  );
+}
+
+@media (min-width: 1024px) {
+  .explore-viewport {
+    height: 100dvh;
+  }
+}
+
+/* Keep the collapsed map attribution clear of the floating destination card. */
+.explore-map .maplibregl-ctrl-bottom-right {
+  bottom: 0.75rem;
+  right: 0.75rem;
+}
+
+@media (max-width: 1023.98px) {
+  .explore-map .maplibregl-ctrl-bottom-right {
+    bottom: 16rem;
+  }
+}
+
 /* Safe-area helpers for the mobile web chrome. */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
