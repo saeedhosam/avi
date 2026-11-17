@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { routeAirports } from "../src/lib/data";
 import { watchRowId } from "../src/lib/supabase";
 import { AIRCRAFT_PRESETS } from "../src/lib/airplane-data";
 import { mapOpenMeteoToForecast } from "../src/lib/weather";
@@ -77,6 +78,35 @@ describe("data integrity guards", () => {
       const node = referenceAirports.find((entry) => entry.iata === iata);
       if (!node) continue;
       expect(node.historical).toBe(true);
+    }
+  });
+
+  it("ships the local glyph and sprite subsets used by the globe", () => {
+    const assets = [
+      "../public/map/glyphs/Noto Sans Regular/0-255.pbf",
+      "../public/map/glyphs/Noto Sans Bold/0-255.pbf",
+      "../public/map/glyphs/Noto Sans Italic/0-255.pbf",
+      "../public/map/sprite/ofm.json",
+      "../public/map/sprite/ofm.png",
+      "../public/map/sprite/ofm@2x.png",
+    ];
+    for (const asset of assets) {
+      expect(statSync(new URL(asset, import.meta.url)).size).toBeGreaterThan(0);
+    }
+  });
+
+  it("limits the map catalogue to airports-routes.csv rows with coordinates", () => {
+    expect(routeAirports.length).toBeGreaterThan(3000);
+    expect(routeAirports.length).toBeLessThan(referenceAirports.length);
+    expect(new Set(routeAirports.map((airport) => airport.iata)).size).toBe(
+      routeAirports.length,
+    );
+    for (const airport of routeAirports) {
+      expect(airport.iata).toMatch(/^[A-Z]{3}$/);
+      expect(airport.destCount ?? 0).toBeGreaterThan(0);
+      expect(Number.isFinite(airport.latitude)).toBe(true);
+      expect(Number.isFinite(airport.longitude)).toBe(true);
+      expect(airport.historical).not.toBe(true);
     }
   });
 });

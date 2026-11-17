@@ -6,6 +6,7 @@ import {
   NavigationControl,
   Map as MapLibreMapClass,
   setWorkerUrl,
+  type StyleSpecification,
 } from "maplibre-gl";
 import type {
   Feature,
@@ -43,11 +44,17 @@ export function createBaseMap(
     attribution?: boolean;
     /** Built-in +/- control. Custom map HUDs supply their own controls. */
     navigation?: boolean;
+    /** Local style for a network-free first paint; defaults to the full style. */
+    style?: StyleSpecification | string | (() => StyleSpecification | string);
   } = {},
 ): MapLibreMap {
+  const style =
+    typeof options.style === "function"
+      ? options.style()
+      : (options.style ?? MAP_STYLE_URL);
   const map = new MapLibreMapClass({
     container,
-    style: MAP_STYLE_URL,
+    style,
     center: options.center ?? [10, 24],
     zoom: options.zoom ?? 2,
     minZoom: options.minZoom ?? 1,
@@ -61,12 +68,15 @@ export function createBaseMap(
   if (options.attribution !== false) {
     const attribControl = new AttributionControl({
       compact: true,
-      customAttribution: "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
+      customAttribution:
+        "© OpenStreetMap contributors · Tiles by OpenFreeMap · Weather data by Open-Meteo",
     });
     map.addControl(attribControl, "bottom-right");
 
     const collapseAttribution = () => {
-      const attribContainer = (attribControl as unknown as { _container?: HTMLElement })._container;
+      const attribContainer = (
+        attribControl as unknown as { _container?: HTMLElement }
+      )._container;
       if (attribContainer) {
         attribContainer.classList.add("maplibregl-compact");
         attribContainer.classList.remove("maplibregl-compact-show");
@@ -89,7 +99,9 @@ export function createBaseMap(
 export function setGeoJson(
   map: MapLibreMap,
   id: string,
-  data: FeatureCollection<Geometry> | FeatureCollection<Geometry, Record<string, unknown>>,
+  data:
+    | FeatureCollection<Geometry>
+    | FeatureCollection<Geometry, Record<string, unknown>>,
 ) {
   const source = map.getSource(id) as GeoJSONSource | undefined;
   if (source) {
@@ -114,11 +126,7 @@ export function setBaseSymbolLayersVisible(map: MapLibreMap, visible: boolean) {
   for (const layer of layers) {
     if (layer.type !== "symbol" || layer.id.startsWith("avi-")) continue;
     if (!map.getLayer(layer.id)) continue;
-    map.setLayoutProperty(
-      layer.id,
-      "visibility",
-      visible ? "visible" : "none",
-    );
+    map.setLayoutProperty(layer.id, "visibility", visible ? "visible" : "none");
   }
 }
 

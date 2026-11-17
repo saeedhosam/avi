@@ -8,20 +8,18 @@ import { routeAirports } from "@/lib/data";
 export const metadata: Metadata = {
   title: "Global airport connectivity map",
   description:
-    "Explore every airport on one globe, coloured by its approximate number of non-stop routes. Select an airport to open its direct-route network.",
+    "Explore every airport with active routes on one globe, coloured by its active route count. Select an airport to open its direct-route network.",
   alternates: { canonical: "/explore" },
   openGraph: {
     title: "Avi global airport connectivity map",
-    description:
-      "A worldwide airport map coloured by approximate non-stop connectivity.",
+    description: "A worldwide airport map coloured by active route count.",
     type: "website",
     url: "/explore",
   },
   twitter: {
     card: "summary_large_image",
     title: "Avi global airport connectivity map",
-    description:
-      "A worldwide airport map coloured by approximate non-stop connectivity.",
+    description: "A worldwide airport map coloured by active route count.",
   },
 };
 

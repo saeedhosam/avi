@@ -2,36 +2,36 @@ import type { ExpressionSpecification } from "maplibre-gl";
 import { PALETTE } from "./palette";
 
 /**
- * Approximate airport connectivity buckets.
+ * Airport connectivity buckets.
  *
- * Counts come from the bundled OpenFlights-derived reference catalog
- * (`destCount`), not from live schedules. The ramp runs from deep ocean blue
- * for quiet airports to pale ice blue for the busiest hubs, so density reads
- * at a glance without leaving the dark instrument theme.
+ * Counts come from `apps/web/public/airports-routes.csv` (`Active Route
+ * Count`), not from live schedules. The ramp runs from deep ocean blue for
+ * quiet airports to pale ice blue for the busiest hubs, so density reads at a
+ * glance without leaving the dark instrument theme.
  */
 export const AIRPORT_TRAFFIC_BUCKETS = [
   {
     id: "MEGA",
     label: "40+",
-    range: "40+ non-stop routes",
+    range: "40+ active routes",
     color: PALETTE.traffic.MEGA,
   },
   {
     id: "HIGH",
     label: "10–39",
-    range: "10–39 non-stop routes",
+    range: "10–39 active routes",
     color: PALETTE.traffic.HIGH,
   },
   {
     id: "MEDIUM",
     label: "3–9",
-    range: "3–9 non-stop routes",
+    range: "3–9 active routes",
     color: PALETTE.traffic.MEDIUM,
   },
   {
     id: "LOW",
     label: "1–2",
-    range: "1–2 non-stop routes",
+    range: "1–2 active routes",
     color: PALETTE.traffic.LOW,
   },
 ] as const;
@@ -59,7 +59,10 @@ export const AIRPORT_TRAFFIC_RADIUS_EXPRESSION: ExpressionSpecification = [
   "interpolate",
   ["linear"],
   ["zoom"],
-  2, 2,
-  5, 5,
-  9, 9,
+  2,
+  2,
+  5,
+  5,
+  9,
+  9,
 ];

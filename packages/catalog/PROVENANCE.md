@@ -29,6 +29,16 @@ responses:
 4. Before redistributing this package or using it commercially, establish the
    upstream source and licence, and record it here with an `as of` date.
 
+## Web airport map
+
+`apps/web/public/airports-routes.csv` is the source of truth for which airports
+appear on the web map and for their active route counts. It has no coordinates,
+so the web app joins each row to `apps/web/src/data/global-airports.json` by
+IATA (preferred) or ICAO. CSV rows with no coordinate match are omitted.
+
+`global-airports.json` is now coordinate/identity reference data only; it is no
+longer the map's membership list.
+
 ## Timezones
 
 `apps/web/src/data/global-airports.json` intentionally no longer stores

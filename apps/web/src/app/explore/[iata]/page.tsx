@@ -5,7 +5,20 @@ import { ExploreGlobe } from "@/components/explore-globe";
 import { findAirportNode, routeAirports } from "@/lib/data";
 import { getExploreRoutes } from "@/lib/explore-routes.server";
 
-const HUBS = ["CAI", "DXB", "LHR", "JFK", "IST", "DOH", "FRA", "CDG", "JED", "SIN", "HND", "SFO"];
+const HUBS = [
+  "CAI",
+  "DXB",
+  "LHR",
+  "JFK",
+  "IST",
+  "DOH",
+  "FRA",
+  "CDG",
+  "JED",
+  "SIN",
+  "HND",
+  "SFO",
+];
 
 type Props = { params: Promise<{ iata: string }> };
 
@@ -20,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const place = node ? `${node.city} (${code})` : code;
   const title = `Direct flights from ${place} · Avi Route Explorer`;
   const description = node
-    ? `Explore every non-stop destination from ${node.name} in ${node.city}, ${node.country}. Compare each airport's approximate connectivity, distance, and cached arrival weather, then unlock the 3D Cabin & Seat Twin.`
+    ? `Explore every non-stop destination from ${node.name} in ${node.city}, ${node.country}. Compare each airport's active route count, distance, and cached arrival weather, then unlock the 3D Cabin & Seat Twin.`
     : `Explore non-stop destinations from ${code} on the Avi globe.`;
   return {
     title,
@@ -77,7 +90,11 @@ async function ExploreContent({ params }: Props) {
       "@type": "Airport",
       iataCode: code,
       name: node.name,
-      address: { "@type": "PostalAddress", addressLocality: node.city, addressCountry: node.country },
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: node.city,
+        addressCountry: node.country,
+      },
     },
   };
 

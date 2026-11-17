@@ -11,6 +11,10 @@ import {
 } from "@/lib/airport-traffic";
 import { useMapLibre } from "@/lib/use-maplibre";
 import {
+  createLocalBasemapStyle,
+  scheduleBasemapUpgrade,
+} from "@/lib/local-basemap";
+import {
   collection,
   ensureLayer,
   pointFeature,
@@ -26,13 +30,18 @@ export interface ExploreWorldAirport {
   destCount: number;
 }
 
-export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) {
+export function ExploreWorld({
+  airports,
+}: {
+  airports: ExploreWorldAirport[];
+}) {
   const router = useRouter();
   const { containerRef, map } = useMapLibre({
     center: [12, 18],
     zoom: 1.8,
     minZoom: 1,
-    maxZoom: 9,
+    maxZoom: 6,
+    style: createLocalBasemapStyle,
   });
 
   useEffect(() => {
@@ -48,15 +57,11 @@ export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) 
     if (!map) return;
 
     const features = airports.map((airport) =>
-      pointFeature(
-        airport.iata,
-        [airport.longitude, airport.latitude],
-        {
-          iata: airport.iata,
-          city: airport.city,
-          count: airport.destCount,
-        },
-      ),
+      pointFeature(airport.iata, [airport.longitude, airport.latitude], {
+        iata: airport.iata,
+        city: airport.city,
+        count: airport.destCount,
+      }),
     );
 
     setGeoJson(map, "avi-world-airports", collection(features));
@@ -147,6 +152,11 @@ export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) 
 
   useEffect(() => {
     if (!map) return;
+    return scheduleBasemapUpgrade(map);
+  }, [map]);
+
+  useEffect(() => {
+    if (!map) return;
     const onClick = (event: MapLayerMouseEvent) => {
       const iata = event.features?.[0]?.properties?.iata;
       if (typeof iata === "string") router.push(`/explore/${iata}`);
@@ -184,8 +194,8 @@ export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) 
             The world&apos;s non-stop network
           </h1>
           <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-muted sm:text-sm">
-            Airport dots are coloured by their approximate number of non-stop
-            routes. Select any airport to open its direct-route explorer.
+            Airport dots are coloured by their active route count. Select any
+            airport to open its direct-route explorer.
           </p>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
             {AIRPORT_TRAFFIC_BUCKETS.map((bucket) => (
@@ -202,8 +212,8 @@ export function ExploreWorld({ airports }: { airports: ExploreWorldAirport[] }) 
             ))}
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-subtle">
-            Approximate OpenFlights-derived reference counts, not live
-            schedules.
+            Active route counts from the bundled airports-routes dataset, not
+            live schedules.
           </p>
         </header>
       </div>

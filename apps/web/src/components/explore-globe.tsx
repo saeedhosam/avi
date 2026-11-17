@@ -11,6 +11,10 @@ import {
 } from "@avi/shared";
 import { useMapLibre } from "@/lib/use-maplibre";
 import {
+  createLocalBasemapStyle,
+  scheduleBasemapUpgrade,
+} from "@/lib/local-basemap";
+import {
   collection,
   ensureLayer,
   lineFeature,
@@ -30,7 +34,7 @@ export interface ExploreGlobeProps {
   airportName: string;
   city: string;
   country: string;
-  /** Approximate non-stop route count keyed by airport IATA. */
+  /** Active route count from the airports-routes catalogue, keyed by IATA. */
   trafficByIata: Record<string, number>;
   /**
    * Route network rendered by the server. `null` means the gateway was
@@ -57,13 +61,16 @@ export function ExploreGlobe({
   const [selected, setSelected] = useState<DirectFlightConnection | null>(
     initialRoutes?.[0] ?? null,
   );
-  const [weather, setWeather] = useState<DestinationArrivalForecast | null>(null);
+  const [weather, setWeather] = useState<DestinationArrivalForecast | null>(
+    null,
+  );
   const [weatherLoading, setWeatherLoading] = useState(false);
   const { containerRef, map } = useMapLibre({
     center: [15, 22],
     zoom: 2.1,
     minZoom: 1,
-    maxZoom: 8,
+    maxZoom: 6,
+    style: createLocalBasemapStyle,
   });
 
   useEffect(() => {
@@ -100,7 +107,7 @@ export function ExploreGlobe({
         setSelected((current) =>
           current && routes.some((route) => route.id === current.id)
             ? current
-            : routes[0] ?? null,
+            : (routes[0] ?? null),
         );
       })
       .catch((cause: unknown) => {
@@ -143,6 +150,11 @@ export function ExploreGlobe({
     } catch {
       // Older/embedded MapLibre builds may not expose globe; the map still works.
     }
+  }, [map]);
+
+  useEffect(() => {
+    if (!map) return;
+    return scheduleBasemapUpgrade(map);
   }, [map]);
 
   useEffect(() => {
@@ -306,10 +318,12 @@ export function ExploreGlobe({
     });
     fetch(`/api/weather?${params.toString()}`)
       .then((response) => response.json())
-      .then((body: { live?: boolean; forecast?: DestinationArrivalForecast }) => {
-        if (!active) return;
-        setWeather(body.live && body.forecast ? body.forecast : null);
-      })
+      .then(
+        (body: { live?: boolean; forecast?: DestinationArrivalForecast }) => {
+          if (!active) return;
+          setWeather(body.live && body.forecast ? body.forecast : null);
+        },
+      )
       .catch(() => {
         if (active) setWeather(null);
       })
@@ -329,7 +343,9 @@ export function ExploreGlobe({
         <header className="pointer-events-auto absolute left-3 right-3 top-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 sm:top-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
           <div className="flex items-center gap-2">
             <Globe2 className="size-3.5 text-accent" />
-            <span className="label-caps text-accent">Direct route explorer</span>
+            <span className="label-caps text-accent">
+              Direct route explorer
+            </span>
             <span className="ml-auto flex items-center gap-1.5 rounded-full border border-line/70 px-2 py-1 text-[11px] font-medium text-muted">
               <span
                 className={cn(
@@ -351,8 +367,8 @@ export function ExploreGlobe({
             {airportName} · {iata}
           </p>
           <p className="mt-2 hidden text-xs leading-relaxed text-muted sm:block">
-            Destinations are coloured by each airport&apos;s approximate
-            non-stop connectivity and paired with cached arrival weather.
+            Destinations are coloured by each airport&apos;s active route count
+            and paired with cached arrival weather.
           </p>
           <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1">
             {AIRPORT_TRAFFIC_BUCKETS.map((bucket) => (
@@ -416,8 +432,8 @@ export function ExploreGlobe({
                   </p>
                   <p className="mt-1 text-[11px] text-subtle">
                     {(trafficByIata[selected.destination.iata] ?? 0) > 0
-                      ? `~${trafficByIata[selected.destination.iata]} non-stop routes`
-                      : "No reported non-stop routes"}
+                      ? `~${trafficByIata[selected.destination.iata]} active routes`
+                      : "No active routes in the reference catalogue"}
                   </p>
                 </div>
                 <span className="rounded-md border border-line/70 px-2 py-1 text-xs font-medium tabular text-muted">

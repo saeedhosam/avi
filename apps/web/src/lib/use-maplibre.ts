@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as MapLibreMap } from "maplibre-gl";
+import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { createBaseMap } from "./maplibre";
 
 export function useMapLibre(
@@ -12,6 +12,7 @@ export function useMapLibre(
     maxZoom?: number;
     attribution?: boolean;
     navigation?: boolean;
+    style?: StyleSpecification | string | (() => StyleSpecification | string);
   } = {},
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
