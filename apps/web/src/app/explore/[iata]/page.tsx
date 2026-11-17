@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ExploreGlobe } from "@/components/explore-globe";
+import { ExploreGlobeSkeleton } from "@/components/explore-globe-skeleton";
 import { findAirportNode, routeAirports } from "@/lib/data";
 import { getExploreRoutes } from "@/lib/explore-routes.server";
 
@@ -52,13 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default function ExplorePage({ params }: Props) {
   return (
     <div className="explore-viewport w-full overflow-hidden">
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center bg-surface p-8 text-sm text-muted">
-            Loading the Avi direct-route globe…
-          </div>
-        }
-      >
+      <Suspense fallback={<ExploreGlobeSkeleton />}>
         <ExploreContent params={params} />
       </Suspense>
     </div>
@@ -110,6 +105,8 @@ async function ExploreContent({ params }: Props) {
         airportName={node.name}
         city={node.city}
         country={node.country}
+        latitude={node.latitude}
+        longitude={node.longitude}
         trafficByIata={trafficByIata}
         initialRoutes={initialRoutes}
       />

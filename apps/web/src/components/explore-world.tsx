@@ -10,6 +10,7 @@ import {
   AIRPORT_TRAFFIC_RADIUS_EXPRESSION,
 } from "@/lib/airport-traffic";
 import { useMapLibre } from "@/lib/use-maplibre";
+import { storeExploreTransition } from "@/lib/explore-transition";
 import {
   createLocalBasemapStyle,
   scheduleBasemapUpgrade,
@@ -159,9 +160,18 @@ export function ExploreWorld({
     if (!map) return;
     const onClick = (event: MapLayerMouseEvent) => {
       const iata = event.features?.[0]?.properties?.iata;
-      if (typeof iata === "string") router.push(`/explore/${iata}`);
+      if (typeof iata !== "string") return;
+      const center = map.getCenter();
+      storeExploreTransition({
+        iata,
+        center: [center.lng, center.lat],
+        zoom: map.getZoom(),
+      });
+      router.push(`/explore/${iata}`, { scroll: false });
     };
-    const onEnter = () => {
+    const onEnter = (event: MapLayerMouseEvent) => {
+      const iata = event.features?.[0]?.properties?.iata;
+      if (typeof iata === "string") router.prefetch(`/explore/${iata}`);
       map.getCanvas().style.cursor = "pointer";
     };
     const onLeave = () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Globe2, MapPin, RefreshCw } from "lucide-react";
 import { LngLatBounds, type MapLayerMouseEvent } from "maplibre-gl";
@@ -10,6 +10,7 @@ import {
   type DestinationArrivalForecast,
 } from "@avi/shared";
 import { useMapLibre } from "@/lib/use-maplibre";
+import { readExploreTransition } from "@/lib/explore-transition";
 import {
   createLocalBasemapStyle,
   scheduleBasemapUpgrade,
@@ -34,6 +35,8 @@ export interface ExploreGlobeProps {
   airportName: string;
   city: string;
   country: string;
+  latitude: number;
+  longitude: number;
   /** Active route count from the airports-routes catalogue, keyed by IATA. */
   trafficByIata: Record<string, number>;
   /**
@@ -48,6 +51,8 @@ export function ExploreGlobe({
   airportName,
   city,
   country,
+  latitude,
+  longitude,
   trafficByIata,
   initialRoutes,
 }: ExploreGlobeProps) {
@@ -65,9 +70,17 @@ export function ExploreGlobe({
     null,
   );
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [initialView] = useState(
+    () =>
+      readExploreTransition(iata) ?? {
+        center: [longitude, latitude] as [number, number],
+        zoom: 2.4,
+      },
+  );
+  const hasFitRef = useRef(false);
   const { containerRef, map } = useMapLibre({
-    center: [15, 22],
-    zoom: 2.1,
+    center: initialView.center,
+    zoom: initialView.zoom,
     minZoom: 1,
     maxZoom: 6,
     style: createLocalBasemapStyle,
@@ -233,18 +246,85 @@ export function ExploreGlobe({
       },
     });
 
-    const bounds = new LngLatBounds();
-    bounds.extend([origin.longitude, origin.latitude]);
-    for (const connection of connections) {
-      bounds.extend([
-        connection.destination.longitude,
-        connection.destination.latitude,
-      ]);
+    // Keep the origin marker above the route network after a refresh.
+    for (const id of [
+      "avi-explore-origin-circle",
+      "avi-explore-origin-label",
+    ]) {
+      if (map.getLayer(id)) map.moveLayer(id);
     }
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: 70, duration: 0, maxZoom: 3.1 });
+
+    if (!hasFitRef.current) {
+      const bounds = new LngLatBounds();
+      bounds.extend([origin.longitude, origin.latitude]);
+      for (const connection of connections) {
+        bounds.extend([
+          connection.destination.longitude,
+          connection.destination.latitude,
+        ]);
+      }
+      if (!bounds.isEmpty()) {
+        hasFitRef.current = true;
+        const reduceMotion =
+          window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ??
+          false;
+        requestAnimationFrame(() => {
+          try {
+            map.fitBounds(bounds, {
+              padding: 70,
+              duration: reduceMotion ? 0 : 1100,
+              maxZoom: 3.1,
+              essential: true,
+            });
+          } catch {
+            // The map may have been removed before the frame ran.
+          }
+        });
+      }
     }
   }, [map, origin, connections, trafficByIata]);
+
+  // Show the clicked airport immediately, before the route network resolves.
+  useEffect(() => {
+    if (!map) return;
+    setGeoJson(
+      map,
+      "avi-explore-origin",
+      collection([
+        pointFeature("origin", [longitude, latitude], { iata, city }),
+      ]),
+    );
+    ensureLayer(map, {
+      id: "avi-explore-origin-circle",
+      type: "circle",
+      source: "avi-explore-origin",
+      paint: {
+        "circle-radius": 6.5,
+        "circle-color": PALETTE.accent,
+        "circle-stroke-color": PALETTE.map.highlight,
+        "circle-stroke-width": 2,
+      },
+    });
+    ensureLayer(map, {
+      id: "avi-explore-origin-label",
+      type: "symbol",
+      source: "avi-explore-origin",
+      layout: {
+        "text-field": ["get", "iata"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 11,
+        "text-offset": [0, -1.5],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: {
+        "text-color": PALETTE.text,
+        "text-halo-color": PALETTE.background,
+        "text-halo-width": 1.4,
+      },
+    });
+  }, [map, iata, city, latitude, longitude]);
 
   useEffect(() => {
     if (!map || !selected || !origin) return;
