@@ -66,3 +66,29 @@ export const AIRPORT_TRAFFIC_RADIUS_EXPRESSION: ExpressionSpecification = [
   9,
   9,
 ];
+
+/**
+ * Invisible hit target around each dot. MapLibre only allows a zoom
+ * expression at the top level of `interpolate`, so the extra 9px is baked
+ * into each stop rather than added to the visual radius expression.
+ */
+export const AIRPORT_HITBOX_RADIUS_EXPRESSION: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  2,
+  11,
+  5,
+  14,
+  9,
+  18,
+];
+
+/** Solid traffic colour for an airport's active route count. */
+export function airportTrafficColor(count: number): string {
+  if (count >= 40) return PALETTE.traffic.MEGA;
+  if (count >= 10) return PALETTE.traffic.HIGH;
+  if (count >= 3) return PALETTE.traffic.MEDIUM;
+  if (count >= 1) return PALETTE.traffic.LOW;
+  return PALETTE.subtle;
+}

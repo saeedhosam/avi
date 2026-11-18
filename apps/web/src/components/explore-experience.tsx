@@ -21,8 +21,10 @@ import {
 } from "@/lib/maplibre";
 import { routeCoordinates } from "@/lib/geo";
 import {
+  AIRPORT_HITBOX_RADIUS_EXPRESSION,
   AIRPORT_TRAFFIC_COLOR_EXPRESSION,
   AIRPORT_TRAFFIC_RADIUS_EXPRESSION,
+  airportTrafficColor,
 } from "@/lib/airport-traffic";
 import { PALETTE } from "@/lib/palette";
 import { EXPLORE_HOME_EVENT } from "@/lib/explore-events";
@@ -31,12 +33,16 @@ import { cn } from "@/lib/utils";
 import { ExploreAirportOverlay } from "./explore-airport-overlay";
 import { ExploreWorldOverlay } from "./explore-world-overlay";
 
-const WORLD_LABEL_LAYERS = [
-  "avi-world-airport-labels-mega",
-  "avi-world-airport-labels-major",
-  "avi-world-airport-labels-mid",
-  "avi-world-airport-labels-all",
-] as const;
+const WORLD_HITBOX_LAYER = "avi-world-airport-hitbox";
+
+interface WorldHover {
+  iata: string;
+  city: string;
+  count: number;
+  x: number;
+  y: number;
+  flip: boolean;
+}
 
 function prefersReducedMotion(): boolean {
   return (
@@ -124,6 +130,7 @@ export function ExploreExperience({
     null,
   );
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [worldHover, setWorldHover] = useState<WorldHover | null>(null);
 
   const routeCacheRef = useRef(new Map<string, DirectFlightConnection[]>());
   const prefetchingRef = useRef(new Set<string>());
@@ -137,6 +144,7 @@ export function ExploreExperience({
   );
   const lastFitIataRef = useRef<string | null>(null);
   const lastFlyIataRef = useRef<string | null>(null);
+  const hoveredWorldIataRef = useRef<string | null>(null);
 
   const [initialMapView] = useState(() =>
     initialAirport
@@ -409,75 +417,16 @@ export function ExploreExperience({
       },
     });
 
-    const labelPaints = {
-      "text-color": PALETTE.text,
-      "text-halo-color": PALETTE.background,
-      "text-halo-width": 1.4,
-    } as const;
-
+    // Invisible, larger circles keep quiet airports easy to hover and tap.
     ensureLayer(map, {
-      id: "avi-world-airport-labels-mega",
-      type: "symbol",
+      id: WORLD_HITBOX_LAYER,
+      type: "circle",
       source: "avi-world-airports",
-      minzoom: 1.4,
-      filter: [">=", ["get", "count"], 160],
-      layout: {
-        "text-field": ["get", "iata"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 11,
-        "text-offset": [0, 1.1],
-        "text-anchor": "top",
-        "text-allow-overlap": false,
+      paint: {
+        "circle-radius": AIRPORT_HITBOX_RADIUS_EXPRESSION,
+        "circle-color": PALETTE.accent,
+        "circle-opacity": 0,
       },
-      paint: labelPaints,
-    });
-    ensureLayer(map, {
-      id: "avi-world-airport-labels-major",
-      type: "symbol",
-      source: "avi-world-airports",
-      minzoom: 2.4,
-      filter: [">=", ["get", "count"], 40],
-      layout: {
-        "text-field": ["get", "iata"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 10,
-        "text-offset": [0, 1.1],
-        "text-anchor": "top",
-        "text-allow-overlap": false,
-      },
-      paint: labelPaints,
-    });
-    ensureLayer(map, {
-      id: "avi-world-airport-labels-mid",
-      type: "symbol",
-      source: "avi-world-airports",
-      minzoom: 4,
-      filter: [">=", ["get", "count"], 10],
-      layout: {
-        "text-field": ["get", "iata"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 10,
-        "text-offset": [0, 1.1],
-        "text-anchor": "top",
-        "text-allow-overlap": false,
-      },
-      paint: labelPaints,
-    });
-    ensureLayer(map, {
-      id: "avi-world-airport-labels-all",
-      type: "symbol",
-      source: "avi-world-airports",
-      minzoom: 5.5,
-      filter: [">=", ["get", "count"], 1],
-      layout: {
-        "text-field": ["get", "iata"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 10,
-        "text-offset": [0, 1.1],
-        "text-anchor": "top",
-        "text-allow-overlap": false,
-      },
-      paint: labelPaints,
     });
   }, [map, airports]);
 
@@ -713,7 +662,8 @@ export function ExploreExperience({
     };
 
     setCircleOpacity("avi-world-airport-circles", inAirport ? 0.18 : 0.9);
-    for (const id of WORLD_LABEL_LAYERS) setTextOpacity(id, inAirport ? 0 : 1);
+    hoveredWorldIataRef.current = null;
+    setWorldHover(null);
 
     setLineOpacity(
       "avi-explore-route-lines",
@@ -832,13 +782,33 @@ export function ExploreExperience({
       const iata = event.features?.[0]?.properties?.iata;
       if (typeof iata === "string") selectAirport(iata);
     };
-    const onWorldEnter = (event: MapLayerMouseEvent) => {
+    const onWorldMove = (event: MapLayerMouseEvent) => {
+      if (selectedAirport) return;
       const iata = event.features?.[0]?.properties?.iata;
-      if (typeof iata === "string") prefetchAirport(iata);
+      if (typeof iata !== "string") return;
+      const airport = airportByIata.get(iata);
+      if (!airport) return;
       map.getCanvas().style.cursor = "pointer";
+      if (hoveredWorldIataRef.current !== iata) {
+        hoveredWorldIataRef.current = iata;
+        prefetchAirport(iata);
+      }
+      const width = map.getContainer().clientWidth;
+      const edge = Math.min(88, width / 2);
+      setWorldHover({
+        iata,
+        city: airport.city,
+        count: airport.destCount,
+        x: Math.min(Math.max(event.point.x, edge), width - edge),
+        y: event.point.y,
+        flip: event.point.y < 150,
+      });
     };
     const onWorldLeave = () => {
       map.getCanvas().style.cursor = "";
+      if (hoveredWorldIataRef.current === null) return;
+      hoveredWorldIataRef.current = null;
+      setWorldHover(null);
     };
     const onRouteClick = (event: MapLayerMouseEvent) => {
       if (!selectedAirport) return;
@@ -855,24 +825,33 @@ export function ExploreExperience({
       map.getCanvas().style.cursor = "";
     };
 
-    map.on("click", "avi-world-airport-circles", onWorldClick);
-    map.on("mouseenter", "avi-world-airport-circles", onWorldEnter);
-    map.on("mouseleave", "avi-world-airport-circles", onWorldLeave);
+    map.on("click", WORLD_HITBOX_LAYER, onWorldClick);
+    map.on("mousemove", WORLD_HITBOX_LAYER, onWorldMove);
+    map.on("mouseleave", WORLD_HITBOX_LAYER, onWorldLeave);
+    map.on("dragstart", onWorldLeave);
     map.on("click", "avi-explore-point-circles", onRouteClick);
     map.on("click", "avi-explore-route-lines", onRouteClick);
     map.on("mouseenter", "avi-explore-point-circles", onRouteEnter);
     map.on("mouseleave", "avi-explore-point-circles", onRouteLeave);
 
     return () => {
-      map.off("click", "avi-world-airport-circles", onWorldClick);
-      map.off("mouseenter", "avi-world-airport-circles", onWorldEnter);
-      map.off("mouseleave", "avi-world-airport-circles", onWorldLeave);
+      map.off("click", WORLD_HITBOX_LAYER, onWorldClick);
+      map.off("mousemove", WORLD_HITBOX_LAYER, onWorldMove);
+      map.off("mouseleave", WORLD_HITBOX_LAYER, onWorldLeave);
+      map.off("dragstart", onWorldLeave);
       map.off("click", "avi-explore-point-circles", onRouteClick);
       map.off("click", "avi-explore-route-lines", onRouteClick);
       map.off("mouseenter", "avi-explore-point-circles", onRouteEnter);
       map.off("mouseleave", "avi-explore-point-circles", onRouteLeave);
     };
-  }, [map, selectedAirport, connections, selectAirport, prefetchAirport]);
+  }, [
+    map,
+    selectedAirport,
+    connections,
+    selectAirport,
+    prefetchAirport,
+    airportByIata,
+  ]);
 
   return (
     <div
@@ -882,6 +861,46 @@ export function ExploreExperience({
       )}
     >
       <div ref={containerRef} className="absolute inset-0" />
+
+      {worldHover && !selectedAirport && (
+        <div
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute z-20 -translate-x-1/2",
+            worldHover.flip ? "translate-y-0" : "-translate-y-full",
+          )}
+          style={{
+            left: worldHover.x,
+            top: worldHover.flip ? worldHover.y + 16 : worldHover.y - 14,
+          }}
+        >
+          <div className="relative flex max-w-[10.5rem] items-center gap-1.5 rounded-md border border-line-strong bg-surface-2 px-2 py-1 shadow-[0_10px_28px_-12px_rgba(0,0,0,0.95)]">
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{
+                backgroundColor: airportTrafficColor(worldHover.count),
+              }}
+            />
+            <span className="shrink-0 font-mono text-[11px] font-semibold tracking-[0.12em] text-ink">
+              {worldHover.iata}
+            </span>
+            <span className="truncate text-[10px] text-muted">
+              {worldHover.city}
+            </span>
+            <span className="ml-auto shrink-0 rounded-sm bg-surface-3 px-1 py-px text-[9px] tabular text-subtle">
+              {worldHover.count}
+            </span>
+            <span
+              className={cn(
+                "absolute left-1/2 size-1.5 -translate-x-1/2 rotate-45 border-line-strong bg-surface-2",
+                worldHover.flip
+                  ? "-top-[3.5px] border-l border-t"
+                  : "-bottom-[3.5px] border-r border-b",
+              )}
+            />
+          </div>
+        </div>
+      )}
 
       <ExploreWorldOverlay
         airportCount={airports.length}
