@@ -15,6 +15,7 @@ import {
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { DATA_SOURCE_META } from "@/lib/data-source";
+import { EXPLORE_HOME_EVENT } from "@/lib/explore-events";
 import { AccountDialog } from "./account-dialog";
 import { NotificationsDialog } from "./notifications-dialog";
 import { Button, Modal } from "./ui";
@@ -49,6 +50,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Link
         href="/explore"
         aria-label="Avi home"
+        onClick={(event) => {
+          if (!pathname.startsWith("/explore")) return;
+          event.preventDefault();
+          window.dispatchEvent(new Event(EXPLORE_HOME_EVENT));
+        }}
         className="floating-top floating-left fixed z-50 flex items-center gap-2.5 rounded-full border border-line/70 bg-surface/85 py-1.5 pl-1.5 pr-3.5 shadow-2xl backdrop-blur-xl transition-colors hover:border-line-strong sm:gap-3 sm:pr-4"
       >
         <span className="flex size-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent sm:size-9">
