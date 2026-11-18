@@ -74,7 +74,8 @@ so the browser stays same-origin and never receives a provider key.
 `/explore/[iata]` is public, shareable, and SEO-indexed. It renders a MapLibre
 globe with great-circle route arcs colour-coded by haul, airline filters, and
 cached destination weather. `/explore` adds a world airport map coloured by
-approximate non-stop connectivity.
+approximate non-stop connectivity; hover any dot for its IATA code, city, and
+active-route count.
 
 ### 2. 3D Cabin & Seat Twin
 `packages/ui/src/cabin/CabinViewer3D.tsx` renders a parametric deck for the
@@ -108,11 +109,31 @@ date, origin/destination, seat, and cabin are extracted with zero API cost.
 - Free: route explorer, basic flight lookup, 2D terminal map.
 - Pro: instant gate/terminal/status alerts, 3D cabin, Sprint Mode, fog-of-war
   passport.
-- `$4.99 Single-Trip Pass`: trip-scoped access to the Pro travel features.
+- `$4.99 Single-Trip Pass`: trip-scoped access to the Pro travel features,
+  proxied through `/api/billing/trip-pass`.
 - Contextual cards only: a 2h+ delay shows a lounge affiliate hook; a landed
   international flight shows an eSIM hook. No banner ads.
-- `/pricing` presents the plans; checkout stays explicitly unavailable until a
-  provider or hosted trip-pass URL is configured.
+- Trip-pass grants are verified server-side; clients cannot grant entitlements.
+  RevenueCat/Stripe receipt adapters are still pending.
+
+---
+
+## Known limitations
+
+- Route durations are great-circle estimates and are labelled as such; no
+  forward schedule is inferred.
+- Airline filter counts use reported operators, not per-carrier frequency.
+- Cabin layouts are parametric (A320, B789, B77W, A388, plus a generic fallback),
+  not airline-certified. Layouts marked `isExact: false` are never presented as
+  exact plans.
+- The ingested OSM terminal graph is a fallback when no curated layout exists;
+  Sprint Mode requires a real connection with gates and times.
+- In-flight cabin altitude is derived from barometric pressure, not aircraft
+  altitude.
+- Aircraft lookup accepts a registration; AeroDataBox's registration endpoint
+  does not support ICAO type-only lookup.
+- `packages/contracts` still supplies the gateway's console-flight shapes, and
+  web-only route/terminal/weather types are still being moved to `@avi/shared`.
 
 ---
 
@@ -163,6 +184,9 @@ pnpm test
 pnpm build
 node packages/catalog/scripts/validate.mjs
 ```
+
+Current suites: `@avi/shared` 49 tests, `@avi/api` 162 tests across 17 files,
+`@avi/web` 40 tests plus a production build, and `@avi/ui` TypeScript clean.
 
 ---
 
