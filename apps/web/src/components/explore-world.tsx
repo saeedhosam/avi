@@ -192,7 +192,7 @@ export function ExploreWorld({
       <div ref={containerRef} className="absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        <header className="pointer-events-auto absolute left-3 right-3 top-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 sm:top-4 lg:w-[min(38rem,calc(100%-2rem))]">
+        <header className="map-overlay-top pointer-events-auto absolute left-3 right-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 lg:w-[min(38rem,calc(100%-2rem))]">
           <div className="flex flex-wrap items-center gap-2">
             <Globe2 className="size-3.5 text-accent" />
             <span className="label-caps text-accent">Global airport map</span>

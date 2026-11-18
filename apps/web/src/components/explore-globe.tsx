@@ -420,7 +420,7 @@ export function ExploreGlobe({
       <div ref={containerRef} className="absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        <header className="pointer-events-auto absolute left-3 right-3 top-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 sm:top-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
+        <header className="map-overlay-top pointer-events-auto absolute left-3 right-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
           <div className="flex items-center gap-2">
             <Globe2 className="size-3.5 text-accent" />
             <span className="label-caps text-accent">
@@ -496,7 +496,7 @@ export function ExploreGlobe({
           ) : null}
         </header>
 
-        <div className="pointer-events-auto absolute inset-x-3 bottom-3 lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-4 lg:w-[360px]">
+        <div className="map-card-top map-card-bottom pointer-events-auto absolute inset-x-3 lg:inset-x-auto lg:bottom-auto lg:right-4 lg:w-[360px]">
           {selected ? (
             <section className="rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl">
               <div className="flex items-start justify-between gap-2">

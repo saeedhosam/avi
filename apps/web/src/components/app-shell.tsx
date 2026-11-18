@@ -6,50 +6,18 @@ import { useState } from "react";
 import {
   Bell,
   CheckCircle2,
-  ChevronRight,
   CircleAlert,
-  Globe2,
   Info,
-  LayoutGrid,
   Plane,
   RefreshCw,
-  Settings2,
   X,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { DATA_SOURCE_META } from "@/lib/data-source";
 import { AccountDialog } from "./account-dialog";
 import { NotificationsDialog } from "./notifications-dialog";
 import { Button, Modal } from "./ui";
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  matches?: string[];
-};
-
-const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
-  {
-    label: "Explore",
-    items: [
-      { href: "/explore", label: "Explore", icon: Globe2, matches: ["/explore"] },
-    ],
-  },
-];
-
-const MOBILE_ITEMS: NavItem[] = [
-  { href: "/explore", label: "Explore", icon: Globe2, matches: ["/explore"] },
-];
-
-function isActive(pathname: string, item: NavItem) {
-  const targets = item.matches ?? [item.href];
-  return targets.some(
-    (target) => pathname === target || pathname.startsWith(`${target}/`),
-  );
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -66,9 +34,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const source = DATA_SOURCE_META[dataSourceMode];
+  const isGlobeRoute =
+    pathname === "/explore" || pathname.startsWith("/explore/");
 
   return (
     <div className="app-bg min-h-screen">
@@ -76,216 +45,99 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
 
-      {/* Desktop rail */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line/60 bg-surface/70 backdrop-blur-xl lg:flex">
-        <Link
-          href="/explore"
-          className="flex h-[68px] items-center gap-2.5 border-b border-line/50 px-5 transition-colors hover:bg-surface-2/40"
-        >
-          <span className="flex size-9 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent">
-            <Plane className="size-4" />
+      {/* Floating brand */}
+      <Link
+        href="/explore"
+        aria-label="Avi home"
+        className="floating-top floating-left fixed z-50 flex items-center gap-2.5 rounded-full border border-line/70 bg-surface/85 py-1.5 pl-1.5 pr-3.5 shadow-2xl backdrop-blur-xl transition-colors hover:border-line-strong sm:gap-3 sm:pr-4"
+      >
+        <span className="flex size-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent sm:size-9">
+          <Plane className="size-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold leading-none tracking-tight text-ink">
+            Avi
           </span>
-          <span className="min-w-0">
-            <span className="block text-[17px] font-semibold leading-none tracking-tight text-ink">
-              Avi
-            </span>
-            <span className="mt-1 block whitespace-nowrap text-xs font-medium text-subtle">
-              Direct-route explorer
-            </span>
+          <span className="mt-1 hidden text-[10px] font-medium text-subtle sm:block">
+            Direct-route explorer
           </span>
-        </Link>
+        </span>
+      </Link>
 
-        <nav
-          className="flex-1 space-y-5 overflow-y-auto px-3 py-5"
-          aria-label="Primary"
+      {/* Floating account, alerts, and data status */}
+      <div className="floating-top floating-right fixed z-50 flex items-center gap-1 rounded-full border border-line/70 bg-surface/85 p-1 shadow-2xl backdrop-blur-xl">
+        <button
+          type="button"
+          onClick={() => setSourceOpen(true)}
+          title={source.title}
+          aria-label={`Data status: ${source.short}`}
+          className="flex min-h-9 items-center gap-1.5 rounded-full px-2 text-xs font-medium text-muted transition-colors hover:bg-surface-2/70 hover:text-ink sm:px-2.5"
         >
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p className="label-caps px-3 pb-2 text-subtle">{group.label}</p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const active = isActive(pathname, item);
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "group flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors",
-                        active
-                          ? "bg-accent-soft text-accent"
-                          : "text-muted hover:bg-surface-2/60 hover:text-ink",
-                      )}
-                    >
-                      <Icon
-                        className={cn(
-                          "size-[18px] shrink-0",
-                          active ? "text-accent" : "text-subtle group-hover:text-muted",
-                        )}
-                      />
-                      <span className="flex-1">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
+          <span
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: source.color }}
+          />
+          <span className="hidden sm:inline">{source.short}</span>
+        </button>
 
-        <div className="space-y-1.5 border-t border-line/50 p-3">
-          <button
-            type="button"
-            onClick={() => setSourceOpen(true)}
-            className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left transition-colors hover:bg-surface-2/60"
-          >
-            <span
-              className="size-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: source.color }}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-medium text-ink">
-                {source.badge}
-              </span>
-              <span className="block truncate text-xs text-subtle">
-                Data &amp; API status
-              </span>
+        <button
+          type="button"
+          onClick={() => setNotificationsOpen(true)}
+          aria-label={
+            unreadAlertCount > 0
+              ? `Alerts, ${unreadAlertCount} unread`
+              : "Alerts"
+          }
+          title="Alerts"
+          className="relative flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2/70 hover:text-ink"
+        >
+          <Bell className="size-4" />
+          {unreadAlertCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-delayed px-1 text-center text-[10px] font-semibold leading-4 text-[color:var(--bg)]">
+              {unreadAlertCount > 9 ? "9+" : unreadAlertCount}
             </span>
-            <Info className="size-3.5 text-subtle" />
-          </button>
+          )}
+        </button>
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => void refreshData()}
-              disabled={syncing}
-              className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted transition-colors hover:bg-surface-2/60 hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <RefreshCw className={cn("size-3.5", syncing && "animate-spin")} />
-              {syncing ? "Syncing" : "Refresh"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setNotificationsOpen(true)}
-              className="relative flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-muted transition-colors hover:bg-surface-2/60 hover:text-ink"
-            >
-              <Bell className="size-3.5" />
-              Alerts
-              {unreadAlertCount > 0 && (
-                <span className="ml-0.5 rounded-full bg-delayed px-1.5 text-xs font-semibold tabular leading-4 text-[color:var(--bg)]">
-                  {unreadAlertCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setAccountOpen(true)}
-            className="flex min-h-12 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-2/60"
-          >
-            <span className="flex size-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-xs font-semibold text-accent">
-              {account.avatarInitial}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium text-ink">
-                {account.name}
-              </span>
-              <span className="block truncate text-xs text-subtle">
-                {account.isSignedIn ? account.email : "Sign in to sync"}
-              </span>
-            </span>
-            <Settings2 className="size-3.5 shrink-0 text-subtle" />
-          </button>
-
-          <div className="flex items-center justify-between px-3 pt-1 text-xs text-subtle">
-            <Link href="/legal/terms" className="hover:text-muted">
-              Terms
-            </Link>
-            <Link href="/legal/privacy" className="hover:text-muted">
-              Privacy
-            </Link>
-          </div>
-        </div>
-      </aside>
-
-      <div className="lg:pl-[248px]">
-        <main id="main-content" className="min-h-screen pb-safe-nav pt-safe">
-          {children}
-        </main>
+        <button
+          type="button"
+          onClick={() => setAccountOpen(true)}
+          aria-label={
+            account.isSignedIn ? `Account: ${account.name}` : "Sign in"
+          }
+          title={account.isSignedIn ? account.name : "Sign in"}
+          className="flex size-9 items-center justify-center rounded-full border border-accent/35 bg-accent-soft text-xs font-semibold text-accent transition-colors hover:border-accent/60 hover:bg-accent/15"
+        >
+          {account.avatarInitial}
+        </button>
       </div>
 
-      {/* Mobile tab bar: five destinations, everything else under More. */}
-      <nav
-        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-surface/95 backdrop-blur-xl lg:hidden"
-        aria-label="Primary"
+      <main
+        id="main-content"
+        className={isGlobeRoute ? "shell-globe" : "shell-content"}
       >
-        <div className="grid grid-cols-2">
-          {MOBILE_ITEMS.map((item) => {
-            const active = isActive(pathname, item);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-[58px] flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
-                  active ? "text-accent" : "text-subtle hover:text-ink",
-                )}
-              >
-                <span className="relative">
-                  <Icon className="size-5" />
-                </span>
-                {item.label}
-              </Link>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-expanded={moreOpen}
-            className={cn(
-              "flex min-h-[58px] flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
-              moreOpen ? "text-accent" : "text-subtle hover:text-ink",
-            )}
-          >
-            <span className="relative">
-              <LayoutGrid className="size-5" />
-              {unreadAlertCount > 0 && (
-                <span className="absolute -right-2 -top-1 min-w-3.5 rounded-full bg-delayed px-1 text-center text-xs font-semibold leading-3.5 text-[color:var(--bg)]">
-                  {unreadAlertCount}
-                </span>
-              )}
-            </span>
-            More
-          </button>
-        </div>
-      </nav>
+        {children}
+      </main>
+
+      {/* Floating legal links */}
+      <div className="floating-bottom floating-right fixed z-50 flex items-center gap-2 rounded-full border border-line/60 bg-surface/80 px-3 py-1.5 text-[11px] font-medium text-subtle shadow-lg backdrop-blur-xl">
+        <Link href="/legal/terms" className="transition-colors hover:text-ink">
+          Terms
+        </Link>
+        <span className="h-3 w-px bg-line/70" />
+        <Link
+          href="/legal/privacy"
+          className="transition-colors hover:text-ink"
+        >
+          Privacy
+        </Link>
+      </div>
 
       <NotificationsDialog
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
       />
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
-
-      <MoreSheet
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        onAlerts={() => {
-          setMoreOpen(false);
-          setNotificationsOpen(true);
-        }}
-        onAccount={() => {
-          setMoreOpen(false);
-          setAccountOpen(true);
-        }}
-        onSource={() => {
-          setMoreOpen(false);
-          setSourceOpen(true);
-        }}
-        accountName={account.name}
-      />
 
       <Modal
         open={sourceOpen}
@@ -295,13 +147,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         icon={<Info className="size-4" />}
         size="sm"
         footer={
-          <Button size="sm" variant="ghost" onClick={() => setSourceOpen(false)}>
-            Close
-          </Button>
+          <div className="flex w-full items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSourceOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void refreshData()}
+              disabled={syncing}
+            >
+              <RefreshCw
+                className={cn("size-3.5", syncing && "animate-spin")}
+              />
+              {syncing ? "Syncing" : "Refresh data"}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed text-muted">{source.subtitle}</p>
+          <p className="text-sm leading-relaxed text-muted">
+            {source.subtitle}
+          </p>
           <div className="divide-y divide-line/60 rounded-lg border border-line/60">
             <DiagnosticRow
               title="Live flight data"
@@ -350,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div
         aria-live="polite"
-        className="pointer-events-none fixed bottom-24 right-4 z-[90] flex w-[min(92vw,380px)] flex-col gap-2 lg:bottom-5"
+        className="pointer-events-none fixed bottom-16 right-3 z-[90] flex w-[min(92vw,380px)] flex-col gap-2 sm:bottom-20 sm:right-4"
       >
         {toasts.map((toast) => (
           <div
@@ -383,87 +253,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function MoreSheet({
-  open,
-  onClose,
-  onAlerts,
-  onAccount,
-  onSource,
-  accountName,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onAlerts: () => void;
-  onAccount: () => void;
-  onSource: () => void;
-  accountName: string;
-}) {
-  const rows: Array<{
-    label: string;
-    icon: LucideIcon;
-    detail: string;
-    onPress: () => void;
-  }> = [
-    {
-      label: "Alerts",
-      icon: Bell,
-      detail: "Watchlist notifications",
-      onPress: onAlerts,
-    },
-    {
-      label: accountName,
-      icon: Settings2,
-      detail: "Account and sync",
-      onPress: onAccount,
-    },
-    {
-      label: "Data & API status",
-      icon: Info,
-      detail: "Sources and availability",
-      onPress: onSource,
-    },
-  ];
-
-  return (
-    <Modal open={open} onClose={onClose} title="More" size="sm">
-      <div className="divide-y divide-line/60">
-        {rows.map((row) => {
-          const Icon = row.icon;
-          return (
-            <button
-              key={row.label}
-              type="button"
-              onClick={row.onPress}
-              className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left"
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface-2 text-muted">
-                <Icon className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-ink">
-                  {row.label}
-                </span>
-                <span className="block truncate text-xs text-subtle">
-                  {row.detail}
-                </span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-subtle" />
-            </button>
-          );
-        })}
-        <div className="flex items-center justify-between py-3 text-xs text-subtle">
-          <Link href="/legal/terms" onClick={onClose} className="hover:text-muted">
-            Terms
-          </Link>
-          <Link href="/legal/privacy" onClick={onClose} className="hover:text-muted">
-            Privacy
-          </Link>
-        </div>
-      </div>
-    </Modal>
   );
 }
 

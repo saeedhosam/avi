@@ -21,7 +21,7 @@ export function ExploreGlobeSkeleton() {
         <div className="absolute left-[36%] top-[68%] size-1.5 rounded-full bg-accent/30" />
       </div>
 
-      <div className="absolute left-3 right-3 top-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 sm:top-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
+      <div className="map-overlay-top absolute left-3 right-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl sm:left-4 sm:right-4 lg:right-auto lg:w-[min(30rem,calc(100%_-_26rem))]">
         <div className="flex items-center gap-2">
           <div className="h-3.5 w-3.5 rounded-full bg-accent/30" />
           <div className="h-3 w-32 rounded bg-line/70" />
@@ -36,7 +36,7 @@ export function ExploreGlobeSkeleton() {
         </div>
       </div>
 
-      <div className="absolute inset-x-3 bottom-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-4 lg:w-[360px]">
+      <div className="map-card-top map-card-bottom absolute inset-x-3 rounded-xl border border-line/70 bg-surface/90 p-4 shadow-2xl backdrop-blur-xl lg:inset-x-auto lg:bottom-auto lg:right-4 lg:w-[360px]">
         <div className="h-3 w-14 rounded bg-accent/30" />
         <div className="mt-2 h-6 w-32 rounded bg-line/60" />
         <div className="mt-2 h-3 w-48 rounded bg-line/40" />

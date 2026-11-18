@@ -13,6 +13,7 @@ export type DataSourceMode =
 export const DATA_SOURCE_META = {
   LIVE_AERODATABOX: {
     badge: "LIVE DATA RECEIVED",
+    short: "Live",
     summary: "A live response was received recently",
     title: "Live flight data received",
     subtitle:
@@ -21,6 +22,7 @@ export const DATA_SOURCE_META = {
   },
   CONFIGURED_IDLE: {
     badge: "PROVIDER READY",
+    short: "Ready",
     summary: "Live data is configured — no recent response yet",
     title: "Live provider configured",
     subtitle:
@@ -29,6 +31,7 @@ export const DATA_SOURCE_META = {
   },
   OFFLINE_CACHE: {
     badge: "OFFLINE · SAVED FLIGHTS",
+    short: "Offline",
     summary: "Saved flights from your last sync",
     title: "Offline — showing saved flights",
     subtitle:
@@ -37,6 +40,7 @@ export const DATA_SOURCE_META = {
   },
   QUOTA_FALLBACK: {
     badge: "LIVE UPDATES PAUSED",
+    short: "Paused",
     summary: "Provider quota exhausted — no fresh data",
     title: "Live updates paused",
     subtitle:
@@ -45,6 +49,7 @@ export const DATA_SOURCE_META = {
   },
   NOT_CONFIGURED: {
     badge: "LIVE DATA UNAVAILABLE",
+    short: "Unavailable",
     summary: "Provider not configured",
     title: "Live flight data unavailable",
     subtitle:

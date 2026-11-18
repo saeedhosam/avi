@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
@@ -58,13 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <link rel="dns-prefetch" href="https://tiles.openfreemap.org" />
       </head>
       <body className="min-h-full bg-bg text-ink">
-        <Suspense
-          fallback={
-            <div className="app-bg min-h-screen">
-              <div className="hidden h-screen w-[240px] border-r border-line/70 bg-surface/80 lg:block" />
-            </div>
-          }
-        >
+        <Suspense fallback={<div className="app-bg min-h-screen" />}>
           <AppProvider>
             <ServiceWorkerRegistrar />
             <AppShell>{children}</AppShell>

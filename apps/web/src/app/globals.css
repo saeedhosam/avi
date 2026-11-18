@@ -54,7 +54,9 @@
   --status-cancelled: #e26f6f;
   --status-scheduled: #93a6b4;
   --shadow-card: 0 18px 40px -32px rgba(0, 0, 0, 0.9);
-  --shadow-glow: 0 0 0 1px rgba(53, 211, 230, 0.16), 0 18px 50px -30px rgba(53, 211, 230, 0.4);
+  --shadow-glow:
+    0 0 0 1px rgba(53, 211, 230, 0.16),
+    0 18px 50px -30px rgba(53, 211, 230, 0.4);
   color-scheme: dark;
 }
 
@@ -113,8 +115,16 @@ body {
 /* Cockpit ambience — soft, low-contrast depth instead of glow everywhere. */
 .app-bg {
   background-image:
-    radial-gradient(ellipse 80% 50% at 6% -10%, rgba(53, 211, 230, 0.055), transparent 58%),
-    radial-gradient(ellipse 55% 42% at 100% 0%, rgba(91, 167, 217, 0.04), transparent 60%),
+    radial-gradient(
+      ellipse 80% 50% at 6% -10%,
+      rgba(53, 211, 230, 0.055),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 55% 42% at 100% 0%,
+      rgba(91, 167, 217, 0.04),
+      transparent 60%
+    ),
     linear-gradient(180deg, rgba(11, 20, 29, 0.5) 0%, transparent 26%);
   background-attachment: fixed;
 }
@@ -127,29 +137,89 @@ body {
   box-shadow: var(--shadow-glow);
 }
 
-/* Full-bleed explorer canvas that fills the app content area. */
-.explore-viewport {
-  height: calc(
-    100dvh - 4.5rem - env(safe-area-inset-top, 0px) -
-      env(safe-area-inset-bottom, 0px)
-  );
+/* Full-bleed map routes: the canvas owns the whole viewport. */
+.shell-globe {
+  height: 100dvh;
+  overflow: hidden;
 }
 
-@media (min-width: 1024px) {
-  .explore-viewport {
-    height: 100dvh;
+/* Content pages clear the floating brand and legal links. */
+.shell-content {
+  min-height: 100dvh;
+  padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Floating chrome respects notch and home-indicator safe areas. */
+.floating-top {
+  top: max(0.75rem, env(safe-area-inset-top, 0px));
+}
+.floating-bottom {
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+.floating-left {
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+}
+.floating-right {
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 640px) {
+  .floating-top {
+    top: max(1rem, env(safe-area-inset-top, 0px));
+  }
+  .floating-bottom {
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+  .floating-left {
+    left: max(1rem, env(safe-area-inset-left, 0px));
+  }
+  .floating-right {
+    right: max(1rem, env(safe-area-inset-right, 0px));
   }
 }
 
-/* Keep the collapsed map attribution clear of the floating destination card. */
-.explore-map .maplibregl-ctrl-bottom-right {
-  bottom: 0.75rem;
+/* Full-bleed explorer canvas that fills the app content area. */
+.explore-viewport {
+  height: 100dvh;
+}
+
+/* MapLibre's stylesheet sets .maplibregl-map to position:relative; our globe
+   containers are absolutely positioned and must keep filling their parent. */
+.explore-world-map > .maplibregl-map,
+.explore-map > .maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Map HUD panels clear the floating brand and notch. */
+.map-overlay-top {
+  top: calc(5rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 1024px) {
+  .map-card-top {
+    top: calc(5rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .map-card-bottom {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Keep the collapsed map attribution clear of the floating legal links. */
+.explore-map .maplibregl-ctrl-bottom-right,
+.explore-world-map .maplibregl-ctrl-bottom-right {
+  bottom: 3.25rem;
   right: 0.75rem;
 }
 
 @media (max-width: 1023.98px) {
+  /* The direct-route card sits above the legal links on small screens. */
   .explore-map .maplibregl-ctrl-bottom-right {
-    bottom: 16rem;
+    bottom: 20rem;
   }
 }
 
@@ -162,16 +232,6 @@ body {
 }
 .pb-safe-body {
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
-}
-
-/* Mobile web chrome only; the desktop rail keeps its own padding. */
-@media (max-width: 1023.98px) {
-  .pt-safe {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-  .pb-safe-nav {
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 /* Custom scrollbars */
@@ -279,7 +339,12 @@ body {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.045), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.045),
+    transparent
+  );
   animation: shimmer 1.5s infinite;
 }
 
@@ -323,7 +388,8 @@ progress {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner {
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show)
+  .maplibregl-ctrl-attrib-inner {
   display: none !important;
 }
 
@@ -342,7 +408,9 @@ progress {
   text-decoration: none;
 }
 
-.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a:hover {
+.maplibregl-ctrl-attrib.maplibregl-compact
+  .maplibregl-ctrl-attrib-inner
+  a:hover {
   text-decoration: underline;
 }
 
